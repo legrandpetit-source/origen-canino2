@@ -9,7 +9,9 @@ cmds = [
 
 [phases.build]
 cmds = [
-  'npm run build'
+  'npm run build',
+  'chmod 777 backend',
+  'chmod 666 backend/origen_database.sqlite'
 ]
 
 [start]

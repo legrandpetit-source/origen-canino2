@@ -176,27 +176,30 @@ class ContactMessage(BaseModel):
 # --- Endpoints Auth Admin ---
 @app.post("/api/admin/login")
 def login(request: LoginRequest):
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM admin_users WHERE email = ?", (request.email,))
-        user = cursor.fetchone()
-        if not user or not verify_password(request.password, user["password_hash"]):
-            raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
-        
-        session_id = str(uuid.uuid4())
-        code = str(random.randint(10000, 99999))
-        expires_at = (datetime.utcnow() + timedelta(minutes=5)).isoformat()
-        
-        cursor.execute("""
-            INSERT INTO admin_2fa_codes (email, session_id, code, expires_at)
-            VALUES (?, ?, ?, ?)
-        """, (request.email, session_id, code, expires_at))
-        conn.commit()
-        
-        msg = f"🔐 *Código de acceso admin Origen Canino*\n\nAlguien está intentando iniciar sesión.\nTu código es: {code}"
-        notify_telegram(msg)
-        
-        return {"requires_2fa": True, "session_id": session_id}
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM admin_users WHERE email = ?", (request.email,))
+            user = cursor.fetchone()
+            if not user or not verify_password(request.password, user["password_hash"]):
+                raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
+            
+            session_id = str(uuid.uuid4())
+            code = str(random.randint(10000, 99999))
+            expires_at = (datetime.utcnow() + timedelta(minutes=5)).isoformat()
+            
+            cursor.execute("""
+                INSERT INTO admin_2fa_codes (email, session_id, code, expires_at)
+                VALUES (?, ?, ?, ?)
+            """, (request.email, session_id, code, expires_at))
+            conn.commit()
+            
+            msg = f"🔐 *Código de acceso admin Origen Canino*\n\nAlguien está intentando iniciar sesión.\nTu código es: {code}"
+            notify_telegram(msg)
+            
+            return {"requires_2fa": True, "session_id": session_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
 @app.post("/api/admin/verify-2fa")
 def verify_2fa(request: Verify2FARequest):
