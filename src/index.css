@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary-green: 85 34% 28%;
+  --color-primary-green-light: 85 30% 45%;
+  --color-primary-green-dark: 85 38% 18%;
+  --color-secondary-brown: 24 38% 13%;
+  --color-secondary-brown-light: 24 25% 30%;
+  --color-bg-cream: 40 24% 96%;
+}
+
+@layer base {
+  body {
+    background-color: hsl(var(--color-bg-cream));
+    color: hsl(var(--color-secondary-brown));
+  }
+}
