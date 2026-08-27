@@ -22,6 +22,8 @@ from fastapi import Depends
 app = FastAPI(title="Origen Canino API")
 
 # Mount uploads directory
+# Asegurarnos de que el directorio de subidas exista
+os.makedirs("uploads", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Inicializar base de datos al arrancar
