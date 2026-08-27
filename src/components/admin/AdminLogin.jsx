@@ -84,16 +84,16 @@ const AdminLogin = ({ onLoginSuccess }) => {
           {step === 1 ? (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Correo Electrónico</label>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Correo Electrónico o Usuario</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                   <input 
-                    type="email" 
+                    type="text" 
                     required 
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full border rounded-lg py-2 pl-10 pr-3 focus:ring-2 focus:ring-primary-green outline-none"
-                    placeholder="admin@origencanino.cl"
+                    placeholder="admin o correo"
                   />
                 </div>
               </div>
