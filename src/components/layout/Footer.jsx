@@ -21,7 +21,6 @@ const Footer = () => {
           <h4 className="font-header text-lg mb-4">Enlaces Rápidos</h4>
           <ul className="space-y-2 font-sans text-sm opacity-80">
             <li><a href="/" className="hover:underline">Inicio</a></li>
-            <li><a href="/admin" className="hover:underline">Acceso Admin</a></li>
           </ul>
         </div>
       </div>
