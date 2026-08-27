@@ -1,6 +1,4 @@
-[providers]
-python = true
-node = true
+providers = ["python", "node"]
 
 [phases.setup]
 nixPkgs = ['nodejs', 'python312', 'gcc']
