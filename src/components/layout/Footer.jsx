@@ -6,7 +6,7 @@ const Footer = () => {
       <div className="container mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-8">
         <div>
           <h3 className="font-header text-2xl mb-4">Origen Canino</h3>
-          <p className="text-secondary-brown-light max-w-sm">
+          <p className="text-secondary-orange max-w-sm">
             Alimentación natural biológicamente apropiada. Hecho con amor en Chile para el bienestar integral de tu fiel compañero.
           </p>
         </div>
