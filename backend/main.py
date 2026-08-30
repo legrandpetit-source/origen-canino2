@@ -281,6 +281,16 @@ def update_product(product_id: int, p: ProductUpdate):
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error actualizando el producto.")
 
+@app.delete("/api/products/{product_id}", dependencies=[Depends(verify_admin)])
+def delete_product(product_id: int):
+    try:
+        with get_connection() as conn:
+            conn.execute("UPDATE products SET active = 0 WHERE id = ?", (product_id,))
+            conn.commit()
+        return {"success": True, "message": "Producto eliminado exitosamente"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error eliminando el producto.")
+
 # --- Endpoints Blog ---
 @app.get("/api/blog", response_model=List[BlogPostResponse])
 def get_blog_posts():
@@ -487,6 +497,20 @@ def update_order(order_id: int, update_data: OrderStatusUpdate, current_user: st
             return {"success": True, "message": "Orden actualizada"}
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error actualizando la orden.")
+
+@app.delete("/api/admin/orders/{order_id}")
+def delete_order(order_id: int, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            # Eliminar items de la orden primero por FK
+            cursor.execute("DELETE FROM order_items WHERE order_id = ?", (order_id,))
+            # Eliminar la orden
+            cursor.execute("DELETE FROM orders WHERE id = ?", (order_id,))
+            conn.commit()
+            return {"success": True, "message": "Orden eliminada exitosamente"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error eliminando la orden.")
 
 # --- Testimonials Endpoints ---
 @app.get("/api/testimonials")

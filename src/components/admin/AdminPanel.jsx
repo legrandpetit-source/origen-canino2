@@ -83,6 +83,21 @@ const AdminPanel = () => {
     }
   };
 
+  const handleDeleteProduct = async (id) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar este producto?')) return;
+    try {
+      const res = await fetchWithAuth(`/api/products/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchData();
+        alert('Producto eliminado exitosamente');
+      } else {
+        alert('Error al eliminar el producto');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // --- Orders Logic ---
   const handleUpdateOrderStatus = async (orderId, updates) => {
     try {
@@ -92,6 +107,21 @@ const AdminPanel = () => {
         body: JSON.stringify(updates)
       });
       if (res.ok) fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteOrder = async (orderId) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar este pedido permanentemente? Esta acción no se puede deshacer.')) return;
+    try {
+      const res = await fetchWithAuth(`/api/admin/orders/${orderId}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchData();
+        alert('Pedido eliminado exitosamente');
+      } else {
+        alert('Error al eliminar el pedido');
+      }
     } catch (err) {
       console.error(err);
     }
@@ -288,15 +318,24 @@ const AdminPanel = () => {
                           </div>
                         </div>
                         
-                        <button 
-                          onClick={() => {
-                            const msg = encodeURIComponent(`Hola ${order.customer_name},\n\nTe escribimos de Origen Canino 🐶. Te queríamos avisar que tu pedido #${order.id} se encuentra en estado: *${order.delivery_status}*.\n\n¡Gracias por tu compra!`);
-                            window.open(`https://wa.me/${order.customer_phone.replace(/\+/g, '').replace(/ /g, '')}?text=${msg}`, '_blank');
-                          }}
-                          className="bg-green-500 text-white px-4 py-2 rounded font-bold text-sm hover:bg-green-600 transition flex gap-2 items-center"
-                        >
-                          Avisar por WhatsApp
-                        </button>
+                        <div className="flex gap-2 items-center shrink-0">
+                          <button 
+                            onClick={() => {
+                              const msg = encodeURIComponent(`Hola ${order.customer_name},\n\nTe escribimos de Origen Canino 🐶. Te queríamos avisar que tu pedido #${order.id} se encuentra en estado: *${order.delivery_status}*.\n\n¡Gracias por tu compra!`);
+                              window.open(`https://wa.me/${order.customer_phone.replace(/\+/g, '').replace(/ /g, '')}?text=${msg}`, '_blank');
+                            }}
+                            className="bg-green-500 text-white px-4 py-2 rounded font-bold text-sm hover:bg-green-600 transition flex gap-2 items-center"
+                          >
+                            Avisar por WhatsApp
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteOrder(order.id)}
+                            className="bg-red-50 text-red-600 p-2 rounded hover:bg-red-100 transition"
+                            title="Eliminar pedido"
+                          >
+                            <Trash2 size={20} />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="text-sm border-t pt-2 mt-2">
@@ -326,12 +365,20 @@ const AdminPanel = () => {
                           <p className="text-sm text-gray-500">Precio: ${product.price.toLocaleString('es-CL')} | Peso: {product.weight} | Tipo: {product.type}</p>
                         </div>
                       </div>
-                      <button 
-                        onClick={() => setEditingProduct(product)}
-                        className="flex items-center justify-center gap-2 text-primary-green bg-green-50 px-5 py-2 rounded-lg font-semibold hover:bg-green-100 transition"
-                      >
-                        <Edit2 size={16} /> Editar
-                      </button>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => setEditingProduct(product)}
+                          className="flex items-center justify-center gap-2 text-primary-green bg-green-50 px-5 py-2 rounded-lg font-semibold hover:bg-green-100 transition"
+                        >
+                          <Edit2 size={16} /> Editar
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteProduct(product.id)}
+                          className="flex items-center justify-center gap-2 text-red-600 bg-red-50 px-4 py-2 rounded-lg font-semibold hover:bg-red-100 transition"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
