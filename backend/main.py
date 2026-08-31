@@ -50,6 +50,7 @@ class ProductResponse(BaseModel):
     benefits: List[str]
     image: str
     isNew: bool
+    fixed_cost: int = 0
 
 class ProductUpdate(BaseModel):
     name: str
@@ -59,6 +60,32 @@ class ProductUpdate(BaseModel):
     ingredients: List[str]
     benefits: List[str]
     isNew: bool
+    fixed_cost: int = 0
+
+class IngredientResponse(BaseModel):
+    id: int
+    name: str
+    cost_per_unit: int
+    unit: str
+
+class IngredientCreateUpdate(BaseModel):
+    name: str
+    cost_per_unit: int
+    unit: str
+    kcal_per_100g: Optional[float] = 0
+    protein_g: Optional[float] = 0
+    fat_g: Optional[float] = 0
+    fiber_g: Optional[float] = 0
+    moisture_g: Optional[float] = 0
+    ash_g: Optional[float] = 0
+    carbs_g: Optional[float] = 0
+
+class RecipeItem(BaseModel):
+    ingredient_id: int
+    quantity: float
+
+class RecipeUpdate(BaseModel):
+    items: List[RecipeItem]
 
 class BlogPostResponse(BaseModel):
     id: int
@@ -184,7 +211,7 @@ def login(request: LoginRequest):
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM admin_users WHERE email = ?", (request.email,))
+            cursor.execute("SELECT * FROM admin_users WHERE email = %s", (request.email,))
             user = cursor.fetchone()
             if not user or not verify_password(request.password, user["password_hash"]):
                 raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
@@ -195,7 +222,7 @@ def login(request: LoginRequest):
             
             cursor.execute("""
                 INSERT INTO admin_2fa_codes (email, session_id, code, expires_at)
-                VALUES (?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s)
             """, (request.email, session_id, code, expires_at))
             conn.commit()
             
@@ -212,7 +239,7 @@ def verify_2fa(request: Verify2FARequest):
         cursor = conn.cursor()
         cursor.execute("""
             SELECT * FROM admin_2fa_codes 
-            WHERE session_id = ? AND code = ?
+            WHERE session_id = %s AND code = %s
         """, (request.session_id, request.code))
         
         row = cursor.fetchone()
@@ -223,7 +250,7 @@ def verify_2fa(request: Verify2FARequest):
         if datetime.utcnow() > expires_at:
             raise HTTPException(status_code=401, detail="Código expirado")
             
-        cursor.execute("DELETE FROM admin_2fa_codes WHERE session_id = ?", (request.session_id,))
+        cursor.execute("DELETE FROM admin_2fa_codes WHERE session_id = %s", (request.session_id,))
         conn.commit()
         
         access_token = create_access_token(data={"sub": row["email"]})
@@ -233,14 +260,14 @@ def verify_2fa(request: Verify2FARequest):
 def change_password(request: ChangePasswordRequest, current_user: str = Depends(get_current_admin)):
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM admin_users WHERE email = ?", (current_user,))
+        cursor.execute("SELECT * FROM admin_users WHERE email = %s", (current_user,))
         user = cursor.fetchone()
         
         if not verify_password(request.old_password, user["password_hash"]):
             raise HTTPException(status_code=400, detail="Contraseña actual incorrecta")
             
         new_hash = get_password_hash(request.new_password)
-        cursor.execute("UPDATE admin_users SET password_hash = ? WHERE email = ?", (new_hash, current_user))
+        cursor.execute("UPDATE admin_users SET password_hash = %s WHERE email = %s", (new_hash, current_user))
         conn.commit()
         return {"success": True, "message": "Contraseña actualizada"}
 
@@ -248,7 +275,8 @@ def change_password(request: ChangePasswordRequest, current_user: str = Depends(
 @app.get("/api/products", response_model=List[ProductResponse])
 def get_products():
     with get_connection() as conn:
-        cursor = conn.execute("SELECT * FROM products WHERE active = 1 ORDER BY id ASC")
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM products WHERE active = 1 ORDER BY id ASC")
         rows = cursor.fetchall()
         
         products = []
@@ -263,29 +291,123 @@ def get_products():
                 ingredients=json.loads(row["ingredients"]),
                 benefits=json.loads(row["benefits"]),
                 image=row["image"],
-                isNew=bool(row["is_new"])
+                isNew=bool(row["is_new"]),
+                fixed_cost=row.get("fixed_cost", 0)
             ))
         return products
 
 @app.put("/api/products/{product_id}")
-def update_product(product_id: int, p: ProductUpdate):
+def update_product(product_id: int, p: ProductUpdate, current_user: str = Depends(get_current_admin)):
     try:
         with get_connection() as conn:
-            conn.execute("""
+            conn.cursor().execute("""
                 UPDATE products 
-                SET name = ?, price = ?, weight = ?, description = ?, ingredients = ?, benefits = ?, is_new = ?
-                WHERE id = ?
-            """, (p.name, p.price, p.weight, p.description, json.dumps(p.ingredients), json.dumps(p.benefits), int(p.isNew), product_id))
+                SET name = %s, price = %s, weight = %s, description = %s, ingredients = %s, benefits = %s, is_new = %s, fixed_cost = %s
+                WHERE id = %s
+            """, (p.name, p.price, p.weight, p.description, json.dumps(p.ingredients), json.dumps(p.benefits), int(p.isNew), p.fixed_cost, product_id))
             conn.commit()
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error actualizando el producto.")
 
+# --- Endpoints Ingredientes (Inventario) ---
+@app.get("/api/admin/ingredients", response_model=List[IngredientResponse])
+def get_ingredients(current_user: str = Depends(get_current_admin)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM ingredients ORDER BY name ASC")
+        return [dict(r) for r in cursor.fetchall()]
+
+@app.post("/api/admin/ingredients")
+def create_ingredient(i: IngredientCreateUpdate, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO ingredients (
+                    name, cost_per_unit, unit, 
+                    kcal_per_100g, protein_g, fat_g, fiber_g, moisture_g, ash_g, carbs_g
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+            """, (
+                i.name, i.cost_per_unit, i.unit,
+                i.kcal_per_100g, i.protein_g, i.fat_g, i.fiber_g, i.moisture_g, i.ash_g, i.carbs_g
+            ))
+            conn.commit()
+            return {"success": True, "id": cursor.fetchone()["id"]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error creando ingrediente")
+
+@app.put("/api/admin/ingredients/{ingredient_id}")
+def update_ingredient(ingredient_id: int, i: IngredientCreateUpdate, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE ingredients 
+                SET name = %s, cost_per_unit = %s, unit = %s,
+                    kcal_per_100g = %s, protein_g = %s, fat_g = %s, fiber_g = %s, moisture_g = %s, ash_g = %s, carbs_g = %s
+                WHERE id = %s
+            """, (
+                i.name, i.cost_per_unit, i.unit,
+                i.kcal_per_100g, i.protein_g, i.fat_g, i.fiber_g, i.moisture_g, i.ash_g, i.carbs_g,
+                ingredient_id
+            ))
+            conn.commit()
+            return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error actualizando ingrediente")
+
+@app.delete("/api/admin/ingredients/{ingredient_id}")
+def delete_ingredient(ingredient_id: int, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM ingredients WHERE id = %s", (ingredient_id,))
+            conn.commit()
+            return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error eliminando ingrediente")
+
+# --- Endpoints Recetas ---
+@app.get("/api/admin/products/{product_id}/recipe")
+def get_recipe(product_id: int, current_user: str = Depends(get_current_admin)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT pi.ingredient_id, pi.quantity, i.name, i.cost_per_unit, i.unit 
+            FROM product_ingredients pi
+            JOIN ingredients i ON pi.ingredient_id = i.id
+            WHERE pi.product_id = %s
+        """, (product_id,))
+        return [dict(r) for r in cursor.fetchall()]
+
+@app.put("/api/admin/products/{product_id}/recipe")
+def update_recipe(product_id: int, r: RecipeUpdate, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            # Eliminar la receta anterior
+            cursor.execute("DELETE FROM product_ingredients WHERE product_id = %s", (product_id,))
+            
+            # Insertar la nueva receta
+            for item in r.items:
+                cursor.execute("""
+                    INSERT INTO product_ingredients (product_id, ingredient_id, quantity)
+                    VALUES (%s, %s, %s)
+                """, (product_id, item.ingredient_id, item.quantity))
+            
+            conn.commit()
+            return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error actualizando receta")
+
 @app.delete("/api/products/{product_id}")
 def delete_product(product_id: int, current_user: str = Depends(get_current_admin)):
     try:
         with get_connection() as conn:
-            conn.execute("UPDATE products SET active = 0 WHERE id = ?", (product_id,))
+            cursor = conn.cursor()
+            cursor.execute("UPDATE products SET active = 0 WHERE id = %s", (product_id,))
             conn.commit()
         return {"success": True, "message": "Producto eliminado exitosamente"}
     except Exception as e:
@@ -295,7 +417,8 @@ def delete_product(product_id: int, current_user: str = Depends(get_current_admi
 @app.get("/api/blog", response_model=List[BlogPostResponse])
 def get_blog_posts():
     with get_connection() as conn:
-        cursor = conn.execute("SELECT * FROM blog_posts WHERE active = 1 ORDER BY created_at DESC")
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM blog_posts WHERE active = 1 ORDER BY created_at DESC")
         rows = cursor.fetchall()
         return [BlogPostResponse(
             id=row["id"],
@@ -310,7 +433,8 @@ def get_blog_posts():
 @app.get("/api/blog/{slug}", response_model=BlogPostResponse)
 def get_blog_post_by_slug(slug: str):
     with get_connection() as conn:
-        cursor = conn.execute("SELECT * FROM blog_posts WHERE slug = ? AND active = 1", (slug,))
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM blog_posts WHERE slug = %s AND active = 1", (slug,))
         row = cursor.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Artículo no encontrado")
@@ -328,9 +452,9 @@ def get_blog_post_by_slug(slug: str):
 def create_blog_post(p: BlogPostCreateUpdate):
     try:
         with get_connection() as conn:
-            conn.execute("""
+            conn.cursor().execute("""
                 INSERT INTO blog_posts (slug, title, excerpt, content, image)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
             """, (p.slug, p.title, p.excerpt, p.content, p.image))
             conn.commit()
         return {"success": True}
@@ -341,10 +465,10 @@ def create_blog_post(p: BlogPostCreateUpdate):
 def update_blog_post(post_id: int, p: BlogPostCreateUpdate):
     try:
         with get_connection() as conn:
-            conn.execute("""
+            conn.cursor().execute("""
                 UPDATE blog_posts 
-                SET slug = ?, title = ?, excerpt = ?, content = ?, image = ?
-                WHERE id = ?
+                SET slug = %s, title = %s, excerpt = %s, content = %s, image = %s
+                WHERE id = %s
             """, (p.slug, p.title, p.excerpt, p.content, p.image, post_id))
             conn.commit()
         return {"success": True}
@@ -355,7 +479,8 @@ def update_blog_post(post_id: int, p: BlogPostCreateUpdate):
 def delete_blog_post(post_id: int):
     try:
         with get_connection() as conn:
-            conn.execute("UPDATE blog_posts SET active = 0 WHERE id = ?", (post_id,))
+            cursor = conn.cursor()
+            cursor.execute("UPDATE blog_posts SET active = 0 WHERE id = %s", (post_id,))
             conn.commit()
         return {"success": True}
     except Exception as e:
@@ -367,10 +492,11 @@ from fastapi.responses import Response
 def generate_sitemap():
     # Obtener todos los blogs para el sitemap
     with get_connection() as conn:
-        cursor = conn.execute("SELECT slug FROM blog_posts WHERE active = 1")
+        cursor = conn.cursor()
+        cursor.execute("SELECT slug FROM blog_posts WHERE active = 1")
         rows = cursor.fetchall()
         
-    xml_content = '<?xml version="1.0" encoding="UTF-8"?>\\n'
+    xml_content = '<?xml version="1.0" encoding="UTF-8"%s>\\n'
     xml_content += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\\n'
     
     base_url = "https://origencanino.cl"
@@ -392,8 +518,8 @@ def generate_sitemap():
 def submit_contact(msg: ContactMessage):
     try:
         with get_connection() as conn:
-            conn.execute(
-                "INSERT INTO contact_messages (name, email, phone, message) VALUES (?, ?, ?, ?)",
+            conn.cursor().execute(
+                "INSERT INTO contact_messages (name, email, phone, message) VALUES (%s, %s, %s, %s)",
                 (msg.name, msg.email, msg.phone, msg.message)
             )
             conn.commit()
@@ -419,15 +545,15 @@ def create_order(order: OrderCreate):
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO orders (customer_name, customer_email, customer_phone, customer_address, customer_city, customer_region, subtotal, shipping_cost, total, is_subscription)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
             """, (order.customer_name, order.customer_email, order.customer_phone, order.customer_address, order.customer_city, order.customer_region, subtotal, shipping_cost, total, int(order.is_subscription)))
             
-            order_id = cursor.lastrowid
+            order_id = cursor.fetchone()['id']
             
             for item in order.items:
                 cursor.execute("""
                     INSERT INTO order_items (order_id, product_id, product_name, quantity, price_at_purchase)
-                    VALUES (?, ?, ?, ?, ?)
+                    VALUES (%s, %s, %s, %s, %s)
                 """, (order_id, item.id, item.name, item.quantity, item.price))
             
             conn.commit()
@@ -464,7 +590,7 @@ def get_orders(current_user: str = Depends(get_current_admin)):
             orders = []
             for row in orders_rows:
                 order_dict = dict(row)
-                cursor.execute("SELECT * FROM order_items WHERE order_id = ?", (order_dict["id"],))
+                cursor.execute("SELECT * FROM order_items WHERE order_id = %s", (order_dict["id"],))
                 order_dict["items"] = [dict(item) for item in cursor.fetchall()]
                 orders.append(order_dict)
                 
@@ -481,17 +607,17 @@ def update_order(order_id: int, update_data: OrderStatusUpdate, current_user: st
             updates = []
             params = []
             if update_data.payment_status is not None:
-                updates.append("payment_status = ?")
+                updates.append("payment_status = %s")
                 params.append(update_data.payment_status)
             if update_data.delivery_status is not None:
-                updates.append("delivery_status = ?")
+                updates.append("delivery_status = %s")
                 params.append(update_data.delivery_status)
                 
             if not updates:
                 return {"success": True, "message": "Nada que actualizar"}
                 
             params.append(order_id)
-            query = f"UPDATE orders SET {', '.join(updates)} WHERE id = ?"
+            query = f"UPDATE orders SET {', '.join(updates)} WHERE id = %s"
             cursor.execute(query, tuple(params))
             conn.commit()
             return {"success": True, "message": "Orden actualizada"}
@@ -504,9 +630,9 @@ def delete_order(order_id: int, current_user: str = Depends(get_current_admin)):
         with get_connection() as conn:
             cursor = conn.cursor()
             # Eliminar items de la orden primero por FK
-            cursor.execute("DELETE FROM order_items WHERE order_id = ?", (order_id,))
+            cursor.execute("DELETE FROM order_items WHERE order_id = %s", (order_id,))
             # Eliminar la orden
-            cursor.execute("DELETE FROM orders WHERE id = ?", (order_id,))
+            cursor.execute("DELETE FROM orders WHERE id = %s", (order_id,))
             conn.commit()
             return {"success": True, "message": "Orden eliminada exitosamente"}
     except Exception as e:
@@ -568,7 +694,7 @@ def create_testimonial(
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO testimonials (owner_name, dog_name, content, rating, status, image_path)
-                VALUES (?, ?, ?, ?, 'pending', ?)
+                VALUES (%s, %s, %s, %s, 'pending', %s)
             """, (owner_name, dog_name, content, rating, image_path))
             conn.commit()
             
@@ -607,7 +733,7 @@ def update_testimonial_status(t_id: int, update: TestimonialStatusUpdate, curren
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("UPDATE testimonials SET status = ? WHERE id = ?", (update.status, t_id))
+            cursor.execute("UPDATE testimonials SET status = %s WHERE id = %s", (update.status, t_id))
             conn.commit()
             return {"success": True, "message": "Estado actualizado"}
     except Exception as e:
@@ -631,3 +757,146 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+
+@app.get("/api/admin/finance/report")
+def get_finance_report(month: int, year: int, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Fetch all paid orders for the month
+            cursor.execute("""
+                SELECT id, total, shipping_cost, created_at 
+                FROM orders 
+                WHERE payment_status = 'Pagado' 
+                  AND EXTRACT(MONTH FROM created_at) = %s 
+                  AND EXTRACT(YEAR FROM created_at) = %s
+            """, (month, year))
+            orders_rows = cursor.fetchall()
+            
+            total_sales = sum(r['total'] for r in orders_rows)
+            total_shipping = sum(r['shipping_cost'] for r in orders_rows)
+            
+            # Calculate total production cost
+            # We need to sum up (product_quantity * (fixed_cost + ingredients_cost))
+            cursor.execute("""
+                SELECT 
+                    oi.quantity, 
+                    p.fixed_cost,
+                    COALESCE((
+                        SELECT SUM(pi.quantity * i.cost_per_unit)
+                        FROM product_ingredients pi
+                        JOIN ingredients i ON pi.ingredient_id = i.id
+                        WHERE pi.product_id = p.id
+                    ), 0) as recipe_cost
+                FROM order_items oi
+                JOIN orders o ON oi.order_id = o.id
+                JOIN products p ON oi.product_id = p.id
+                WHERE o.payment_status = 'Pagado'
+                  AND EXTRACT(MONTH FROM o.created_at) = %s 
+                  AND EXTRACT(YEAR FROM o.created_at) = %s
+            """, (month, year))
+            items_rows = cursor.fetchall()
+            
+            total_production_cost = 0
+            for item in items_rows:
+                qty = item['quantity']
+                fixed = item['fixed_cost'] or 0
+                recipe = item['recipe_cost'] or 0
+                total_production_cost += qty * (fixed + recipe)
+                
+            return {
+                "total_sales": total_sales,
+                "total_shipping": total_shipping,
+                "total_production_cost": total_production_cost,
+                "net_profit": (total_sales - total_shipping) - total_production_cost,
+                "orders_count": len(orders_rows)
+            }
+    except Exception as e:
+        print(f"Error generating finance report: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/admin/products/{product_id}/nutrition")
+def get_product_nutrition(product_id: int, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Fetch the recipe
+            cursor.execute("""
+                SELECT 
+                    pi.quantity,
+                    i.name,
+                    i.unit,
+                    i.kcal_per_100g,
+                    i.protein_g,
+                    i.fat_g,
+                    i.fiber_g,
+                    i.moisture_g,
+                    i.ash_g,
+                    i.carbs_g
+                FROM product_ingredients pi
+                JOIN ingredients i ON pi.ingredient_id = i.id
+                WHERE pi.product_id = %s
+            """, (product_id,))
+            
+            items = cursor.fetchall()
+            
+            total_weight_g = 0
+            totals = {
+                "kcal": 0, "protein": 0, "fat": 0, "fiber": 0, "moisture": 0, "ash": 0, "carbs": 0
+            }
+            
+            for item in items:
+                # Convert quantity to grams based on unit
+                qty_in_g = 0
+                if item["unit"] == "kg" or item["unit"] == "litro":
+                    qty_in_g = item["quantity"] * 1000
+                elif item["unit"] == "g" or item["unit"] == "ml":
+                    qty_in_g = item["quantity"]
+                else:
+                    # Fallback for 'unidad' or unknown
+                    qty_in_g = item["quantity"] * 100 # Wild guess, but better to avoid 'unidad' for nutrition
+                    
+                total_weight_g += qty_in_g
+                
+                # multiplier based on per 100g
+                mult = qty_in_g / 100.0
+                
+                totals["kcal"] += (item["kcal_per_100g"] or 0) * mult
+                totals["protein"] += (item["protein_g"] or 0) * mult
+                totals["fat"] += (item["fat_g"] or 0) * mult
+                totals["fiber"] += (item["fiber_g"] or 0) * mult
+                totals["moisture"] += (item["moisture_g"] or 0) * mult
+                totals["ash"] += (item["ash_g"] or 0) * mult
+                totals["carbs"] += (item["carbs_g"] or 0) * mult
+                
+            # If total_weight_g is 0, return 0s to avoid division by zero
+            if total_weight_g == 0:
+                return {
+                    "total_weight_g": 0,
+                    "totals": totals,
+                    "per_100g": totals
+                }
+                
+            # Calculate per 100g of the FINAL product
+            per_100g_mult = 100.0 / total_weight_g
+            per_100g = {
+                "kcal": totals["kcal"] * per_100g_mult,
+                "protein": totals["protein"] * per_100g_mult,
+                "fat": totals["fat"] * per_100g_mult,
+                "fiber": totals["fiber"] * per_100g_mult,
+                "moisture": totals["moisture"] * per_100g_mult,
+                "ash": totals["ash"] * per_100g_mult,
+                "carbs": totals["carbs"] * per_100g_mult,
+            }
+            
+            return {
+                "total_weight_g": total_weight_g,
+                "totals": totals,
+                "per_100g": per_100g
+            }
+            
+    except Exception as e:
+        print(f"Error calculating nutrition: {e}")
+        raise HTTPException(status_code=500, detail="Error calculando nutricion")

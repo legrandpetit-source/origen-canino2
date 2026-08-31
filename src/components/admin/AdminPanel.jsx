@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Package, BookOpen, Edit2, Plus, Trash2, X, Save, ShoppingCart, MessageSquareHeart, Check, XCircle, LogOut, Key } from 'lucide-react';
+import { Package, BookOpen, Edit2, Plus, Trash2, X, Save, ShoppingCart, MessageSquareHeart, Check, XCircle, LogOut, Key, ChefHat } from 'lucide-react';
 import AdminLogin from './AdminLogin';
+import IngredientsManager from './IngredientsManager';
+import ProductRecipeManager from './ProductRecipeManager';
+import DispatchManager from './DispatchManager';
+import FinanceManager from './FinanceManager';
+import RetentionManager from './RetentionManager';
 
 const AdminPanel = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_token'));
@@ -9,10 +14,12 @@ const AdminPanel = () => {
   const [products, setProducts] = useState([]);
   const [blogPosts, setBlogPosts] = useState([]);
   const [testimonials, setTestimonials] = useState([]);
+  const [ingredients, setIngredients] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Modals state
   const [editingProduct, setEditingProduct] = useState(null);
+  const [recipeProduct, setRecipeProduct] = useState(null);
   const [editingPost, setEditingPost] = useState(null);
   const [isAddingPost, setIsAddingPost] = useState(false);
 
@@ -40,21 +47,24 @@ const AdminPanel = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [prodRes, blogRes, orderRes, testRes] = await Promise.all([
+      const [prodRes, blogRes, orderRes, testRes, ingRes] = await Promise.all([
         fetch(`/api/products`), // public
         fetch(`/api/blog`), // public
         fetchWithAuth(`/api/admin/orders`),
-        fetchWithAuth(`/api/admin/testimonials`)
+        fetchWithAuth(`/api/admin/testimonials`),
+        fetchWithAuth(`/api/admin/ingredients`)
       ]);
       const prodData = await prodRes.json();
       const blogData = await blogRes.json();
       const orderData = await orderRes.json();
       const testData = await testRes.json();
+      const ingData = await ingRes.json();
       
       setProducts(prodData);
       setBlogPosts(blogData);
       setOrders(orderData);
       setTestimonials(testData);
+      setIngredients(ingData);
     } catch (err) {
       console.error('Error fetching admin data:', err);
     } finally {
@@ -246,6 +256,12 @@ const AdminPanel = () => {
               <Package size={20} /> Productos
             </button>
             <button 
+              onClick={() => setActiveTab('ingredients')}
+              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition ${activeTab === 'ingredients' ? 'bg-white text-primary-green-dark' : 'bg-white/10 hover:bg-white/20'}`}
+            >
+              <ChefHat size={20} /> Ingredientes
+            </button>
+            <button 
               onClick={() => setActiveTab('blog')}
               className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition ${activeTab === 'blog' ? 'bg-white text-primary-green-dark' : 'bg-white/10 hover:bg-white/20'}`}
             >
@@ -256,6 +272,18 @@ const AdminPanel = () => {
               className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition ${activeTab === 'testimonials' ? 'bg-white text-primary-green-dark' : 'bg-white/10 hover:bg-white/20'}`}
             >
               <MessageSquareHeart size={20} /> Testimonios
+            </button>
+            <button 
+              onClick={() => setActiveTab('finance')}
+              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition ${activeTab === 'finance' ? 'bg-white text-primary-green-dark' : 'bg-white/10 hover:bg-white/20'}`}
+            >
+              <BarChart size={20} /> Finanzas
+            </button>
+            <button 
+              onClick={() => setActiveTab('retention')}
+              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition ${activeTab === 'retention' ? 'bg-white text-primary-green-dark' : 'bg-white/10 hover:bg-white/20'}`}
+            >
+              <MessageSquareHeart size={20} /> Retención
             </button>
             <button 
               onClick={() => setActiveTab('settings')}
@@ -271,85 +299,20 @@ const AdminPanel = () => {
             <div className="text-center py-10 text-gray-500">Cargando datos...</div>
           ) : (
             <>
+              {activeTab === 'ingredients' && (
+                <IngredientsManager 
+                  ingredients={ingredients} 
+                  fetchIngredients={fetchData} 
+                  fetchWithAuth={fetchWithAuth} 
+                />
+              )}
               {/* --- ORDERS TAB --- */}
               {activeTab === 'orders' && (
-                <div className="space-y-4">
-                  <h3 className="font-header text-2xl text-secondary-brown mb-4">Pedidos Recientes ({orders.length})</h3>
-                  {orders.map((order) => (
-                    <div key={order.id} className="p-4 border border-gray-200 rounded-xl bg-gray-50/50 flex flex-col gap-4">
-                      <div className="flex justify-between items-start border-b pb-4">
-                        <div>
-                          <h4 className="font-bold text-lg text-primary-green-dark">Orden #{order.id}</h4>
-                          <p className="text-sm font-semibold">{order.customer_name}</p>
-                          <p className="text-xs text-gray-500">{order.customer_email} | {order.customer_phone}</p>
-                          <p className="text-xs text-gray-500 mt-1">{order.customer_address}, {order.customer_city}, {order.customer_region}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold text-xl">${order.total.toLocaleString('es-CL')}</p>
-                          <p className="text-xs text-gray-500">Envío: ${order.shipping_cost}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-between items-center bg-white p-3 rounded-lg border">
-                        <div className="flex gap-4 items-center text-sm">
-                          <div>
-                            <span className="font-semibold block text-xs text-gray-500">Pago</span>
-                            <select 
-                              value={order.payment_status}
-                              onChange={(e) => handleUpdateOrderStatus(order.id, { payment_status: e.target.value })}
-                              className="border rounded p-1 text-xs"
-                            >
-                              <option value="Pendiente">Pendiente</option>
-                              <option value="Pagado">Pagado</option>
-                              <option value="Cancelado">Cancelado</option>
-                            </select>
-                          </div>
-                          <div>
-                            <span className="font-semibold block text-xs text-gray-500">Despacho</span>
-                            <select 
-                              value={order.delivery_status}
-                              onChange={(e) => handleUpdateOrderStatus(order.id, { delivery_status: e.target.value })}
-                              className="border rounded p-1 text-xs"
-                            >
-                              <option value="Preparación">Preparación</option>
-                              <option value="Listo para despacho">Listo para despacho</option>
-                              <option value="Entregado">Entregado</option>
-                            </select>
-                          </div>
-                        </div>
-                        
-                        <div className="flex gap-2 items-center shrink-0">
-                          <button 
-                            onClick={() => {
-                              const msg = encodeURIComponent(`Hola ${order.customer_name},\n\nTe escribimos de Origen Canino 🐶. Te queríamos avisar que tu pedido #${order.id} se encuentra en estado: *${order.delivery_status}*.\n\n¡Gracias por tu compra!`);
-                              window.open(`https://wa.me/${order.customer_phone.replace(/\+/g, '').replace(/ /g, '')}?text=${msg}`, '_blank');
-                            }}
-                            className="bg-green-500 text-white px-4 py-2 rounded font-bold text-sm hover:bg-green-600 transition flex gap-2 items-center"
-                          >
-                            Avisar por WhatsApp
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteOrder(order.id)}
-                            className="bg-red-50 text-red-600 p-2 rounded hover:bg-red-100 transition"
-                            title="Eliminar pedido"
-                          >
-                            <Trash2 size={20} />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="text-sm border-t pt-2 mt-2">
-                        <p className="font-bold text-gray-700 mb-1">Productos:</p>
-                        <ul className="list-disc list-inside text-gray-600">
-                          {order.items?.map(item => (
-                            <li key={item.id}>{item.quantity}x {item.product_name} (${(item.price_at_purchase * item.quantity).toLocaleString('es-CL')})</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  ))}
-                  {orders.length === 0 && <p className="text-center text-gray-500 py-8">Aún no hay pedidos.</p>}
-                </div>
+                <DispatchManager 
+                  orders={orders} 
+                  handleUpdateOrderStatus={handleUpdateOrderStatus} 
+                  handleDeleteOrder={handleDeleteOrder} 
+                />
               )}
 
               {/* --- PRODUCTS TAB --- */}
@@ -371,6 +334,13 @@ const AdminPanel = () => {
                           className="flex items-center justify-center gap-2 text-primary-green bg-green-50 px-5 py-2 rounded-lg font-semibold hover:bg-green-100 transition"
                         >
                           <Edit2 size={16} /> Editar
+                        </button>
+                        <button 
+                          onClick={() => setRecipeProduct(product)}
+                          className="flex items-center justify-center gap-2 text-orange-600 bg-orange-50 px-4 py-2 rounded-lg font-semibold hover:bg-orange-100 transition"
+                          title="Receta y Costos"
+                        >
+                          <ChefHat size={16} /> Receta
                         </button>
                         <button 
                           onClick={() => handleDeleteProduct(product.id)}
@@ -478,6 +448,16 @@ const AdminPanel = () => {
                 </div>
               )}
 
+              {/* --- FINANCE TAB --- */}
+              {activeTab === 'finance' && (
+                <FinanceManager fetchWithAuth={fetchWithAuth} />
+              )}
+
+              {/* --- RETENTION TAB --- */}
+              {activeTab === 'retention' && (
+                <RetentionManager orders={orders} products={products} />
+              )}
+
               {/* --- SETTINGS TAB --- */}
               {activeTab === 'settings' && (
                 <div className="space-y-4 max-w-lg mx-auto">
@@ -516,6 +496,19 @@ const AdminPanel = () => {
           )}
         </div>
       </div>
+
+      {/* --- MODAL: RECIPE --- */}
+      {recipeProduct && (
+        <ProductRecipeManager 
+          product={recipeProduct} 
+          ingredients={ingredients} 
+          fetchWithAuth={fetchWithAuth} 
+          onClose={() => {
+            setRecipeProduct(null);
+            fetchData(); // Refrescar los productos (incluyendo fixed_cost)
+          }} 
+        />
+      )}
 
       {/* --- MODAL: EDIT PRODUCT --- */}
       {editingProduct && (

@@ -5,3 +5,5 @@ Pillow
 python-multipart
 PyJWT
 bcrypt
+psycopg2-binary
+python-dotenv
