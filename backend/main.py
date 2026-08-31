@@ -281,8 +281,8 @@ def update_product(product_id: int, p: ProductUpdate):
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error actualizando el producto.")
 
-@app.delete("/api/products/{product_id}", dependencies=[Depends(verify_admin)])
-def delete_product(product_id: int):
+@app.delete("/api/products/{product_id}")
+def delete_product(product_id: int, current_user: str = Depends(get_current_admin)):
     try:
         with get_connection() as conn:
             conn.execute("UPDATE products SET active = 0 WHERE id = ?", (product_id,))
