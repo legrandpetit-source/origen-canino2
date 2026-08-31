@@ -1,5 +1,6 @@
 import os
 import json
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, Form, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -18,6 +19,14 @@ import bcrypt
 import jwt
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import Depends
+import google.generativeai as genai
+
+load_dotenv()
+
+# Configurar Gemini API si la llave está presente
+gemini_api_key = os.getenv("GEMINI_API_KEY")
+if gemini_api_key:
+    genai.configure(api_key=gemini_api_key)
 
 app = FastAPI(title="Origen Canino API")
 
@@ -79,6 +88,9 @@ class IngredientCreateUpdate(BaseModel):
     moisture_g: Optional[float] = 0
     ash_g: Optional[float] = 0
     carbs_g: Optional[float] = 0
+
+class EstimateNutritionRequest(BaseModel):
+    ingredient_name: str
 
 class RecipeItem(BaseModel):
     ingredient_id: int
@@ -371,6 +383,41 @@ def delete_ingredient(ingredient_id: int, current_user: str = Depends(get_curren
             return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error eliminando ingrediente")
+
+@app.post("/api/ingredients/estimate-nutrition")
+def estimate_nutrition(req: EstimateNutritionRequest, current_user: str = Depends(get_current_admin)):
+    if not gemini_api_key:
+        raise HTTPException(status_code=500, detail="Gemini API Key no configurada en el servidor.")
+    
+    prompt = f"""
+    Eres un experto en nutrición animal y de ingredientes. Estima los valores nutricionales promedio por cada 100g para el ingrediente: "{req.ingredient_name}".
+    Debes devolver ÚNICAMENTE un objeto JSON válido con la siguiente estructura (usa números flotantes sin unidades, 0 si no aplica o es mínimo):
+    {{
+      "kcal_per_100g": 0.0,
+      "protein_g": 0.0,
+      "fat_g": 0.0,
+      "fiber_g": 0.0,
+      "moisture_g": 0.0,
+      "ash_g": 0.0,
+      "carbs_g": 0.0
+    }}
+    No devuelvas ningún otro texto, markdown, ni explicaciones. Solo el JSON.
+    """
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(prompt)
+        text = response.text.strip()
+        if text.startswith("```json"):
+            text = text[7:]
+        if text.startswith("```"):
+            text = text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+            
+        data = json.loads(text.strip())
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error consultando la IA: {str(e)}")
 
 # --- Endpoints Recetas ---
 @app.get("/api/admin/products/{product_id}/recipe")

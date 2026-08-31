@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, Sparkles, Loader } from 'lucide-react';
 
 const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) => {
   const [editingIngredient, setEditingIngredient] = useState(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const [formData, setFormData] = useState({ 
     name: '', cost_per_unit: 0, unit: 'kg',
@@ -35,16 +36,50 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('¿Seguro que deseas eliminar este ingrediente?')) return;
+    if(!window.confirm('¿Seguro de eliminar este ingrediente?')) return;
     try {
       const res = await fetchWithAuth(`/api/admin/ingredients/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        fetchIngredients();
-      } else {
-        alert('Error al eliminar ingrediente');
+      if(res.ok) fetchIngredients();
+    } catch (error) {
+      console.error(error);
+      alert("Error eliminando ingrediente");
+    }
+  };
+
+  const handleGenerateNutrition = async () => {
+    if (!formData.name) {
+      alert("Por favor, ingresa el nombre del ingrediente primero para poder buscarlo.");
+      return;
+    }
+    
+    setIsGenerating(true);
+    try {
+      const res = await fetchWithAuth(`/api/ingredients/estimate-nutrition`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ingredient_name: formData.name })
+      });
+      
+      if (!res.ok) {
+        throw new Error('Error al consultar la IA');
       }
-    } catch (err) {
-      console.error(err);
+      
+      const data = await res.json();
+      setFormData(prev => ({
+        ...prev,
+        kcal_per_100g: data.kcal_per_100g || 0,
+        protein_g: data.protein_g || 0,
+        fat_g: data.fat_g || 0,
+        fiber_g: data.fiber_g || 0,
+        moisture_g: data.moisture_g || 0,
+        ash_g: data.ash_g || 0,
+        carbs_g: data.carbs_g || 0
+      }));
+    } catch (error) {
+      console.error(error);
+      alert("Hubo un error al autocompletar con IA.");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -102,7 +137,18 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
             </div>
             
             <div className="col-span-1 md:col-span-3 border-t pt-4 mt-2">
-              <h4 className="font-bold text-gray-700 text-sm mb-3">Valores Nutricionales (Por cada 100g / 100ml)</h4>
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-bold text-gray-700 text-sm">Valores Nutricionales (Por cada 100g / 100ml)</h4>
+                <button 
+                  type="button" 
+                  onClick={handleGenerateNutrition}
+                  disabled={isGenerating}
+                  className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-indigo-100 transition font-medium disabled:opacity-50"
+                >
+                  {isGenerating ? <Loader size={14} className="animate-spin" /> : <Sparkles size={14} />} 
+                  {isGenerating ? "Pensando..." : "Autocompletar con IA"}
+                </button>
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Kcal</label>
