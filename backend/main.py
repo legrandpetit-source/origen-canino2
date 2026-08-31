@@ -246,7 +246,10 @@ def verify_2fa(request: Verify2FARequest):
         if not row:
             raise HTTPException(status_code=401, detail="Código inválido o sesión expirada")
             
-        expires_at = datetime.fromisoformat(row["expires_at"])
+        expires_at = row["expires_at"]
+        if isinstance(expires_at, str):
+            expires_at = datetime.fromisoformat(expires_at)
+            
         if datetime.utcnow() > expires_at:
             raise HTTPException(status_code=401, detail="Código expirado")
             
