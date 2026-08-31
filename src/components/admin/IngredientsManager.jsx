@@ -73,11 +73,11 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
   };
 
   return (
-    <div className="bg-white rounded-xl shadow p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xl font-bold text-gray-800">Materia Prima e Ingredientes</h3>
-        <button onClick={openAdd} className="bg-primary-green-dark text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-opacity-90">
-          <Plus size={18} /> Agregar Ingrediente
+    <div className="space-y-4">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="font-header text-2xl text-secondary-brown">Materia Prima e Ingredientes</h3>
+        <button onClick={openAdd} className="bg-primary-green text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-primary-green-dark transition shadow-sm text-sm font-bold">
+          <Plus size={16} /> Agregar
         </button>
       </div>
 
@@ -144,35 +144,37 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
         </form>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Costo por unidad</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unidad</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {ingredients.map(ing => (
-              <tr key={ing.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{ing.name}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${ing.cost_per_unit.toLocaleString()}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ing.unit}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button onClick={() => openEdit(ing)} className="text-blue-600 hover:text-blue-900 mr-4"><Edit2 size={18} /></button>
-                  <button onClick={() => handleDelete(ing.id)} className="text-red-600 hover:text-red-900"><Trash2 size={18} /></button>
-                </td>
-              </tr>
-            ))}
-            {ingredients.length === 0 && (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
               <tr>
-                <td colSpan="4" className="px-6 py-8 text-center text-gray-500">No hay ingredientes registrados.</td>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Costo por unidad</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unidad</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {ingredients.map(ing => (
+                <tr key={ing.id} className="hover:bg-gray-50 transition">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-800">{ing.name}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">${ing.cost_per_unit.toLocaleString()}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{ing.unit}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                    <button onClick={() => openEdit(ing)} className="text-primary-green hover:bg-green-50 p-1.5 rounded mr-2 transition"><Edit2 size={16} /></button>
+                    <button onClick={() => handleDelete(ing.id)} className="text-red-600 hover:bg-red-50 p-1.5 rounded transition"><Trash2 size={16} /></button>
+                  </td>
+                </tr>
+              ))}
+              {ingredients.length === 0 && (
+                <tr>
+                  <td colSpan="4" className="px-4 py-8 text-center text-gray-500 text-sm">No hay ingredientes registrados.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

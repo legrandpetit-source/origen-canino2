@@ -225,76 +225,81 @@ const AdminPanel = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-12">
-      <div className="bg-white rounded-2xl shadow-xl overflow-hidden max-w-6xl mx-auto border border-gray-100">
+    <div className="flex flex-col md:flex-row min-h-[calc(100vh-160px)] w-full bg-gray-50 border-t border-gray-200">
+      
+      {/* Sidebar */}
+      <div className="w-full md:w-64 bg-primary-green-dark text-white flex flex-col shadow-xl z-10 shrink-0">
+        <div className="p-6 border-b border-white/10">
+          <h2 className="font-header text-3xl">Admin</h2>
+        </div>
         
-        {/* Header & Tabs */}
-        <div className="bg-primary-green-dark p-6 md:p-8 text-white">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="font-header text-3xl">Panel de Administración</h2>
-            <button 
-              onClick={() => {
-                localStorage.removeItem('admin_token');
-                setIsAuthenticated(false);
-              }}
-              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold transition"
-            >
-              <LogOut size={18} /> Salir
-            </button>
-          </div>
-          <div className="flex gap-4">
-            <button 
-              onClick={() => setActiveTab('orders')}
-              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition ${activeTab === 'orders' ? 'bg-white text-primary-green-dark' : 'bg-white/10 hover:bg-white/20'}`}
-            >
-              <ShoppingCart size={20} /> Pedidos
-            </button>
-            <button 
-              onClick={() => setActiveTab('products')}
-              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition ${activeTab === 'products' ? 'bg-white text-primary-green-dark' : 'bg-white/10 hover:bg-white/20'}`}
-            >
-              <Package size={20} /> Productos
-            </button>
-            <button 
-              onClick={() => setActiveTab('ingredients')}
-              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition ${activeTab === 'ingredients' ? 'bg-white text-primary-green-dark' : 'bg-white/10 hover:bg-white/20'}`}
-            >
-              <ChefHat size={20} /> Ingredientes
-            </button>
-            <button 
-              onClick={() => setActiveTab('blog')}
-              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition ${activeTab === 'blog' ? 'bg-white text-primary-green-dark' : 'bg-white/10 hover:bg-white/20'}`}
-            >
-              <BookOpen size={20} /> Blog SEO
-            </button>
-            <button 
-              onClick={() => setActiveTab('testimonials')}
-              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition ${activeTab === 'testimonials' ? 'bg-white text-primary-green-dark' : 'bg-white/10 hover:bg-white/20'}`}
-            >
-              <MessageSquareHeart size={20} /> Testimonios
-            </button>
-            <button 
-              onClick={() => setActiveTab('finance')}
-              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition ${activeTab === 'finance' ? 'bg-white text-primary-green-dark' : 'bg-white/10 hover:bg-white/20'}`}
-            >
-              <BarChart size={20} /> Finanzas
-            </button>
-            <button 
-              onClick={() => setActiveTab('retention')}
-              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition ${activeTab === 'retention' ? 'bg-white text-primary-green-dark' : 'bg-white/10 hover:bg-white/20'}`}
-            >
-              <MessageSquareHeart size={20} /> Retención
-            </button>
-            <button 
-              onClick={() => setActiveTab('settings')}
-              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition ${activeTab === 'settings' ? 'bg-white text-primary-green-dark' : 'bg-white/10 hover:bg-white/20'}`}
-            >
-              <Key size={20} /> Configuración
-            </button>
-          </div>
+        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
+          <button 
+            onClick={() => setActiveTab('orders')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'orders' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
+          >
+            <ShoppingCart size={20} /> Pedidos
+          </button>
+          <button 
+            onClick={() => setActiveTab('products')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'products' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
+          >
+            <Package size={20} /> Productos
+          </button>
+          <button 
+            onClick={() => setActiveTab('ingredients')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'ingredients' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
+          >
+            <ChefHat size={20} /> Ingredientes
+          </button>
+          <button 
+            onClick={() => setActiveTab('blog')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'blog' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
+          >
+            <BookOpen size={20} /> Blog SEO
+          </button>
+          <button 
+            onClick={() => setActiveTab('testimonials')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'testimonials' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
+          >
+            <MessageSquareHeart size={20} /> Testimonios
+          </button>
+          <button 
+            onClick={() => setActiveTab('finance')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'finance' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
+          >
+            <BarChart size={20} /> Finanzas
+          </button>
+          <button 
+            onClick={() => setActiveTab('retention')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'retention' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
+          >
+            <MessageSquareHeart size={20} /> Retención
+          </button>
+          <button 
+            onClick={() => setActiveTab('settings')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'settings' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
+          >
+            <Key size={20} /> Ajustes
+          </button>
         </div>
 
-        <div className="p-6 md:p-8">
+        <div className="p-4 border-t border-white/10">
+          <button 
+            onClick={() => {
+              localStorage.removeItem('admin_token');
+              setIsAuthenticated(false);
+            }}
+            className="w-full flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-xl font-bold transition shadow-sm"
+          >
+            <LogOut size={18} /> Salir
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 bg-gray-50 flex flex-col min-w-0">
+        <div className="p-6 md:p-8 lg:p-10 flex-1 overflow-x-hidden">
           {loading ? (
             <div className="text-center py-10 text-gray-500">Cargando datos...</div>
           ) : (
@@ -318,133 +323,143 @@ const AdminPanel = () => {
               {/* --- PRODUCTS TAB --- */}
               {activeTab === 'products' && (
                 <div className="space-y-4">
-                  <h3 className="font-header text-2xl text-secondary-brown mb-4">Tus Productos ({products.length})</h3>
-                  {products.map((product) => (
-                    <div key={product.id} className="p-4 border border-gray-200 rounded-xl hover:border-primary-green transition flex flex-col md:flex-row justify-between md:items-center gap-4 bg-gray-50/50">
-                      <div className="flex items-center gap-4">
-                        <img src={product.image} alt={product.name} className="w-16 h-16 rounded-lg object-cover" />
-                        <div>
-                          <h4 className="font-bold text-secondary-brown">{product.name}</h4>
-                          <p className="text-sm text-gray-500">Precio: ${product.price.toLocaleString('es-CL')} | Peso: {product.weight} | Tipo: {product.type}</p>
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-header text-2xl text-secondary-brown">Tus Productos ({products.length})</h3>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    {products.map((product) => (
+                      <div key={product.id} className="py-3 px-4 border-b border-gray-100 hover:bg-gray-50 transition flex flex-col md:flex-row justify-between md:items-center gap-4 last:border-0">
+                        <div className="flex items-center gap-4">
+                          <img src={product.image} alt={product.name} className="w-12 h-12 rounded-lg object-cover" />
+                          <div>
+                            <h4 className="font-bold text-sm text-secondary-brown">{product.name}</h4>
+                            <p className="text-xs text-gray-500">Precio: ${product.price.toLocaleString('es-CL')} | Peso: {product.weight} | Tipo: {product.type}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => setEditingProduct(product)}
+                            className="flex items-center justify-center gap-1 text-primary-green hover:bg-green-50 px-3 py-1.5 rounded-lg font-semibold transition text-sm"
+                          >
+                            <Edit2 size={14} /> Editar
+                          </button>
+                          <button 
+                            onClick={() => setRecipeProduct(product)}
+                            className="flex items-center justify-center gap-1 text-orange-600 hover:bg-orange-50 px-3 py-1.5 rounded-lg font-semibold transition text-sm"
+                            title="Receta y Costos"
+                          >
+                            <ChefHat size={14} /> Receta
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteProduct(product.id)}
+                            className="flex items-center justify-center gap-1 text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg font-semibold transition"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => setEditingProduct(product)}
-                          className="flex items-center justify-center gap-2 text-primary-green bg-green-50 px-5 py-2 rounded-lg font-semibold hover:bg-green-100 transition"
-                        >
-                          <Edit2 size={16} /> Editar
-                        </button>
-                        <button 
-                          onClick={() => setRecipeProduct(product)}
-                          className="flex items-center justify-center gap-2 text-orange-600 bg-orange-50 px-4 py-2 rounded-lg font-semibold hover:bg-orange-100 transition"
-                          title="Receta y Costos"
-                        >
-                          <ChefHat size={16} /> Receta
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteProduct(product.id)}
-                          className="flex items-center justify-center gap-2 text-red-600 bg-red-50 px-4 py-2 rounded-lg font-semibold hover:bg-red-100 transition"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
 
               {/* --- BLOG TAB --- */}
               {activeTab === 'blog' && (
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center mb-4">
+                  <div className="flex justify-between items-center mb-2">
                     <h3 className="font-header text-2xl text-secondary-brown">Artículos del Blog ({blogPosts.length})</h3>
                     <button 
                       onClick={() => {
                         setEditingPost({ title: '', excerpt: '', content: '', image: '', slug: '' });
                         setIsAddingPost(true);
                       }}
-                      className="flex items-center gap-2 bg-primary-green text-white px-5 py-2 rounded-lg font-bold hover:bg-primary-green-dark transition shadow-md"
+                      className="flex items-center gap-2 bg-primary-green text-white px-4 py-2 rounded-lg font-bold hover:bg-primary-green-dark transition shadow-sm text-sm"
                     >
-                      <Plus size={20} /> Nuevo Artículo
+                      <Plus size={16} /> Nuevo
                     </button>
                   </div>
                   
-                  {blogPosts.map((post) => (
-                    <div key={post.id} className="p-4 border border-gray-200 rounded-xl hover:border-primary-green transition flex flex-col md:flex-row justify-between md:items-center gap-4 bg-gray-50/50">
-                      <div className="flex items-center gap-4">
-                        <img src={post.image} alt={post.title} className="w-20 h-16 rounded-lg object-cover" />
-                        <div>
-                          <h4 className="font-bold text-secondary-brown">{post.title}</h4>
-                          <p className="text-sm text-gray-500 line-clamp-1">{post.excerpt}</p>
-                          <a href={`/blog/${post.slug}`} target="_blank" rel="noreferrer" className="text-xs text-primary-green hover:underline mt-1 inline-block">Ver post publicado ↗</a>
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    {blogPosts.map((post) => (
+                      <div key={post.id} className="py-3 px-4 border-b border-gray-100 hover:bg-gray-50 transition flex flex-col md:flex-row justify-between md:items-center gap-4 last:border-0">
+                        <div className="flex items-center gap-4">
+                          <img src={post.image} alt={post.title} className="w-16 h-12 rounded-lg object-cover" />
+                          <div>
+                            <h4 className="font-bold text-sm text-secondary-brown">{post.title}</h4>
+                            <p className="text-xs text-gray-500 line-clamp-1">{post.excerpt}</p>
+                            <a href={`/blog/${post.slug}`} target="_blank" rel="noreferrer" className="text-xs text-primary-green hover:underline mt-1 inline-block">Ver post ↗</a>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => {
+                              setEditingPost(post);
+                              setIsAddingPost(false);
+                            }}
+                            className="flex items-center justify-center gap-1 text-primary-green hover:bg-green-50 px-3 py-1.5 rounded-lg font-semibold transition"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button 
+                            onClick={() => handleDeletePost(post.id)}
+                            className="flex items-center justify-center gap-1 text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg font-semibold transition"
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => {
-                            setEditingPost(post);
-                            setIsAddingPost(false);
-                          }}
-                          className="flex items-center justify-center gap-2 text-primary-green bg-green-50 px-4 py-2 rounded-lg font-semibold hover:bg-green-100 transition"
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                        <button 
-                          onClick={() => handleDeletePost(post.id)}
-                          className="flex items-center justify-center gap-2 text-red-600 bg-red-50 px-4 py-2 rounded-lg font-semibold hover:bg-red-100 transition"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  {blogPosts.length === 0 && <p className="text-center text-gray-500 py-8">Aún no hay artículos en el blog.</p>}
+                    ))}
+                    {blogPosts.length === 0 && <p className="text-center text-gray-500 py-8 text-sm">Aún no hay artículos en el blog.</p>}
+                  </div>
                 </div>
               )}
 
               {/* --- TESTIMONIALS TAB --- */}
               {activeTab === 'testimonials' && (
                 <div className="space-y-4">
-                  <h3 className="font-header text-2xl text-secondary-brown mb-4">Testimonios ({testimonials.length})</h3>
-                  {testimonials.map((test) => (
-                    <div key={test.id} className="p-4 border border-gray-200 rounded-xl hover:border-primary-green transition flex flex-col md:flex-row justify-between md:items-center gap-4 bg-gray-50/50">
-                      <div className="flex-grow">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-bold text-secondary-brown">{test.owner_name} & {test.dog_name}</h4>
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                            test.status === 'approved' ? 'bg-green-100 text-green-700' : 
-                            test.status === 'rejected' ? 'bg-red-100 text-red-700' : 
-                            'bg-yellow-100 text-yellow-700'
-                          }`}>
-                            {test.status === 'approved' ? 'Aprobado' : test.status === 'rejected' ? 'Rechazado' : 'Pendiente'}
-                          </span>
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-header text-2xl text-secondary-brown">Testimonios ({testimonials.length})</h3>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    {testimonials.map((test) => (
+                      <div key={test.id} className="py-3 px-4 border-b border-gray-100 hover:bg-gray-50 transition flex flex-col md:flex-row justify-between md:items-center gap-4 last:border-0">
+                        <div className="flex-grow">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-bold text-sm text-secondary-brown">{test.owner_name} & {test.dog_name}</h4>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                              test.status === 'approved' ? 'bg-green-100 text-green-700' : 
+                              test.status === 'rejected' ? 'bg-red-100 text-red-700' : 
+                              'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {test.status === 'approved' ? 'Aprobado' : test.status === 'rejected' ? 'Rechazado' : 'Pendiente'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500">Calificación: {test.rating} estrellas</p>
+                          <p className="text-sm text-gray-700 italic mt-1 line-clamp-2">"{test.content}"</p>
                         </div>
-                        <p className="text-sm text-gray-500">Calificación: {test.rating} estrellas</p>
-                        <p className="text-gray-700 italic mt-2">"{test.content}"</p>
+                        
+                        <div className="flex gap-2 shrink-0">
+                          {test.status !== 'approved' && (
+                            <button 
+                              onClick={() => handleUpdateTestimonialStatus(test.id, 'approved')}
+                              className="flex items-center justify-center gap-1 text-green-600 hover:bg-green-50 px-3 py-1.5 rounded-lg font-semibold transition text-sm"
+                            >
+                              <Check size={16} /> Aprobar
+                            </button>
+                          )}
+                          {test.status !== 'rejected' && (
+                            <button 
+                              onClick={() => handleUpdateTestimonialStatus(test.id, 'rejected')}
+                              className="flex items-center justify-center gap-1 text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg font-semibold transition text-sm"
+                            >
+                              <XCircle size={16} /> Rechazar
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      
-                      <div className="flex gap-2 shrink-0">
-                        {test.status !== 'approved' && (
-                          <button 
-                            onClick={() => handleUpdateTestimonialStatus(test.id, 'approved')}
-                            className="flex items-center justify-center gap-1 text-green-600 bg-green-50 px-3 py-2 rounded-lg font-semibold hover:bg-green-100 transition"
-                          >
-                            <Check size={16} /> Aprobar
-                          </button>
-                        )}
-                        {test.status !== 'rejected' && (
-                          <button 
-                            onClick={() => handleUpdateTestimonialStatus(test.id, 'rejected')}
-                            className="flex items-center justify-center gap-1 text-red-600 bg-red-50 px-3 py-2 rounded-lg font-semibold hover:bg-red-100 transition"
-                          >
-                            <XCircle size={16} /> Rechazar
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {testimonials.length === 0 && <p className="text-center text-gray-500 py-8">Aún no hay testimonios.</p>}
+                    ))}
+                    {testimonials.length === 0 && <p className="text-center text-gray-500 py-8 text-sm">Aún no hay testimonios.</p>}
+                  </div>
                 </div>
               )}
 

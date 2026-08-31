@@ -53,32 +53,32 @@ const DispatchManager = ({ orders, handleUpdateOrderStatus, handleDeleteOrder })
             </span>
           </div>
           
-          <div className="p-4 space-y-4">
+          <div className="divide-y divide-gray-100">
             {groupedOrders[city].map((order) => (
-              <div key={order.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50/50 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center hover:border-primary-green transition">
+              <div key={order.id} className="p-4 hover:bg-gray-50 transition flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <h4 className="font-bold text-lg text-primary-green-dark">Orden #{order.id}</h4>
-                    <span className={`text-xs px-2 py-1 rounded-full font-bold ${
+                    <h4 className="font-bold text-primary-green-dark">Orden #{order.id}</h4>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
                       order.payment_status === 'Pagado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                     }`}>
                       {order.payment_status}
                     </span>
                   </div>
-                  <p className="font-semibold text-gray-800">{order.customer_name}</p>
-                  <p className="text-sm text-gray-500">{order.customer_address} - {order.customer_phone}</p>
+                  <p className="text-sm font-semibold text-gray-800">{order.customer_name}</p>
+                  <p className="text-xs text-gray-500">{order.customer_address} - {order.customer_phone}</p>
                 </div>
                 
-                <div className="flex gap-4 items-center bg-white p-3 rounded-lg border w-full md:w-auto">
+                <div className="flex gap-4 items-center w-full md:w-auto">
                   <div className="flex-1 md:flex-none">
-                    <span className="font-semibold block text-xs text-gray-500 mb-1">Estado de Despacho</span>
+                    <span className="font-semibold block text-[10px] uppercase text-gray-500 mb-1">Estado</span>
                     <select 
                       value={order.delivery_status || 'Preparación'}
                       onChange={(e) => handleStatusChange(order, e.target.value)}
-                      className={`border-2 rounded p-1 text-sm font-bold w-full ${
-                        order.delivery_status === 'Entregado' ? 'border-green-500 text-green-600' :
-                        order.delivery_status === 'En Ruta' ? 'border-blue-500 text-blue-600' :
-                        'border-yellow-500 text-yellow-600'
+                      className={`border rounded p-1 text-xs font-bold w-full ${
+                        order.delivery_status === 'Entregado' ? 'border-green-500 text-green-700 bg-green-50' :
+                        order.delivery_status === 'En Ruta' ? 'border-blue-500 text-blue-700 bg-blue-50' :
+                        'border-yellow-500 text-yellow-700 bg-yellow-50'
                       }`}
                     >
                       <option value="Preparación">Preparación</option>
