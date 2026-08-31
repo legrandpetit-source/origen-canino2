@@ -19,14 +19,11 @@ import bcrypt
 import jwt
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import Depends
-import google.generativeai as genai
+from groq import Groq
 
 load_dotenv()
 
-# Configurar Gemini API si la llave está presente
-gemini_api_key = os.getenv("GEMINI_API_KEY")
-if gemini_api_key:
-    genai.configure(api_key=gemini_api_key)
+groq_api_key = os.getenv("GROQ_API_KEY")
 
 app = FastAPI(title="Origen Canino API")
 
@@ -386,8 +383,8 @@ def delete_ingredient(ingredient_id: int, current_user: str = Depends(get_curren
 
 @app.post("/api/ingredients/estimate-nutrition")
 def estimate_nutrition(req: EstimateNutritionRequest, current_user: str = Depends(get_current_admin)):
-    if not gemini_api_key:
-        raise HTTPException(status_code=500, detail="Gemini API Key no configurada en el servidor.")
+    if not groq_api_key:
+        raise HTTPException(status_code=500, detail="Groq API Key no configurada en el servidor.")
     
     prompt = f"""
     Eres un experto en nutrición animal y de ingredientes. Estima los valores nutricionales promedio por cada 100g para el ingrediente: "{req.ingredient_name}".
@@ -404,20 +401,24 @@ def estimate_nutrition(req: EstimateNutritionRequest, current_user: str = Depend
     No devuelvas ningún otro texto, markdown, ni explicaciones. Solo el JSON.
     """
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(prompt)
-        text = response.text.strip()
-        if text.startswith("```json"):
-            text = text[7:]
-        if text.startswith("```"):
-            text = text[3:]
-        if text.endswith("```"):
-            text = text[:-3]
-            
-        data = json.loads(text.strip())
+        client = Groq(api_key=groq_api_key)
+        response = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+            model="llama-3.1-8b-instant",
+            temperature=0,
+            response_format={"type": "json_object"}
+        )
+        
+        text = response.choices[0].message.content.strip()
+        data = json.loads(text)
         return data
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error consultando la IA: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error consultando la IA (Groq): {str(e)}")
 
 # --- Endpoints Recetas ---
 @app.get("/api/admin/products/{product_id}/recipe")
