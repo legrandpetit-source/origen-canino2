@@ -430,7 +430,7 @@ def get_blog_posts():
             excerpt=row["excerpt"],
             content=row["content"],
             image=row["image"],
-            created_at=row["created_at"]
+            created_at=row["created_at"].isoformat() if hasattr(row["created_at"], 'isoformat') else str(row["created_at"])
         ) for row in rows]
 
 @app.get("/api/blog/{slug}", response_model=BlogPostResponse)
@@ -448,7 +448,7 @@ def get_blog_post_by_slug(slug: str):
             excerpt=row["excerpt"],
             content=row["content"],
             image=row["image"],
-            created_at=row["created_at"]
+            created_at=row["created_at"].isoformat() if hasattr(row["created_at"], 'isoformat') else str(row["created_at"])
         )
 
 @app.post("/api/blog")
