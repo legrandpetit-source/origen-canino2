@@ -198,6 +198,8 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Costo por unidad</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unidad</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kcal/100g</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Proteína/100g</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
               </tr>
             </thead>
@@ -207,6 +209,8 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
                   <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-800">{ing.name}</td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">${ing.cost_per_unit.toLocaleString()}</td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{ing.unit}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{ing.kcal_per_100g || 0}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{ing.protein_g || 0}g</td>
                   <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                     <button onClick={() => openEdit(ing)} className="text-primary-green hover:bg-green-50 p-1.5 rounded mr-2 transition"><Edit2 size={16} /></button>
                     <button onClick={() => handleDelete(ing.id)} className="text-red-600 hover:bg-red-50 p-1.5 rounded transition"><Trash2 size={16} /></button>
