@@ -96,6 +96,17 @@ def init_database():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
+            
+            # Migración: Agregar columnas nutricionales a ingredients si no existen
+            cursor.execute("""
+                ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS kcal_per_100g NUMERIC DEFAULT 0;
+                ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS protein_g NUMERIC DEFAULT 0;
+                ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS fat_g NUMERIC DEFAULT 0;
+                ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS fiber_g NUMERIC DEFAULT 0;
+                ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS moisture_g NUMERIC DEFAULT 0;
+                ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS ash_g NUMERIC DEFAULT 0;
+                ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS carbs_g NUMERIC DEFAULT 0;
+            """)
 
             # 1.2 Tabla de Recetas (Ingredientes por Producto)
             cursor.execute("""
