@@ -409,15 +409,23 @@ def estimate_nutrition(req: EstimateNutritionRequest, current_user: str = Depend
                     "content": prompt,
                 }
             ],
-            model="llama-3.1-8b-instant",
+            model="qwen/qwen3.8-27b",
             temperature=0,
             response_format={"type": "json_object"}
         )
         
         text = response.choices[0].message.content.strip()
-        data = json.loads(text)
+        if text.startswith("```json"):
+            text = text[7:]
+        if text.startswith("```"):
+            text = text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+        
+        data = json.loads(text.strip())
         return data
     except Exception as e:
+        print(f"Error AI: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error consultando la IA (Groq): {str(e)}")
 
 # --- Endpoints Recetas ---
