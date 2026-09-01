@@ -333,6 +333,7 @@ def get_ingredients(current_user: str = Depends(get_current_admin)):
 @app.post("/api/admin/ingredients")
 def create_ingredient(i: IngredientCreateUpdate, current_user: str = Depends(get_current_admin)):
     try:
+        print(f"DEBUG create_ingredient: payload={i.model_dump()}")
         with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -346,6 +347,7 @@ def create_ingredient(i: IngredientCreateUpdate, current_user: str = Depends(get
                 i.kcal_per_100g, i.protein_g, i.fat_g, i.fiber_g, i.moisture_g, i.ash_g, i.carbs_g
             ))
             conn.commit()
+            print("DEBUG create_ingredient: commit successful")
             return {"success": True, "id": cursor.fetchone()["id"]}
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error creando ingrediente")
