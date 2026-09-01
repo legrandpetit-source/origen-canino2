@@ -13,6 +13,7 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
 
   const handleSave = async (e) => {
     e.preventDefault();
+    console.log("DEBUG: Guardando ingrediente...", formData);
     try {
       const url = isAdding ? '/api/admin/ingredients' : `/api/admin/ingredients/${editingIngredient.id}`;
       const method = isAdding ? 'POST' : 'PUT';

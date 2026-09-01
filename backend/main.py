@@ -353,6 +353,7 @@ def create_ingredient(i: IngredientCreateUpdate, current_user: str = Depends(get
 @app.put("/api/admin/ingredients/{ingredient_id}")
 def update_ingredient(ingredient_id: int, i: IngredientCreateUpdate, current_user: str = Depends(get_current_admin)):
     try:
+        print(f"DEBUG update_ingredient ID {ingredient_id}: payload={i.model_dump()}")
         with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -366,8 +367,10 @@ def update_ingredient(ingredient_id: int, i: IngredientCreateUpdate, current_use
                 ingredient_id
             ))
             conn.commit()
+            print("DEBUG update_ingredient: commit successful")
             return {"success": True}
     except Exception as e:
+        print(f"DEBUG update_ingredient: exception {e}")
         raise HTTPException(status_code=500, detail="Error actualizando ingrediente")
 
 @app.delete("/api/admin/ingredients/{ingredient_id}")
