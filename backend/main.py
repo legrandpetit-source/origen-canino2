@@ -73,6 +73,13 @@ class IngredientResponse(BaseModel):
     name: str
     cost_per_unit: int
     unit: str
+    kcal_per_100g: Optional[float] = 0
+    protein_g: Optional[float] = 0
+    fat_g: Optional[float] = 0
+    fiber_g: Optional[float] = 0
+    moisture_g: Optional[float] = 0
+    ash_g: Optional[float] = 0
+    carbs_g: Optional[float] = 0
 
 class IngredientCreateUpdate(BaseModel):
     name: str
