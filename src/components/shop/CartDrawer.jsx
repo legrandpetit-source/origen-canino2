@@ -20,7 +20,7 @@ const CartDrawer = () => {
     }
   }, [isCartOpen, suggestedProducts.length]);
 
-  const snacksToSuggest = suggestedProducts.filter(p => p.type === 'snack' && !items.some(i => i.id === p.id)).slice(0, 3);
+  const productsToSuggest = suggestedProducts.filter(p => !items.some(i => i.id === p.id)).slice(0, 3);
 
   const totalKilos = items.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -98,11 +98,11 @@ const CartDrawer = () => {
                     </div>
                   ))}
 
-                  {snacksToSuggest.length > 0 && (
+                  {productsToSuggest.length > 0 && (
                     <div className="mt-8 pt-6 border-t">
                       <h3 className="font-bold text-gray-800 mb-4">¿Te gustaría agregar algo más?</h3>
                       <div className="space-y-3">
-                        {snacksToSuggest.map(product => (
+                        {productsToSuggest.map(product => (
                           <div key={product.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border">
                             <div>
                               <h5 className="font-bold text-sm text-secondary-brown">{product.name}</h5>
