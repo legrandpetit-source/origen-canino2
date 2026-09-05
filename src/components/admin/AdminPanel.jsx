@@ -578,8 +578,8 @@ const AdminPanel = () => {
                     }}
                     className="w-full border rounded-lg p-1.5 mb-2 focus:ring-2 focus:ring-primary-green outline-none text-sm"
                   />
-                  <input type="url" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-primary-green outline-none text-sm" required
-                    placeholder="URL de la imagen"
+                  <input type="text" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-primary-green outline-none text-sm" required
+                    placeholder="URL o ruta de la imagen"
                     value={editingProduct.image} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} />
                 </div>
               </div>
