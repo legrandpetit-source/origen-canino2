@@ -551,8 +551,35 @@ const AdminPanel = () => {
                     value={editingProduct.weight} onChange={e => setEditingProduct({...editingProduct, weight: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">URL Imagen</label>
-                  <input type="url" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-primary-green outline-none" required
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Imagen (Subir o URL)</label>
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      const formData = new FormData();
+                      formData.append('file', file);
+                      try {
+                        const res = await fetchWithAuth('/api/admin/products/upload-image', {
+                          method: 'POST',
+                          body: formData
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          setEditingProduct({...editingProduct, image: data.url});
+                        } else {
+                          alert("Error al subir la imagen");
+                        }
+                      } catch (err) {
+                        console.error(err);
+                        alert("Error de red al subir la imagen");
+                      }
+                    }}
+                    className="w-full border rounded-lg p-1.5 mb-2 focus:ring-2 focus:ring-primary-green outline-none text-sm"
+                  />
+                  <input type="url" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-primary-green outline-none text-sm" required
+                    placeholder="URL de la imagen"
                     value={editingProduct.image} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} />
                 </div>
               </div>

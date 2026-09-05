@@ -66,6 +66,7 @@ class ProductUpdate(BaseModel):
     ingredients: List[str]
     benefits: List[str]
     isNew: bool
+    image: str
     fixed_cost: int = 0
 
 class IngredientResponse(BaseModel):
@@ -134,6 +135,9 @@ class OrderCreate(BaseModel):
     customer_region: str
     items: List[OrderItem]
     is_subscription: bool = False
+    dog_name: Optional[str] = None
+    dog_weight: Optional[float] = None
+    dog_age: Optional[str] = None
 
 class OrderStatusUpdate(BaseModel):
     payment_status: Optional[str] = None
@@ -321,13 +325,34 @@ def update_product(product_id: int, p: ProductUpdate, current_user: str = Depend
         with get_connection() as conn:
             conn.cursor().execute("""
                 UPDATE products 
-                SET name = %s, price = %s, weight = %s, description = %s, ingredients = %s, benefits = %s, is_new = %s, fixed_cost = %s
+                SET name = %s, price = %s, weight = %s, description = %s, ingredients = %s, benefits = %s, is_new = %s, image = %s, fixed_cost = %s
                 WHERE id = %s
-            """, (p.name, p.price, p.weight, p.description, json.dumps(p.ingredients), json.dumps(p.benefits), int(p.isNew), p.fixed_cost, product_id))
+            """, (p.name, p.price, p.weight, p.description, json.dumps(p.ingredients), json.dumps(p.benefits), int(p.isNew), p.image, p.fixed_cost, product_id))
             conn.commit()
         return {"success": True}
     except Exception as e:
+        print(f"Error updating product: {e}")
         raise HTTPException(status_code=500, detail="Error actualizando el producto.")
+
+@app.post("/api/admin/products/upload-image")
+async def upload_product_image(file: UploadFile = File(...), current_user: str = Depends(get_current_admin)):
+    try:
+        content = await file.read()
+        image = Image.open(io.BytesIO(content))
+        
+        if image.mode in ("RGBA", "P", "LA"):
+            image = image.convert("RGB")
+            
+        filename = f"{uuid.uuid4().hex}.webp"
+        filepath = os.path.join("uploads", "products", filename)
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        
+        image.save(filepath, "WEBP", quality=80, method=6)
+        
+        return {"url": f"/uploads/products/{filename}"}
+    except Exception as e:
+        print(f"Error uploading product image: {e}")
+        raise HTTPException(status_code=500, detail="Error procesando la imagen.")
 
 # --- Endpoints Ingredientes (Inventario) ---
 @app.get("/api/admin/ingredients", response_model=List[IngredientResponse])
@@ -615,9 +640,9 @@ def create_order(order: OrderCreate):
         with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO orders (customer_name, customer_email, customer_phone, customer_address, customer_city, customer_region, subtotal, shipping_cost, total, is_subscription)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
-            """, (order.customer_name, order.customer_email, order.customer_phone, order.customer_address, order.customer_city, order.customer_region, subtotal, shipping_cost, total, int(order.is_subscription)))
+                INSERT INTO orders (customer_name, customer_email, customer_phone, customer_address, customer_city, customer_region, subtotal, shipping_cost, total, is_subscription, dog_name, dog_weight, dog_age)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+            """, (order.customer_name, order.customer_email, order.customer_phone, order.customer_address, order.customer_city, order.customer_region, subtotal, shipping_cost, total, int(order.is_subscription), order.dog_name, order.dog_weight, order.dog_age))
             
             order_id = cursor.fetchone()['id']
             
