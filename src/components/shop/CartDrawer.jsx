@@ -9,6 +9,14 @@ const CartDrawer = () => {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isSubscription, setIsSubscription] = useState(false);
 
+  const totalKilos = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  React.useEffect(() => {
+    if (totalKilos < 10 && isSubscription) {
+      setIsSubscription(false);
+    }
+  }, [totalKilos, isSubscription]);
+
   const handleCheckout = () => {
     if (items.length === 0) return;
     setIsCheckoutOpen(true);
@@ -82,22 +90,33 @@ const CartDrawer = () => {
             
             {items.length > 0 && (
               <div className="border-t p-4 bg-gray-50">
-                <div className="bg-primary-cream/30 p-3 rounded-lg mb-4 border border-primary-green/20">
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="mt-1 w-5 h-5 accent-primary-green"
-                      checked={isSubscription}
-                      onChange={(e) => setIsSubscription(e.target.checked)}
-                    />
+                {totalKilos >= 10 ? (
+                  <div className="bg-primary-cream/30 p-3 rounded-lg mb-4 border border-primary-green/20">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="mt-1 w-5 h-5 accent-primary-green"
+                        checked={isSubscription}
+                        onChange={(e) => setIsSubscription(e.target.checked)}
+                      />
+                      <div className="flex-1">
+                        <span className="font-bold text-primary-green-dark">Suscribirme a este pedido</span>
+                        <p className="text-xs text-gray-600 mt-1">
+                          Obtén un <span className="font-bold text-green-600">10% de descuento</span> y <span className="font-bold text-green-600">despacho gratis</span> en todos tus envíos mensuales.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                ) : (
+                  <div className="bg-gray-100 p-3 rounded-lg mb-4 border border-gray-200">
                     <div className="flex-1">
-                      <span className="font-bold text-primary-green-dark">Suscribirme a este pedido</span>
-                      <p className="text-xs text-gray-600 mt-1">
-                        Obtén un <span className="font-bold text-green-600">10% de descuento</span> y <span className="font-bold text-green-600">despacho gratis</span> en todos tus envíos mensuales.
+                      <span className="font-bold text-gray-500">Suscripción Mensual</span>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Agrega al menos 10kg a tu carrito para habilitar la suscripción con un 10% de descuento y despacho gratis.
                       </p>
                     </div>
-                  </label>
-                </div>
+                  </div>
+                )}
                 
                 <div className="flex justify-between font-bold text-lg mb-4">
                   <span>Total estimado:</span>
