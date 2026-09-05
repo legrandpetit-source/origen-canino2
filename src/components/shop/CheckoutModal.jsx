@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle } from 'lucide-react';
+import { X, CheckCircle, ArrowLeft } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 
-const CheckoutModal = ({ isOpen, onClose, isSubscription = false }) => {
+const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
   const { items, total, clearCart, dogData } = useCart();
   
   const [formData, setFormData] = useState({
@@ -107,8 +107,15 @@ const CheckoutModal = ({ isOpen, onClose, isSubscription = false }) => {
             ) : (
               <>
                 <div className="flex justify-between items-center p-4 border-b bg-bg-cream sticky top-0 z-10">
-                  <h2 className="text-2xl font-header text-primary-green-dark">Finalizar Compra</h2>
-                  <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition">
+                  <div className="flex items-center gap-3">
+                    {onBack && (
+                      <button type="button" onClick={onBack} className="p-2 hover:bg-gray-200 rounded-full transition text-gray-600 flex items-center justify-center" title="Volver al carrito">
+                        <ArrowLeft size={24} />
+                      </button>
+                    )}
+                    <h2 className="text-2xl font-header text-primary-green-dark">Finalizar Compra</h2>
+                  </div>
+                  <button type="button" onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition">
                     <X size={24} />
                   </button>
                 </div>

@@ -143,7 +143,15 @@ const CartDrawer = () => {
         </>
       )}
     </AnimatePresence>
-    <CheckoutModal isOpen={isCheckoutOpen} onClose={() => setIsCheckoutOpen(false)} isSubscription={isSubscription} />
+    <CheckoutModal 
+      isOpen={isCheckoutOpen} 
+      onClose={() => setIsCheckoutOpen(false)} 
+      onBack={() => {
+        setIsCheckoutOpen(false);
+        setIsCartOpen(true);
+      }}
+      isSubscription={isSubscription} 
+    />
     </>
   );
 };
