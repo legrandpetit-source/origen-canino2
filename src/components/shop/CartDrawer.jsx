@@ -5,9 +5,22 @@ import { motion, AnimatePresence } from 'framer-motion';
 import CheckoutModal from './CheckoutModal';
 
 const CartDrawer = () => {
-  const { items, isCartOpen, setIsCartOpen, updateQuantity, removeItem, total } = useCart();
+  const { items, isCartOpen, setIsCartOpen, updateQuantity, removeItem, total, addItem } = useCart();
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isSubscription, setIsSubscription] = useState(false);
+
+  const [suggestedProducts, setSuggestedProducts] = useState([]);
+
+  React.useEffect(() => {
+    if (isCartOpen && suggestedProducts.length === 0) {
+      fetch('/api/products')
+        .then(res => res.json())
+        .then(data => setSuggestedProducts(data))
+        .catch(err => console.error(err));
+    }
+  }, [isCartOpen, suggestedProducts.length]);
+
+  const snacksToSuggest = suggestedProducts.filter(p => p.type === 'snack' && !items.some(i => i.id === p.id)).slice(0, 3);
 
   const totalKilos = items.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -84,6 +97,28 @@ const CartDrawer = () => {
                       </div>
                     </div>
                   ))}
+
+                  {snacksToSuggest.length > 0 && (
+                    <div className="mt-8 pt-6 border-t">
+                      <h3 className="font-bold text-gray-800 mb-4">¿Te gustaría agregar algo más?</h3>
+                      <div className="space-y-3">
+                        {snacksToSuggest.map(product => (
+                          <div key={product.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border">
+                            <div>
+                              <h5 className="font-bold text-sm text-secondary-brown">{product.name}</h5>
+                              <p className="text-xs text-gray-500">${product.price.toLocaleString('es-CL')}</p>
+                            </div>
+                            <button 
+                              onClick={() => addItem(product)} 
+                              className="bg-primary-green text-white px-3 py-1 text-sm rounded hover:bg-primary-green-dark transition"
+                            >
+                              Agregar
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
