@@ -20,7 +20,9 @@ const CartDrawer = () => {
     }
   }, [isCartOpen, suggestedProducts.length]);
 
-  const productsToSuggest = suggestedProducts.filter(p => !items.some(i => i.id === p.id)).slice(0, 3);
+  const productsToSuggest = suggestedProducts
+    .filter(p => !items.some(i => i.id === p.id) && !p.name.toLowerCase().includes("pack inicial"))
+    .slice(0, 3);
 
   const totalKilos = items.reduce((sum, item) => sum + item.quantity, 0);
 
