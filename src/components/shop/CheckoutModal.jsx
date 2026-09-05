@@ -4,7 +4,7 @@ import { X, CheckCircle } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 
 const CheckoutModal = ({ isOpen, onClose, isSubscription = false }) => {
-  const { items, total, clearCart } = useCart();
+  const { items, total, clearCart, dogData } = useCart();
   
   const [formData, setFormData] = useState({
     customer_name: '',
@@ -13,6 +13,9 @@ const CheckoutModal = ({ isOpen, onClose, isSubscription = false }) => {
     customer_address: '',
     customer_city: '',
     customer_region: 'Región Metropolitana',
+    dog_name: dogData?.name || '',
+    dog_weight: dogData?.weight || '',
+    dog_age: dogData?.age || 'adult_normal',
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -80,10 +83,11 @@ const CheckoutModal = ({ isOpen, onClose, isSubscription = false }) => {
             onClick={orderSuccess ? handleFinish : onClose}
           />
           <motion.div 
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed inset-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[600px] max-h-[90vh] bg-white md:rounded-2xl shadow-2xl z-[70] overflow-y-auto flex flex-col"
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed top-0 right-0 h-full w-full md:w-[600px] bg-white shadow-2xl z-[70] overflow-y-auto flex flex-col"
           >
             {orderSuccess ? (
               <div className="p-8 text-center flex flex-col items-center justify-center min-h-[400px]">
@@ -124,6 +128,30 @@ const CheckoutModal = ({ isOpen, onClose, isSubscription = false }) => {
                       <div className="md:col-span-2">
                         <label className="block text-sm text-gray-600 mb-1">Correo Electrónico</label>
                         <input required type="email" name="customer_email" value={formData.customer_email} onChange={handleChange} className="w-full border p-2 rounded-lg" placeholder="juan@ejemplo.com" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="font-bold text-lg mb-3">Datos de tu Perrito</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-1">Nombre</label>
+                        <input required type="text" name="dog_name" value={formData.dog_name} onChange={handleChange} className="w-full border p-2 rounded-lg" placeholder="Ej. Max" />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-1">Peso (Kg)</label>
+                        <input required type="number" step="0.1" name="dog_weight" value={formData.dog_weight} onChange={handleChange} className="w-full border p-2 rounded-lg" placeholder="Ej. 15" />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-1">Etapa / Actividad</label>
+                        <select name="dog_age" value={formData.dog_age} onChange={handleChange} className="w-full border p-2 rounded-lg">
+                          <option value="puppy_small">Cachorro (2 a 6 meses)</option>
+                          <option value="puppy_large">Cachorro (6 a 12 meses)</option>
+                          <option value="adult_low">Adulto (Baja Actividad / Senior)</option>
+                          <option value="adult_normal">Adulto (Actividad Normal)</option>
+                          <option value="adult_high">Adulto (Alta Actividad / Deporte)</option>
+                        </select>
                       </div>
                     </div>
                   </div>
