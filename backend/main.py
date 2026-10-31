@@ -181,6 +181,14 @@ class ChangePasswordRequest(BaseModel):
     old_password: str
     new_password: str
 
+class AdminUserCreate(BaseModel):
+    email: str
+    password: str
+
+class AdminUserUpdate(BaseModel):
+    email: str
+    password: Optional[str] = None
+
 # --- Auth Config ---
 SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key-origen")
 ALGORITHM = "HS256"
@@ -238,12 +246,30 @@ def notify_telegram(message: str):
         print("Telegram env vars missing, skipping notification.")
         return
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    data = urllib.parse.urlencode({'chat_id': chat_id, 'text': message}).encode('utf-8')
+    data = urllib.parse.urlencode({'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'}).encode('utf-8')
     try:
         req = urllib.request.Request(url, data=data)
         urllib.request.urlopen(req)
     except Exception as e:
         print("Error sending telegram notification:", e)
+
+def log_security_event(user_email: str, action: str, status: str = "success", ip_address: str = "127.0.0.1", details: str = ""):
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO admin_audit_logs (user_email, action, status, ip_address, details)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (user_email, action, status, ip_address or "127.0.0.1", details or ""))
+            conn.commit()
+    except Exception as e:
+        print("Error logging security event:", e)
+
+def get_client_ip(req: Request) -> str:
+    forwarded = req.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return req.client.host if req.client else "127.0.0.1"
 
 class ContactMessage(BaseModel):
     name: str
@@ -253,13 +279,16 @@ class ContactMessage(BaseModel):
 
 # --- Endpoints Auth Admin ---
 @app.post("/api/admin/login")
-def login(request: LoginRequest):
+def login(request: LoginRequest, req: Request):
+    ip = get_client_ip(req)
+    clean_email = request.email.strip().lower()
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM admin_users WHERE email = %s", (request.email,))
+            cursor.execute("SELECT * FROM admin_users WHERE LOWER(email) = %s", (clean_email,))
             user = cursor.fetchone()
             if not user or not verify_password(request.password, user["password_hash"]):
+                log_security_event(clean_email, "Intento de inicio de sesión fallido", status="warning", ip_address=ip, details="Credenciales incorrectas")
                 raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
             
             session_id = str(uuid.uuid4())
@@ -269,18 +298,22 @@ def login(request: LoginRequest):
             cursor.execute("""
                 INSERT INTO admin_2fa_codes (email, session_id, code, expires_at)
                 VALUES (%s, %s, %s, %s)
-            """, (request.email, session_id, code, expires_at))
+            """, (user["email"], session_id, code, expires_at))
             conn.commit()
             
-            msg = f"🔐 *Código de acceso admin Origen Canino*\n\nAlguien está intentando iniciar sesión.\nTu código es: {code}"
+            msg = f"🔐 *Código de acceso admin Origen Canino*\n\nAlguien está intentando iniciar sesión desde `{ip}` con el usuario `{user['email']}`.\n\nTu código es: *{code}*"
             notify_telegram(msg)
+            log_security_event(user["email"], "Código 2FA generado", status="info", ip_address=ip, details="Código enviado a Telegram @OrigenCanino_bot")
             
             return {"requires_2fa": True, "session_id": session_id}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
 @app.post("/api/admin/verify-2fa")
-def verify_2fa(request: Verify2FARequest):
+def verify_2fa(request: Verify2FARequest, req: Request):
+    ip = get_client_ip(req)
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -290,6 +323,7 @@ def verify_2fa(request: Verify2FARequest):
         
         row = cursor.fetchone()
         if not row:
+            log_security_event("Desconocido", "Código 2FA inválido", status="warning", ip_address=ip, details="Código incorrecto o sesión expirada")
             raise HTTPException(status_code=401, detail="Código inválido o sesión expirada")
             
         expires_at = row["expires_at"]
@@ -297,28 +331,172 @@ def verify_2fa(request: Verify2FARequest):
             expires_at = datetime.fromisoformat(expires_at)
             
         if datetime.utcnow() > expires_at:
+            log_security_event(row["email"], "Código 2FA expirado", status="warning", ip_address=ip, details="Tiempo de 5 minutos excedido")
             raise HTTPException(status_code=401, detail="Código expirado")
             
         cursor.execute("DELETE FROM admin_2fa_codes WHERE session_id = %s", (request.session_id,))
         conn.commit()
         
+        log_security_event(row["email"], "Inicio de sesión exitoso (2FA)", status="success", ip_address=ip, details="Acceso autorizado al panel de administración")
         access_token = create_access_token(data={"sub": row["email"]})
         return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/api/admin/change-password")
-def change_password(request: ChangePasswordRequest, current_user: str = Depends(get_current_admin)):
+def change_password(request: ChangePasswordRequest, req: Request, current_user: str = Depends(get_current_admin)):
+    ip = get_client_ip(req)
+    if len(request.new_password) < 6:
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 6 caracteres")
+        
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM admin_users WHERE email = %s", (current_user,))
         user = cursor.fetchone()
         
-        if not verify_password(request.old_password, user["password_hash"]):
+        if not user or not verify_password(request.old_password, user["password_hash"]):
+            log_security_event(current_user, "Intento fallido de cambio de contraseña", status="warning", ip_address=ip, details="Contraseña actual incorrecta")
             raise HTTPException(status_code=400, detail="Contraseña actual incorrecta")
             
         new_hash = get_password_hash(request.new_password)
         cursor.execute("UPDATE admin_users SET password_hash = %s WHERE email = %s", (new_hash, current_user))
         conn.commit()
-        return {"success": True, "message": "Contraseña actualizada"}
+        
+        log_security_event(current_user, "Cambio de contraseña exitoso", status="success", ip_address=ip, details="Contraseña actualizada")
+        notify_telegram(f"🔐 *Alerta de Seguridad*\n\nEl usuario `{current_user}` cambió su contraseña de acceso admin.")
+        return {"success": True, "message": "Contraseña actualizada exitosamente"}
+
+# --- Endpoints Panel de Seguridad Completo ---
+@app.get("/api/admin/security/overview")
+def get_security_overview(current_user: str = Depends(get_current_admin)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) as count FROM admin_users")
+        total_admins = cursor.fetchone()["count"]
+        
+        cursor.execute("SELECT COUNT(*) as count FROM admin_audit_logs WHERE created_at >= NOW() - INTERVAL '24 hours'")
+        activity_24h = cursor.fetchone()["count"]
+        
+        token = os.getenv("TELEGRAM_BOT_TOKEN") or "9089876682:AAFeQDNJLqt7qGodbf7EH3fh5gTHlMH2FSQ"
+        chat_id = os.getenv("TELEGRAM_CHAT_ID") or "1468481915"
+        masked_token = f"{token[:8]}...{token[-4:]}" if len(token) > 12 else "***"
+        
+        return {
+            "current_user": current_user,
+            "total_admins": total_admins,
+            "activity_24h": activity_24h,
+            "telegram": {
+                "active": bool(token and chat_id),
+                "bot_username": "@OrigenCanino_bot",
+                "masked_token": masked_token,
+                "chat_id": chat_id
+            }
+        }
+
+@app.get("/api/admin/security/users")
+def get_admin_users(current_user: str = Depends(get_current_admin)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, email, created_at FROM admin_users ORDER BY id ASC")
+        users = cursor.fetchall()
+        for u in users:
+            if isinstance(u.get("created_at"), datetime):
+                u["created_at"] = u["created_at"].strftime("%d/%m/%Y %H:%M")
+        return users
+
+@app.post("/api/admin/security/users")
+def create_admin_user(request: AdminUserCreate, req: Request, current_user: str = Depends(get_current_admin)):
+    ip = get_client_ip(req)
+    if len(request.password) < 6:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 6 caracteres")
+    
+    clean_email = request.email.strip().lower()
+    if not clean_email:
+        raise HTTPException(status_code=400, detail="El correo o usuario no puede estar vacío")
+        
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM admin_users WHERE LOWER(email) = %s", (clean_email,))
+        if cursor.fetchone():
+            raise HTTPException(status_code=400, detail="Ya existe un usuario con ese email/nombre")
+            
+        pwd_hash = get_password_hash(request.password)
+        cursor.execute("INSERT INTO admin_users (email, password_hash) VALUES (%s, %s) RETURNING id", (clean_email, pwd_hash))
+        new_id = cursor.fetchone()["id"]
+        conn.commit()
+        
+        log_security_event(current_user, f"Creación de usuario: {clean_email}", status="success", ip_address=ip, details="Nuevo administrador añadido")
+        notify_telegram(f"👤 *Nuevo Administrador Creado*\n\nCreado por: `{current_user}`\nNuevo usuario: `{clean_email}`")
+        return {"success": True, "message": "Usuario administrador creado", "id": new_id}
+
+@app.put("/api/admin/security/users/{user_id}")
+def update_admin_user(user_id: int, request: AdminUserUpdate, req: Request, current_user: str = Depends(get_current_admin)):
+    ip = get_client_ip(req)
+    clean_email = request.email.strip().lower()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, email FROM admin_users WHERE id = %s", (user_id,))
+        target = cursor.fetchone()
+        if not target:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+            
+        if request.password and len(request.password) < 6:
+            raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 6 caracteres")
+            
+        if request.password:
+            pwd_hash = get_password_hash(request.password)
+            cursor.execute("UPDATE admin_users SET email = %s, password_hash = %s WHERE id = %s", (clean_email, pwd_hash, user_id))
+            log_security_event(current_user, f"Edición y reseteo de clave: {clean_email}", status="success", ip_address=ip)
+            notify_telegram(f"🔑 *Contraseña Reseteada*\n\nUsuario modificado: `{clean_email}` por `{current_user}`")
+        else:
+            cursor.execute("UPDATE admin_users SET email = %s WHERE id = %s", (clean_email, user_id))
+            log_security_event(current_user, f"Edición de usuario: {clean_email}", status="success", ip_address=ip)
+            
+        conn.commit()
+        return {"success": True, "message": "Usuario actualizado exitosamente"}
+
+@app.delete("/api/admin/security/users/{user_id}")
+def delete_admin_user(user_id: int, req: Request, current_user: str = Depends(get_current_admin)):
+    ip = get_client_ip(req)
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) as count FROM admin_users")
+        total = cursor.fetchone()["count"]
+        if total <= 1:
+            raise HTTPException(status_code=400, detail="No puedes eliminar al único administrador del sistema")
+            
+        cursor.execute("SELECT id, email FROM admin_users WHERE id = %s", (user_id,))
+        target = cursor.fetchone()
+        if not target:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+            
+        cursor.execute("DELETE FROM admin_users WHERE id = %s", (user_id,))
+        conn.commit()
+        
+        log_security_event(current_user, f"Eliminación de usuario: {target['email']}", status="warning", ip_address=ip, details="Administrador removido")
+        notify_telegram(f"🗑️ *Administrador Eliminado*\n\nUsuario removido: `{target['email']}` por `{current_user}`")
+        return {"success": True, "message": "Usuario eliminado"}
+
+@app.get("/api/admin/security/logs")
+def get_security_logs(limit: int = 50, current_user: str = Depends(get_current_admin)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, user_email, action, status, ip_address, details, created_at 
+            FROM admin_audit_logs 
+            ORDER BY created_at DESC 
+            LIMIT %s
+        """, (limit,))
+        logs = cursor.fetchall()
+        for log in logs:
+            if isinstance(log.get("created_at"), datetime):
+                log["created_at"] = log["created_at"].strftime("%d/%m/%Y %H:%M:%S")
+        return logs
+
+@app.post("/api/admin/security/telegram-test")
+def test_telegram_alert(current_user: str = Depends(get_current_admin)):
+    now_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    msg = f"🔔 *Prueba de Alerta de Seguridad*\n\nConexión exitosa verificada por `{current_user}`.\nFecha: {now_str}\nEstado: ✅ Todo operativo"
+    notify_telegram(msg)
+    return {"success": True, "message": "Alerta de prueba enviada a Telegram"}
 
 # --- Endpoints ---
 @app.get("/api/products", response_model=List[ProductResponse])

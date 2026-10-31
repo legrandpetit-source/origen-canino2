@@ -8,6 +8,7 @@ import FinanceManager from './FinanceManager';
 import RetentionManager from './RetentionManager';
 import NfcManager from './NfcManager';
 import PaymentSettingsManager from './PaymentSettingsManager';
+import SecurityManager from './SecurityManager';
 
 const AdminPanel = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_token'));
@@ -497,39 +498,9 @@ const AdminPanel = () => {
                 <PaymentSettingsManager fetchWithAuth={fetchWithAuth} />
               )}
 
-              {/* --- SETTINGS TAB --- */}
+              {/* --- SETTINGS / SECURITY TAB --- */}
               {activeTab === 'settings' && (
-                <div className="space-y-4 max-w-lg mx-auto">
-                  <h3 className="font-header text-2xl text-secondary-brown mb-4">Configuración de Seguridad</h3>
-                  <div className="p-6 border border-gray-200 rounded-xl bg-gray-50/50">
-                    <h4 className="font-bold text-lg text-primary-green-dark mb-4">Cambiar Contraseña</h4>
-                    <form onSubmit={handleChangePassword} className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">Contraseña Actual</label>
-                        <input 
-                          type="password" 
-                          required 
-                          value={passwords.old}
-                          onChange={(e) => setPasswords({...passwords, old: e.target.value})}
-                          className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-primary-green outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">Nueva Contraseña</label>
-                        <input 
-                          type="password" 
-                          required 
-                          value={passwords.new}
-                          onChange={(e) => setPasswords({...passwords, new: e.target.value})}
-                          className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-primary-green outline-none"
-                        />
-                      </div>
-                      <button type="submit" className="w-full bg-primary-green text-white font-bold py-3 rounded-lg hover:bg-primary-green-dark transition">
-                        Actualizar Contraseña
-                      </button>
-                    </form>
-                  </div>
-                </div>
+                <SecurityManager fetchWithAuth={fetchWithAuth} />
               )}
             </>
           )}

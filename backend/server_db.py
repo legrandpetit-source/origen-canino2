@@ -256,6 +256,19 @@ def init_database():
                 );
             """)
 
+            # 8. Tabla de Auditoría y Logs de Seguridad
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS admin_audit_logs (
+                    id SERIAL PRIMARY KEY,
+                    user_email TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    status TEXT DEFAULT 'success',
+                    ip_address TEXT,
+                    details TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
             # Cargar datos semilla si la base de datos es nueva
             cursor.execute("SELECT COUNT(*) FROM products")
             if cursor.fetchone()['count'] == 0:
