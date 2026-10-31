@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calculator } from 'lucide-react';
+import { useCart } from '../../context/CartContext';
 
 const CalculatorModal = ({ isOpen, onClose }) => {
   const [dietType, setDietType] = useState('barf');
   const [weight, setWeight] = useState('');
   const [lifeStage, setLifeStage] = useState('adult_normal');
   const [result, setResult] = useState(null);
+  const { dogData, setDogData } = useCart();
 
   const calculateRation = () => {
     const w = parseFloat(weight);
@@ -36,6 +38,13 @@ const CalculatorModal = ({ isOpen, onClose }) => {
     
     const dailyGrams = Math.round((w * 1000) * percentage);
     setResult(dailyGrams);
+    
+    // Guardar los datos del perro en el contexto para el checkout
+    setDogData(prev => ({
+      ...prev,
+      weight: w,
+      age: lifeStage
+    }));
   };
 
   return (

@@ -1,6 +1,6 @@
 import React from 'react';
-import { motion } from 'framer-motion';
-import { Leaf, Info, HeartPulse, Bone } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Leaf, Info, HeartPulse, Bone, Building2, Check, Sparkles, X } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import Especialidades from './Especialidades';
 import Blog from './Blog';
@@ -12,18 +12,37 @@ import BenefitsMarquee from './BenefitsMarquee';
 import SuggestedPlans from './SuggestedPlans';
 import DeliveryArea from './DeliveryArea';
 import Testimonials from './Testimonials';
+import ProductCard from './ProductCard';
 
 // Products will be fetched from API
 
 const Home = () => {
-  const { addItem } = useCart();
+  const { addItem, nfcCommunity, setNfcCommunity, clearNfcCommunity } = useCart();
   const [products, setProducts] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [isCalculatorOpen, setIsCalculatorOpen] = React.useState(false);
+  const [nfcBannerOpen, setNfcBannerOpen] = React.useState(true);
+
+  React.useEffect(() => {
+    // Detectar si el usuario ingresó por un tag NFC de condominio/edificio (?nfc=slug)
+    const params = new URLSearchParams(window.location.search);
+    const nfcParam = params.get('nfc');
+    if (nfcParam) {
+      fetch(`/api/nfc/validate/${encodeURIComponent(nfcParam)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.valid) {
+            setNfcCommunity(data);
+            setNfcBannerOpen(true);
+          }
+        })
+        .catch(err => console.error("Error validando NFC:", err));
+    }
+  }, []);
 
   React.useEffect(() => {
     fetch('/api/products')
-      .then(res => res.json())
+      .then(res => { if (!res.ok) throw new Error("HTTP error " + res.status); return res.json(); })
       .then(data => {
         // Asignamos colores estáticos por ahora basados en el index o tipo
         const productsWithColors = data.map(p => {
@@ -48,6 +67,54 @@ const Home = () => {
 
   return (
     <div className="w-full overflow-hidden">
+      {/* Banner de Bienvenida NFC para Condominios */}
+      <AnimatePresence>
+        {nfcCommunity && nfcBannerOpen && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="bg-gradient-to-r from-primary-green to-primary-green-dark text-white px-4 py-3 shadow-lg border-b border-white/20 relative z-30"
+          >
+            <div className="container mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="bg-white/20 p-2 rounded-full text-white backdrop-blur-sm">
+                  <Building2 size={24} />
+                </div>
+                <div>
+                  <p className="font-header font-bold text-lg flex items-center gap-2">
+                    ¡Hola vecino de <span className="underline decoration-secondary-orange underline-offset-4">{nfcCommunity.name}</span>! 🐾
+                  </p>
+                  <p className="text-xs text-white/90">
+                    {nfcCommunity.address} {nfcCommunity.street_references && `(${nfcCommunity.street_references})`}
+                    {" • "}
+                    <strong className="text-secondary-orange font-bold text-sm bg-white/20 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                      <Sparkles size={12} /> {nfcCommunity.discount_percent}% de Descuento Exclusivo
+                    </strong> aplicado automáticamente a tu compra.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <a 
+                  href="#tienda" 
+                  className="bg-white text-primary-green font-bold text-xs uppercase tracking-wider px-4 py-2 rounded-lg hover:bg-bg-cream transition shadow"
+                >
+                  Ver Menú con Descuento
+                </a>
+                <button 
+                  onClick={() => setNfcBannerOpen(false)}
+                  className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition"
+                  title="Cerrar aviso"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Hero Section */}
       <section id="inicio" className="container mx-auto px-4 py-8 md:py-12 flex flex-col md:flex-row items-center gap-12">
         <div className="md:w-1/2">
@@ -176,34 +243,12 @@ const Home = () => {
                 <p>Cargando deliciosas recetas...</p>
               </div>
             ) : products.filter(p => p.type !== 'snack').map((product) => (
-              <motion.div 
-                key={product.id}
-                whileHover={{ y: -5 }}
-                className={`rounded-3xl p-8 shadow-lg ${product.color} ${product.textColor} relative overflow-hidden flex flex-col`}
-              >
-                <div className="absolute -right-4 -top-4 opacity-10">
-                  <Leaf size={120} />
-                </div>
-                <h3 className="font-header text-2xl mb-2">{product.name}</h3>
-                <p className="text-3xl font-bold mb-4 font-sans">${product.price.toLocaleString('es-CL')} <span className="text-sm font-normal opacity-80">/ {product.weight}</span></p>
-                <p className="mb-4 opacity-90">{product.description}</p>
-                
-                {product.ingredients && product.ingredients.length > 0 && (
-                  <div className="bg-black/20 rounded-xl p-4 mb-6">
-                    <p className="text-sm font-semibold mb-1 flex items-center gap-2"><Info size={16}/> Ingredientes:</p>
-                    <p className="text-sm opacity-90">{product.ingredients.join(', ')}</p>
-                  </div>
-                )}
-                
-                <div className="mt-auto pt-4">
-                  <button 
-                    onClick={() => addItem(product)}
-                    className="w-full bg-white text-secondary-brown font-bold py-3 rounded-xl hover:bg-gray-100 transition shadow-md"
-                  >
-                    Agregar al Carrito
-                  </button>
-                </div>
-              </motion.div>
+              <ProductCard 
+                key={product.id} 
+                product={product} 
+                Icon={Leaf} 
+                addItem={addItem} 
+              />
             ))}
           </div>
         </div>
@@ -220,34 +265,12 @@ const Home = () => {
                 <p>Cargando snacks...</p>
               </div>
             ) : products.filter(p => p.type === 'snack').map((product) => (
-              <motion.div 
-                key={product.id}
-                whileHover={{ y: -5 }}
-                className={`rounded-3xl p-8 shadow-lg ${product.color} ${product.textColor} relative overflow-hidden flex flex-col`}
-              >
-                <div className="absolute -right-4 -top-4 opacity-10">
-                  <Bone size={120} />
-                </div>
-                <h3 className="font-header text-2xl mb-2">{product.name}</h3>
-                <p className="text-3xl font-bold mb-4 font-sans">${product.price.toLocaleString('es-CL')} <span className="text-sm font-normal opacity-80">/ {product.weight}</span></p>
-                <p className="mb-4 opacity-90">{product.description}</p>
-                
-                {product.ingredients && product.ingredients.length > 0 && (
-                  <div className="bg-black/20 rounded-xl p-4 mb-6">
-                    <p className="text-sm font-semibold mb-1 flex items-center gap-2"><Info size={16}/> Ingredientes:</p>
-                    <p className="text-sm opacity-90">{product.ingredients.join(', ')}</p>
-                  </div>
-                )}
-                
-                <div className="mt-auto pt-4">
-                  <button 
-                    onClick={() => addItem(product)}
-                    className="w-full bg-white text-secondary-brown font-bold py-3 rounded-xl hover:bg-gray-100 transition shadow-md"
-                  >
-                    Agregar al Carrito
-                  </button>
-                </div>
-              </motion.div>
+              <ProductCard 
+                key={product.id} 
+                product={product} 
+                Icon={Bone} 
+                addItem={addItem} 
+              />
             ))}
           </div>
         </div>

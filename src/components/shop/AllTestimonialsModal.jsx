@@ -10,7 +10,7 @@ const AllTestimonialsModal = ({ isOpen, onClose, openSubmitModal }) => {
     if (isOpen) {
       setIsLoading(true);
       fetch(`/api/testimonials`)
-        .then(res => res.json())
+        .then(res => { if (!res.ok) throw new Error("HTTP error " + res.status); return res.json(); })
         .then(data => {
           setTestimonials(data);
           setIsLoading(false);

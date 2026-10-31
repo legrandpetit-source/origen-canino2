@@ -14,7 +14,7 @@ const CartDrawer = () => {
   React.useEffect(() => {
     if (isCartOpen && suggestedProducts.length === 0) {
       fetch('/api/products')
-        .then(res => res.json())
+        .then(res => { if (!res.ok) throw new Error("HTTP error " + res.status); return res.json(); })
         .then(data => setSuggestedProducts(data))
         .catch(err => console.error(err));
     }

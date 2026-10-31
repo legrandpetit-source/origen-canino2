@@ -138,10 +138,27 @@ class OrderCreate(BaseModel):
     dog_name: Optional[str] = None
     dog_weight: Optional[float] = None
     dog_age: Optional[str] = None
+    payment_method: Optional[str] = "transferencia"
+    transfer_bank: Optional[str] = None
+    transfer_receipt_number: Optional[str] = None
+    nfc_building_code: Optional[str] = None
+    discount_amount: Optional[int] = 0
 
 class OrderStatusUpdate(BaseModel):
     payment_status: Optional[str] = None
     delivery_status: Optional[str] = None
+
+class BuildingCreateUpdate(BaseModel):
+    name: str
+    slug: str
+    address: str
+    street_references: str
+    discount_percent: int = 15
+    contact_info: Optional[str] = None
+    active: int = 1
+
+class SettingsUpdate(BaseModel):
+    settings: dict
 
 class TestimonialCreate(BaseModel):
     owner_name: str
@@ -627,22 +644,39 @@ def submit_contact(msg: ContactMessage):
 @app.post("/api/orders")
 def create_order(order: OrderCreate):
     subtotal = sum(item.price * item.quantity for item in order.items)
+    discount = order.discount_amount or 0
+    subtotal_after_discount = max(0, subtotal - discount)
     
     # Envío gratis si es suscripción, de lo contrario $5000 si es menor a $100.000
     if order.is_subscription:
         shipping_cost = 0
     else:
-        shipping_cost = 5000 if subtotal < 100000 else 0
+        shipping_cost = 5000 if subtotal_after_discount < 100000 else 0
         
-    total = subtotal + shipping_cost
+    total = subtotal_after_discount + shipping_cost
+
+    initial_payment_status = "Pendiente (Mercado Pago)" if order.payment_method == "mercadopago" else "Pendiente (Transferencia)"
 
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO orders (customer_name, customer_email, customer_phone, customer_address, customer_city, customer_region, subtotal, shipping_cost, total, is_subscription, dog_name, dog_weight, dog_age)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
-            """, (order.customer_name, order.customer_email, order.customer_phone, order.customer_address, order.customer_city, order.customer_region, subtotal, shipping_cost, total, int(order.is_subscription), order.dog_name, order.dog_weight, order.dog_age))
+                INSERT INTO orders (
+                    customer_name, customer_email, customer_phone, customer_address, 
+                    customer_city, customer_region, subtotal, shipping_cost, total, 
+                    is_subscription, dog_name, dog_weight, dog_age, payment_method, 
+                    transfer_bank, transfer_receipt_number, nfc_building_code, 
+                    discount_amount, payment_status
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
+                RETURNING id
+            """, (
+                order.customer_name, order.customer_email, order.customer_phone, order.customer_address, 
+                order.customer_city, order.customer_region, subtotal, shipping_cost, total, 
+                int(order.is_subscription), order.dog_name, order.dog_weight, order.dog_age,
+                order.payment_method or 'transferencia', order.transfer_bank, order.transfer_receipt_number,
+                order.nfc_building_code, discount, initial_payment_status
+            ))
             
             order_id = cursor.fetchone()['id']
             
@@ -652,6 +686,10 @@ def create_order(order: OrderCreate):
                     VALUES (%s, %s, %s, %s, %s)
                 """, (order_id, item.id, item.name, item.quantity, item.price))
             
+            # Si provino de un NFC de edificio, registrar visita/orden
+            if order.nfc_building_code:
+                cursor.execute("UPDATE nfc_buildings SET visits_count = visits_count + 1 WHERE slug = %s", (order.nfc_building_code,))
+
             conn.commit()
             
             # Send Telegram notification
@@ -662,7 +700,15 @@ def create_order(order: OrderCreate):
             msg += f"👤 Cliente: {order.customer_name}\n"
             msg += f"📞 Teléfono: {order.customer_phone}\n"
             msg += f"📍 Dirección: {order.customer_address}, {order.customer_city}\n"
-            msg += f"💰 Total: ${total:,}\n\n"
+            msg += f"💳 Método: {'Mercado Pago Online' if order.payment_method == 'mercadopago' else 'Transferencia Bancaria'}\n"
+            
+            if order.payment_method == 'transferencia' and order.transfer_bank:
+                msg += f"🏦 Banco: {order.transfer_bank} | N° Operación: {order.transfer_receipt_number or 'Sin registrar'}\n"
+
+            if order.nfc_building_code:
+                msg += f"🏢 Tag NFC Comunidad: {order.nfc_building_code} (Descuento: -${discount:,})\n"
+
+            msg += f"💰 Total a Pagar: ${total:,}\n\n"
             
             if order.is_subscription:
                 msg += "⚠️ Importante: Es una suscripción manual. Recuerda contactar al cliente 1 semana antes del próximo mes.\n\n"
@@ -670,10 +716,282 @@ def create_order(order: OrderCreate):
             msg += "Revisa el panel de admin para más detalles."
             notify_telegram(msg)
             
-            return {"success": True, "order_id": order_id, "message": "Orden creada correctamente"}
+            return {"success": True, "order_id": order_id, "total": total, "message": "Orden creada correctamente"}
     except Exception as e:
         print("Error creating order:", e)
-        raise HTTPException(status_code=500, detail="Error al crear la orden.")
+        raise HTTPException(status_code=500, detail="Error al crear la orden: " + str(e))
+
+# --- Mercado Pago Preference & Webhook ---
+@app.post("/api/payments/mercadopago/create-preference")
+def create_mp_preference(payload: dict):
+    order_id = payload.get("order_id")
+    if not order_id:
+        raise HTTPException(status_code=400, detail="order_id requerido")
+    
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM orders WHERE id = %s", (order_id,))
+        order = cursor.fetchone()
+        if not order:
+            raise HTTPException(status_code=404, detail="Orden no encontrada")
+        
+        cursor.execute("SELECT value FROM system_settings WHERE key = 'mercadopago_access_token'")
+        row = cursor.fetchone()
+        access_token = (row['value'] if row and row['value'] else None) or os.getenv("MERCADOPAGO_ACCESS_TOKEN")
+
+    if not access_token:
+        raise HTTPException(
+            status_code=503,
+            detail="Mercado Pago aún no cuenta con Access Token configurado. Puedes pagar vía Transferencia Bancaria o ingresar la credencial en el panel de administración."
+        )
+
+    total = int(order["total"])
+    title = f"Origen Canino — Pedido #{order_id}"
+    
+    mp_url = "https://api.mercadopago.com/checkout/preferences"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+    
+    pref_data = {
+        "items": [
+            {
+                "title": title,
+                "quantity": 1,
+                "currency_id": "CLP",
+                "unit_price": total
+            }
+        ],
+        "payer": {
+            "name": order["customer_name"],
+            "email": order["customer_email"] or "cliente@origencanino.cl"
+        },
+        "metadata": {
+            "order_id": order_id
+        },
+        "external_reference": str(order_id),
+        "notification_url": "https://origencanino.cl/api/webhooks/mercadopago",
+        "back_urls": {
+            "success": f"https://origencanino.cl/?payment=success&order_id={order_id}",
+            "failure": f"https://origencanino.cl/?payment=failure&order_id={order_id}",
+            "pending": f"https://origencanino.cl/?payment=pending&order_id={order_id}"
+        },
+        "auto_return": "approved"
+    }
+    
+    try:
+        req = urllib.request.Request(
+            mp_url,
+            data=json.dumps(pref_data).encode("utf-8"),
+            headers=headers,
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=12) as response:
+            mp_res = json.loads(response.read().decode("utf-8"))
+            pref_id = mp_res.get("id")
+            
+            with get_connection() as conn:
+                conn.cursor().execute(
+                    "UPDATE orders SET mercadopago_preference_id = %s WHERE id = %s",
+                    (pref_id, order_id)
+                )
+                conn.commit()
+                
+            return {
+                "success": True,
+                "init_point": mp_res.get("init_point"),
+                "sandbox_init_point": mp_res.get("sandbox_init_point"),
+                "preference_id": pref_id
+            }
+    except Exception as e:
+        print("[MercadoPago Error]:", e)
+        raise HTTPException(status_code=502, detail=f"Error comunicando con Mercado Pago: {str(e)}")
+
+@app.post("/api/webhooks/mercadopago")
+async def mercadopago_webhook(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+        
+    topic = payload.get("type") or payload.get("topic")
+    data_id = (payload.get("data") or {}).get("id") or payload.get("id")
+    
+    if topic == "payment" and data_id:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM system_settings WHERE key = 'mercadopago_access_token'")
+            row = cursor.fetchone()
+            access_token = (row['value'] if row and row['value'] else None) or os.getenv("MERCADOPAGO_ACCESS_TOKEN")
+            
+        if access_token:
+            try:
+                check_url = f"https://api.mercadopago.com/v1/payments/{data_id}"
+                req = urllib.request.Request(
+                    check_url,
+                    headers={"Authorization": f"Bearer {access_token}"}
+                )
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    p_data = json.loads(resp.read().decode("utf-8"))
+                    
+                status = p_data.get("status")
+                ext_ref = p_data.get("external_reference")
+                
+                if status == "approved" and ext_ref:
+                    order_id = int(ext_ref)
+                    with get_connection() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("""
+                            UPDATE orders 
+                            SET payment_status = 'Pagado', mercadopago_payment_id = %s
+                            WHERE id = %s
+                        """, (str(data_id), order_id))
+                        conn.commit()
+                        
+                    notify_telegram(f"🎉 ¡PAGO APROBADO EN MERCADO PAGO!\n\n🐶 Pedido #{order_id}\n💰 Monto: ${p_data.get('transaction_amount', 0):,}\nID Pago MP: {data_id}")
+            except Exception as e:
+                print("[MP Webhook Error]:", e)
+                
+    return {"status": "ok"}
+
+# --- NFC Communities Endpoints ---
+@app.get("/api/nfc/validate/{slug}")
+def validate_nfc(slug: str):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, name, slug, address, street_references, discount_percent, active 
+                FROM nfc_buildings 
+                WHERE slug = %s AND active = 1
+            """, (slug.strip().lower(),))
+            building = cursor.fetchone()
+            if not building:
+                return {"valid": False, "message": "Comunidad no encontrada o inactiva"}
+            
+            cursor.execute("UPDATE nfc_buildings SET visits_count = visits_count + 1 WHERE slug = %s", (slug.strip().lower(),))
+            conn.commit()
+            
+            return {
+                "valid": True,
+                "name": building["name"],
+                "slug": building["slug"],
+                "address": building["address"],
+                "street_references": building["street_references"],
+                "discount_percent": building["discount_percent"]
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/admin/nfc-buildings")
+def get_admin_buildings(current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT b.*, 
+                       COUNT(o.id) as orders_count,
+                       COALESCE(SUM(o.total), 0) as total_revenue
+                FROM nfc_buildings b
+                LEFT JOIN orders o ON o.nfc_building_code = b.slug
+                GROUP BY b.id
+                ORDER BY b.id DESC
+            """)
+            return [dict(r) for r in cursor.fetchall()]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/admin/nfc-buildings")
+def create_building(b: BuildingCreateUpdate, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO nfc_buildings (name, slug, address, street_references, discount_percent, contact_info, active)
+                VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
+            """, (b.name, b.slug.strip().lower(), b.address, b.street_references, b.discount_percent, b.contact_info, b.active))
+            new_id = cursor.fetchone()['id']
+            conn.commit()
+            return {"success": True, "id": new_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error creando edificio NFC: " + str(e))
+
+@app.put("/api/admin/nfc-buildings/{b_id}")
+def update_building(b_id: int, b: BuildingCreateUpdate, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE nfc_buildings
+                SET name = %s, slug = %s, address = %s, street_references = %s, discount_percent = %s, contact_info = %s, active = %s
+                WHERE id = %s
+            """, (b.name, b.slug.strip().lower(), b.address, b.street_references, b.discount_percent, b.contact_info, b.active, b_id))
+            conn.commit()
+            return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error actualizando edificio NFC: " + str(e))
+
+@app.delete("/api/admin/nfc-buildings/{b_id}")
+def delete_building(b_id: int, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM nfc_buildings WHERE id = %s", (b_id,))
+            conn.commit()
+            return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- Public Bank & System Settings ---
+@app.get("/api/settings/bank-transfer")
+def get_public_bank_settings():
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT key, value FROM system_settings WHERE key LIKE 'bank_%' OR key LIKE 'mercadopago_%'")
+            rows = cursor.fetchall()
+            settings = {r['key']: r['value'] for r in rows}
+            # Mask or check if MP is active
+            has_token = bool(settings.get('mercadopago_access_token') or os.getenv("MERCADOPAGO_ACCESS_TOKEN"))
+            settings['mercadopago_ready'] = has_token and settings.get('mercadopago_enabled', '1') == '1'
+            if 'mercadopago_access_token' in settings:
+                del settings['mercadopago_access_token']
+            return settings
+    except Exception as e:
+        return {}
+
+@app.get("/api/admin/settings")
+def get_admin_settings(current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT key, value FROM system_settings")
+            rows = cursor.fetchall()
+            settings = {r['key']: r['value'] for r in rows}
+            val = settings.get('mercadopago_access_token') or os.getenv("MERCADOPAGO_ACCESS_TOKEN", "")
+            settings['has_mp_token'] = bool(val)
+            settings['mercadopago_access_token_masked'] = (val[:6] + "..." + val[-4:]) if len(val) > 10 else ("***" if val else "")
+            return settings
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/admin/settings")
+def update_admin_settings(payload: SettingsUpdate, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            for k, v in payload.settings.items():
+                if v is not None and not (k == 'mercadopago_access_token' and v == '***'):
+                    cursor.execute("""
+                        INSERT INTO system_settings (key, value, updated_at)
+                        VALUES (%s, %s, CURRENT_TIMESTAMP)
+                        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
+                    """, (k, str(v)))
+            conn.commit()
+            return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/admin/orders")
 def get_orders(current_user: str = Depends(get_current_admin)):

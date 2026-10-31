@@ -29,8 +29,14 @@ __pycache__/
 *$py.class
 *.sqlite
 *.sqlite3
+*.db
 backend/.env
 backend/.venv/
 backend/venv/
+backend/env/
 backend/uploads/
 backend/backups/
+test_*.py
+test_*.js
+test_*.cjs
+check_errors.js

@@ -184,7 +184,49 @@ def init_database():
                     payment_status TEXT DEFAULT 'Pendiente',
                     delivery_status TEXT DEFAULT 'Preparación',
                     is_subscription INTEGER DEFAULT 0,
+                    dog_name TEXT,
+                    dog_weight NUMERIC,
+                    dog_age TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
+            # Migración: Agregar columnas del perro y pago/NFC a orders si no existen
+            cursor.execute("""
+                ALTER TABLE orders ADD COLUMN IF NOT EXISTS dog_name TEXT;
+                ALTER TABLE orders ADD COLUMN IF NOT EXISTS dog_weight NUMERIC;
+                ALTER TABLE orders ADD COLUMN IF NOT EXISTS dog_age TEXT;
+                ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'transferencia';
+                ALTER TABLE orders ADD COLUMN IF NOT EXISTS transfer_bank TEXT;
+                ALTER TABLE orders ADD COLUMN IF NOT EXISTS transfer_receipt_number TEXT;
+                ALTER TABLE orders ADD COLUMN IF NOT EXISTS mercadopago_preference_id TEXT;
+                ALTER TABLE orders ADD COLUMN IF NOT EXISTS mercadopago_payment_id TEXT;
+                ALTER TABLE orders ADD COLUMN IF NOT EXISTS nfc_building_code TEXT;
+                ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount INTEGER DEFAULT 0;
+            """)
+
+            # 5.1 Tabla de Edificios / Puntos de Captación NFC
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS nfc_buildings (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    slug TEXT UNIQUE NOT NULL,
+                    address TEXT NOT NULL,
+                    street_references TEXT NOT NULL,
+                    discount_percent INTEGER DEFAULT 15,
+                    contact_info TEXT,
+                    active INTEGER DEFAULT 1,
+                    visits_count INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
+            # 5.2 Tabla de Parámetros del Sistema (Mercado Pago, Datos Bancarios)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS system_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
 
@@ -343,6 +385,51 @@ def init_database():
                     INSERT INTO testimonials (owner_name, dog_name, content, rating, status)
                     VALUES (%s, %s, %s, %s, %s);
                 """, default_testimonials)
+
+            # Inicializar Edificios Piloto NFC si no existen
+            cursor.execute("SELECT COUNT(*) FROM nfc_buildings")
+            if cursor.fetchone()['count'] == 0:
+                default_buildings = [
+                    (
+                        'Edificio Los Alerces',
+                        'los-alerces',
+                        'Av. Las Condes 1234',
+                        'Esquina San Damián, frente a plaza canina. Chip en mesón de conserjería torre A.',
+                        15,
+                        'Conserjería: Don Juan (+569 8765 4321)',
+                        1
+                    ),
+                    (
+                        'Condominio Parque Central',
+                        'parque-central',
+                        'Av. Providencia 2450',
+                        'Cruce Los Leones con Providencia. Chip en hall de acceso principal junto al ascensor.',
+                        15,
+                        'Administración: contacto@parquecentral.cl',
+                        1
+                    )
+                ]
+                cursor.executemany("""
+                    INSERT INTO nfc_buildings (name, slug, address, street_references, discount_percent, contact_info, active)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s);
+                """, default_buildings)
+
+            # Inicializar Parámetros por Defecto (Datos de Transferencia Bancaria)
+            cursor.execute("SELECT COUNT(*) FROM system_settings")
+            if cursor.fetchone()['count'] == 0:
+                default_settings = [
+                    ('bank_name', 'Banco Santander'),
+                    ('bank_account_type', 'Cuenta Corriente'),
+                    ('bank_account_number', '764521890'),
+                    ('bank_rut', '77.123.456-7'),
+                    ('bank_owner', 'Origen Canino SpA'),
+                    ('bank_email', 'pagos@origencanino.cl'),
+                    ('mercadopago_enabled', '1')
+                ]
+                cursor.executemany("""
+                    INSERT INTO system_settings (key, value)
+                    VALUES (%s, %s) ON CONFLICT (key) DO NOTHING;
+                """, default_settings)
         conn.commit()
     print("✅ Base de datos PostgreSQL inicializada con éxito.")
 

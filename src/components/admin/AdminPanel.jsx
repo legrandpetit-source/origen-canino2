@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Package, BookOpen, Edit2, Plus, Trash2, X, Save, ShoppingCart, MessageSquareHeart, Check, XCircle, LogOut, Key, ChefHat, BarChart } from 'lucide-react';
+import { Package, BookOpen, Edit2, Plus, Trash2, X, Save, ShoppingCart, MessageSquareHeart, Check, XCircle, LogOut, Key, ChefHat, BarChart, Building2, CreditCard } from 'lucide-react';
 import AdminLogin from './AdminLogin';
 import IngredientsManager from './IngredientsManager';
 import ProductRecipeManager from './ProductRecipeManager';
 import DispatchManager from './DispatchManager';
 import FinanceManager from './FinanceManager';
 import RetentionManager from './RetentionManager';
+import NfcManager from './NfcManager';
+import PaymentSettingsManager from './PaymentSettingsManager';
 
 const AdminPanel = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_token'));
@@ -277,10 +279,22 @@ const AdminPanel = () => {
             <MessageSquareHeart size={20} /> Retención
           </button>
           <button 
+            onClick={() => setActiveTab('nfc')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'nfc' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
+          >
+            <Building2 size={20} /> Puntos NFC (Edificios)
+          </button>
+          <button 
+            onClick={() => setActiveTab('payments')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'payments' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
+          >
+            <CreditCard size={20} /> Pagos & Mercado Pago
+          </button>
+          <button 
             onClick={() => setActiveTab('settings')}
             className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'settings' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
           >
-            <Key size={20} /> Ajustes
+            <Key size={20} /> Seguridad
           </button>
         </div>
 
@@ -471,6 +485,16 @@ const AdminPanel = () => {
               {/* --- RETENTION TAB --- */}
               {activeTab === 'retention' && (
                 <RetentionManager orders={orders} products={products} />
+              )}
+
+              {/* --- NFC BUILDINGS TAB --- */}
+              {activeTab === 'nfc' && (
+                <NfcManager fetchWithAuth={fetchWithAuth} />
+              )}
+
+              {/* --- PAYMENTS & MERCADO PAGO TAB --- */}
+              {activeTab === 'payments' && (
+                <PaymentSettingsManager fetchWithAuth={fetchWithAuth} />
               )}
 
               {/* --- SETTINGS TAB --- */}

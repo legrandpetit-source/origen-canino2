@@ -10,7 +10,7 @@ const Testimonials = () => {
 
   useEffect(() => {
     fetch(`/api/testimonials`)
-      .then(res => res.json())
+      .then(res => { if (!res.ok) throw new Error("HTTP error " + res.status); return res.json(); })
       .then(data => {
         // Seleccionar 3 al azar
         const shuffled = data.sort(() => 0.5 - Math.random());

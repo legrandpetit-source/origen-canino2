@@ -29,8 +29,22 @@ const RetentionManager = ({ orders, products }) => {
         }
       });
 
-      // Asumimos un consumo promedio de 400g (0.4Kg) al día si no tenemos el dato del perro
-      const estimatedDays = totalKg > 0 ? Math.floor(totalKg / 0.4) : 0;
+      // Calcular consumo en base a datos reales del perro o fallback a 400g
+      let dailyConsumptionKg = 0.4; // 400g default
+      
+      if (order.dog_weight) {
+        let percentage = 0.025; // 2.5% default adulto
+        switch (order.dog_age) {
+          case 'puppy_small': percentage = 0.08; break;
+          case 'puppy_large': percentage = 0.05; break;
+          case 'adult_low': percentage = 0.02; break;
+          case 'adult_normal': percentage = 0.025; break;
+          case 'adult_high': percentage = 0.035; break;
+        }
+        dailyConsumptionKg = parseFloat(order.dog_weight) * percentage;
+      }
+      
+      const estimatedDays = totalKg > 0 ? Math.floor(totalKg / dailyConsumptionKg) : 0;
       
       const orderDate = new Date(order.created_at);
       const today = new Date();
@@ -61,7 +75,12 @@ const RetentionManager = ({ orders, products }) => {
   }, [orders, products]);
 
   const sendReminder = (order) => {
-    const msg = encodeURIComponent(`Hola ${order.customer_name}! 🐶\n\nNotamos que han pasado ${order.daysPassed} días desde tu último pedido en Origen Canino, y calculamos que a tu perrito le deben quedar poquitas raciones de sus ${order.totalKg}Kg.\n\n¿Te gustaría agendar tu próxima entrega para que no se quede sin su alimento? 🐾`);
+    let msg = '';
+    if (order.dog_name) {
+      msg = encodeURIComponent(`¡Hola ${order.customer_name}! 🐶\n\nNotamos que han pasado ${order.daysPassed} días desde tu último pedido, y calculamos que a ${order.dog_name} le deben quedar poquitas raciones de sus ${order.totalKg}Kg.\n\n¿Te gustaría agendar tu próxima entrega para que no se quede sin su alimento? 🐾`);
+    } else {
+      msg = encodeURIComponent(`Hola ${order.customer_name}! 🐶\n\nNotamos que han pasado ${order.daysPassed} días desde tu último pedido en Origen Canino, y calculamos que a tu perrito le deben quedar poquitas raciones de sus ${order.totalKg}Kg.\n\n¿Te gustaría agendar tu próxima entrega para que no se quede sin su alimento? 🐾`);
+    }
     window.open(`https://wa.me/${order.customer_phone.replace(/\+/g, '').replace(/ /g, '')}?text=${msg}`, '_blank');
   };
 
@@ -75,7 +94,7 @@ const RetentionManager = ({ orders, products }) => {
       </div>
       
       <p className="text-gray-600 bg-gray-50 p-4 rounded-xl text-sm border">
-        El sistema calcula automáticamente cuántos días le durará la comida al cliente asumiendo un consumo promedio de 400g diarios. Te avisaremos cuando le queden menos de 5 días de alimento para que le escribas por WhatsApp.
+        El sistema calcula automáticamente cuántos días le durará la comida al cliente en base al perfil de su perro (peso y etapa). Te avisaremos cuando le queden menos de 5 días de alimento para que le escribas por WhatsApp.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -92,6 +111,9 @@ const RetentionManager = ({ orders, products }) => {
               <div>
                 <h4 className="font-bold text-gray-800">{order.customer_name}</h4>
                 <p className="text-xs text-gray-500">Orden #{order.id} • {new Date(order.created_at).toLocaleDateString('es-CL')}</p>
+                {order.dog_name && (
+                  <p className="text-xs text-primary-green-dark mt-1 font-semibold">🐶 {order.dog_name} ({order.dog_weight}kg)</p>
+                )}
               </div>
               {order.retentionStatus === 'critical' && <AlertTriangle size={20} className="text-red-500" />}
               {order.retentionStatus === 'warning' && <RefreshCw size={20} className="text-orange-500" />}
