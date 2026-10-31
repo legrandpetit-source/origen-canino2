@@ -223,8 +223,17 @@ def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(securi
 # --- Endpoints Públicos ---
 # --- Utilidades ---
 def notify_telegram(message: str):
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    if os.path.exists("backend/.env"):
+        load_dotenv("backend/.env", override=True)
+    elif os.path.exists(".env"):
+        load_dotenv(".env", override=True)
+        
+    token = os.getenv("TELEGRAM_BOT_TOKEN") or "9089876682:AAFeQDNJLqt7qGodbf7EH3fh5gTHlMH2FSQ"
+    # Si sigue con el token viejo de GetContact, forzar el nuevo
+    if token.startswith("8623970624"):
+        token = "9089876682:AAFeQDNJLqt7qGodbf7EH3fh5gTHlMH2FSQ"
+        
+    chat_id = os.getenv("TELEGRAM_CHAT_ID") or "1468481915"
     if not token or not chat_id:
         print("Telegram env vars missing, skipping notification.")
         return
