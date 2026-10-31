@@ -189,6 +189,36 @@ class AdminUserUpdate(BaseModel):
     email: str
     password: Optional[str] = None
 
+class CustomerRegisterRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    region: Optional[str] = "Región Metropolitana"
+    dog_name: Optional[str] = None
+    dog_weight: Optional[float] = None
+    dog_age: Optional[str] = "adulto"
+
+class CustomerLoginRequest(BaseModel):
+    email: str
+    password: str
+
+class CustomerProfileUpdate(BaseModel):
+    name: str
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    region: Optional[str] = "Región Metropolitana"
+
+class CustomerDogCreateUpdate(BaseModel):
+    name: str
+    weight: float
+    age_stage: Optional[str] = "adulto"
+    favorite_diet: Optional[str] = None
+    notes: Optional[str] = None
+
 # --- Auth Config ---
 SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key-origen")
 ALGORITHM = "HS256"
@@ -225,6 +255,19 @@ def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(securi
         return email
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expirado")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+def get_current_customer(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        customer_id = payload.get("customer_id")
+        if not customer_id:
+            raise HTTPException(status_code=401, detail="Token no corresponde a un cliente")
+        return customer_id
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Sesión expirada")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Token inválido")
 
@@ -497,6 +540,195 @@ def test_telegram_alert(current_user: str = Depends(get_current_admin)):
     msg = f"🔔 *Prueba de Alerta de Seguridad*\n\nConexión exitosa verificada por `{current_user}`.\nFecha: {now_str}\nEstado: ✅ Todo operativo"
     notify_telegram(msg)
     return {"success": True, "message": "Alerta de prueba enviada a Telegram"}
+
+# ==========================================
+# --- PORTAL DE CLIENTES & MASCOTAS ---
+# ==========================================
+
+@app.post("/api/customer/register")
+def customer_register(req: CustomerRegisterRequest):
+    clean_email = req.email.strip().lower()
+    if len(req.password) < 6:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 6 caracteres")
+    if not clean_email or not req.name.strip():
+        raise HTTPException(status_code=400, detail="Nombre y correo son obligatorios")
+        
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM customers WHERE LOWER(email) = %s", (clean_email,))
+        if cursor.fetchone():
+            raise HTTPException(status_code=400, detail="Ya existe una cuenta con este correo electrónico. Inicia sesión.")
+            
+        pwd_hash = get_password_hash(req.password)
+        cursor.execute("""
+            INSERT INTO customers (name, email, password_hash, phone, address, city, region)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, name, email, phone, address, city, region, created_at
+        """, (req.name.strip(), clean_email, pwd_hash, req.phone, req.address, req.city, req.region or "Región Metropolitana"))
+        
+        customer = cursor.fetchone()
+        customer_id = customer["id"]
+        
+        # Guardar perrito si fue ingresado
+        dogs = []
+        if req.dog_name and req.dog_weight:
+            cursor.execute("""
+                INSERT INTO customer_dogs (customer_id, name, weight, age_stage)
+                VALUES (%s, %s, %s, %s)
+                RETURNING id, name, weight, age_stage
+            """, (customer_id, req.dog_name.strip(), req.dog_weight, req.dog_age or "adulto"))
+            dog_row = cursor.fetchone()
+            if dog_row and "weight" in dog_row and dog_row["weight"] is not None:
+                dog_row["weight"] = float(dog_row["weight"])
+            dogs.append(dog_row)
+            
+        conn.commit()
+        
+        token = create_access_token(data={"customer_id": customer_id, "sub": clean_email, "type": "customer"})
+        if isinstance(customer.get("created_at"), datetime):
+            customer["created_at"] = customer["created_at"].isoformat()
+            
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "customer": customer,
+            "dogs": dogs
+        }
+
+@app.post("/api/customer/login")
+def customer_login(req: CustomerLoginRequest):
+    clean_email = req.email.strip().lower()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM customers WHERE LOWER(email) = %s", (clean_email,))
+        customer = cursor.fetchone()
+        if not customer or not verify_password(req.password, customer["password_hash"]):
+            raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos")
+            
+        customer_id = customer["id"]
+        cursor.execute("SELECT id, name, weight, age_stage, favorite_diet, notes FROM customer_dogs WHERE customer_id = %s ORDER BY id ASC", (customer_id,))
+        dogs = cursor.fetchall()
+        for d in dogs:
+            if "weight" in d and d["weight"] is not None:
+                d["weight"] = float(d["weight"])
+                
+        token = create_access_token(data={"customer_id": customer_id, "sub": clean_email, "type": "customer"})
+        
+        customer.pop("password_hash", None)
+        if isinstance(customer.get("created_at"), datetime):
+            customer["created_at"] = customer["created_at"].isoformat()
+        if isinstance(customer.get("updated_at"), datetime):
+            customer["updated_at"] = customer["updated_at"].isoformat()
+            
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "customer": customer,
+            "dogs": dogs
+        }
+
+@app.get("/api/customer/me")
+def get_customer_profile(customer_id: int = Depends(get_current_customer)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, email, phone, address, city, region, created_at FROM customers WHERE id = %s", (customer_id,))
+        customer = cursor.fetchone()
+        if not customer:
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+            
+        cursor.execute("SELECT id, name, weight, age_stage, favorite_diet, notes FROM customer_dogs WHERE customer_id = %s ORDER BY id ASC", (customer_id,))
+        dogs = cursor.fetchall()
+        for d in dogs:
+            if "weight" in d and d["weight"] is not None:
+                d["weight"] = float(d["weight"])
+                
+        if isinstance(customer.get("created_at"), datetime):
+            customer["created_at"] = customer["created_at"].strftime("%d/%m/%Y")
+            
+        return {
+            "customer": customer,
+            "dogs": dogs
+        }
+
+@app.put("/api/customer/profile")
+def update_customer_profile(req: CustomerProfileUpdate, customer_id: int = Depends(get_current_customer)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE customers 
+            SET name = %s, phone = %s, address = %s, city = %s, region = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+            RETURNING id, name, email, phone, address, city, region
+        """, (req.name.strip(), req.phone, req.address, req.city, req.region, customer_id))
+        updated = cursor.fetchone()
+        conn.commit()
+        return {"success": True, "customer": updated}
+
+@app.post("/api/customer/dogs")
+def add_customer_dog(dog: CustomerDogCreateUpdate, customer_id: int = Depends(get_current_customer)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO customer_dogs (customer_id, name, weight, age_stage, favorite_diet, notes)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING id, name, weight, age_stage, favorite_diet, notes
+        """, (customer_id, dog.name.strip(), dog.weight, dog.age_stage or "adulto", dog.favorite_diet, dog.notes))
+        new_dog = cursor.fetchone()
+        if "weight" in new_dog and new_dog["weight"] is not None:
+            new_dog["weight"] = float(new_dog["weight"])
+        conn.commit()
+        return {"success": True, "dog": new_dog}
+
+@app.put("/api/customer/dogs/{dog_id}")
+def update_customer_dog(dog_id: int, dog: CustomerDogCreateUpdate, customer_id: int = Depends(get_current_customer)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE customer_dogs 
+            SET name = %s, weight = %s, age_stage = %s, favorite_diet = %s, notes = %s
+            WHERE id = %s AND customer_id = %s
+            RETURNING id, name, weight, age_stage, favorite_diet, notes
+        """, (dog.name.strip(), dog.weight, dog.age_stage or "adulto", dog.favorite_diet, dog.notes, dog_id, customer_id))
+        updated_dog = cursor.fetchone()
+        if not updated_dog:
+            raise HTTPException(status_code=404, detail="Perrito no encontrado")
+        if "weight" in updated_dog and updated_dog["weight"] is not None:
+            updated_dog["weight"] = float(updated_dog["weight"])
+        conn.commit()
+        return {"success": True, "dog": updated_dog}
+
+@app.delete("/api/customer/dogs/{dog_id}")
+def delete_customer_dog(dog_id: int, customer_id: int = Depends(get_current_customer)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM customer_dogs WHERE id = %s AND customer_id = %s", (dog_id, customer_id))
+        conn.commit()
+        return {"success": True, "message": "Perrito eliminado"}
+
+@app.get("/api/customer/orders")
+def get_customer_orders(customer_id: int = Depends(get_current_customer)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT email FROM customers WHERE id = %s", (customer_id,))
+        cust = cursor.fetchone()
+        cust_email = cust["email"] if cust else ""
+        
+        cursor.execute("""
+            SELECT id, total, subtotal, shipping_cost, payment_status, delivery_status, 
+                   payment_method, dog_name, dog_weight, is_subscription, created_at
+            FROM orders 
+            WHERE customer_id = %s OR LOWER(customer_email) = %s
+            ORDER BY id DESC
+        """, (customer_id, cust_email.lower()))
+        orders = cursor.fetchall()
+        
+        for o in orders:
+            if isinstance(o.get("created_at"), datetime):
+                o["created_at"] = o["created_at"].strftime("%d/%m/%Y %H:%M")
+            cursor.execute("SELECT product_id, product_name, quantity, price_at_purchase as price FROM order_items WHERE order_id = %s", (o["id"],))
+            o["items"] = cursor.fetchall()
+            
+        return orders
 
 # --- Endpoints ---
 @app.get("/api/products", response_model=List[ProductResponse])
@@ -847,25 +1079,46 @@ def create_order(order: OrderCreate):
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
+            
+            # Buscar si el cliente ya está registrado por email
+            cursor.execute("SELECT id FROM customers WHERE LOWER(email) = %s", (order.customer_email.strip().lower(),))
+            c_row = cursor.fetchone()
+            linked_customer_id = c_row['id'] if c_row else None
+
             cursor.execute("""
                 INSERT INTO orders (
                     customer_name, customer_email, customer_phone, customer_address, 
                     customer_city, customer_region, subtotal, shipping_cost, total, 
                     is_subscription, dog_name, dog_weight, dog_age, payment_method, 
                     transfer_bank, transfer_receipt_number, nfc_building_code, 
-                    discount_amount, payment_status
+                    discount_amount, payment_status, customer_id
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
                 RETURNING id
             """, (
                 order.customer_name, order.customer_email, order.customer_phone, order.customer_address, 
                 order.customer_city, order.customer_region, subtotal, shipping_cost, total, 
                 int(order.is_subscription), order.dog_name, order.dog_weight, order.dog_age,
                 order.payment_method or 'transferencia', order.transfer_bank, order.transfer_receipt_number,
-                order.nfc_building_code, discount, initial_payment_status
+                order.nfc_building_code, discount, initial_payment_status, linked_customer_id
             ))
             
             order_id = cursor.fetchone()['id']
+            
+            # Si el cliente existe y trajo datos de perrito, auto-guardar si no lo tiene
+            if linked_customer_id and order.dog_name and order.dog_weight:
+                try:
+                    cursor.execute("""
+                        SELECT id FROM customer_dogs 
+                        WHERE customer_id = %s AND LOWER(name) = %s
+                    """, (linked_customer_id, order.dog_name.strip().lower()))
+                    if not cursor.fetchone():
+                        cursor.execute("""
+                            INSERT INTO customer_dogs (customer_id, name, weight, age_stage)
+                            VALUES (%s, %s, %s, %s)
+                        """, (linked_customer_id, order.dog_name.strip(), float(order.dog_weight), order.dog_age or 'adulto'))
+                except Exception as e_dog:
+                    print("Error auto-saving dog for customer:", e_dog)
             
             for item in order.items:
                 cursor.execute("""

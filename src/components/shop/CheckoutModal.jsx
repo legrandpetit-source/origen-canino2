@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, ArrowLeft, CreditCard, Landmark, Sparkles, Building2, ShieldCheck, Copy, Check } from 'lucide-react';
+import { X, CheckCircle, ArrowLeft, CreditCard, Landmark, Sparkles, Building2, ShieldCheck, Copy, Check, UserCheck, Dog } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
+import { useCustomer } from '../../context/CustomerContext';
 
 const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
   const { items, total, clearCart, dogData, nfcCommunity, nfcDiscount } = useCart();
+  const { customer, dogs, openAuthModal } = useCustomer();
   
   const [formData, setFormData] = useState({
     customer_name: '',
@@ -60,6 +62,36 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
       }));
     }
   }, [dogData]);
+
+  // Autocompletar datos del cliente si tiene sesión iniciada
+  useEffect(() => {
+    if (customer && isOpen) {
+      setFormData(prev => ({
+        ...prev,
+        customer_name: prev.customer_name || customer.name || '',
+        customer_email: prev.customer_email || customer.email || '',
+        customer_phone: prev.customer_phone || customer.phone || '',
+        customer_address: prev.customer_address || customer.address || '',
+        customer_city: prev.customer_city || customer.city || '',
+        customer_region: customer.region || prev.customer_region || 'Región Metropolitana',
+      }));
+
+      // Si no hay perrito seleccionado en el formulario y el cliente tiene perritos guardados, seleccionar el primero
+      if (dogs && dogs.length > 0) {
+        setFormData(prev => {
+          if (!prev.dog_name) {
+            return {
+              ...prev,
+              dog_name: dogs[0].name || '',
+              dog_weight: dogs[0].weight ? String(dogs[0].weight) : '',
+              dog_age: dogs[0].age_stage || 'adult_normal'
+            };
+          }
+          return prev;
+        });
+      }
+    }
+  }, [customer, dogs, isOpen]);
 
   // Descuentos: Suscripción (10%) o Descuento de Comunidad NFC
   const subscriptionDiscount = isSubscription ? Math.round(total * 0.1) : 0;
@@ -245,6 +277,47 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                 </div>
                 
                 <form onSubmit={handleSubmit} className="p-6 space-y-6 flex-1">
+                  {/* Banner de Autocompletado / Inicio de Sesión de Clientes */}
+                  {customer ? (
+                    <div className="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-3.5 flex items-center justify-between shadow-xs">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                          {customer.name?.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-primary-green-dark flex items-center gap-1.5">
+                            <UserCheck size={14} className="text-emerald-600" /> ¡Hola, {customer.name}!
+                          </p>
+                          <p className="text-[11px] text-gray-600">
+                            Hemos autocompletado tus datos de contacto y entrega guardados.
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold text-primary-green bg-white px-2 py-0.5 rounded-full border border-emerald-200 shadow-xs hidden sm:inline-block">
+                        Cliente Registrado
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                          <Sparkles size={16} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-800">¿Ya has comprado antes en Origen Canino?</p>
+                          <p className="text-[11px] text-gray-600">Inicia sesión para autocompletar tus datos y los de tu peludo en 1 clic.</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openAuthModal('login')}
+                        className="whitespace-nowrap px-3.5 py-1.5 bg-primary-green hover:bg-primary-green-dark text-white text-xs font-bold rounded-xl transition shadow-xs w-full sm:w-auto text-center"
+                      >
+                        Iniciar Sesión
+                      </button>
+                    </div>
+                  )}
+
                   {/* Badge Comunidad NFC si aplica */}
                   {nfcCommunity && (
                     <div className="bg-primary-green/10 border border-primary-green/30 p-3.5 rounded-xl flex items-center justify-between">
@@ -291,10 +364,49 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
 
                   {/* Datos del Perro */}
                   <div>
-                    <h3 className="font-bold text-lg mb-3 text-secondary-brown flex items-center gap-2">
-                      <span className="w-6 h-6 bg-primary-green text-white text-xs rounded-full flex items-center justify-center">2</span>
-                      Datos de tu Mascota
-                    </h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-bold text-lg text-secondary-brown flex items-center gap-2">
+                        <span className="w-6 h-6 bg-primary-green text-white text-xs rounded-full flex items-center justify-center">2</span>
+                        Datos de tu Mascota
+                      </h3>
+                    </div>
+
+                    {/* Selector rápido de mascotas guardadas si está logueado */}
+                    {customer && dogs && dogs.length > 0 && (
+                      <div className="mb-4 bg-gray-50/80 border border-gray-200/80 rounded-xl p-3">
+                        <div className="flex items-center gap-1.5 text-xs text-gray-600 font-semibold mb-2">
+                          <Dog size={14} className="text-primary-green" /> Seleccionar una de tus mascotas guardadas:
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {dogs.map((dog) => {
+                            const isSelected = formData.dog_name?.trim().toLowerCase() === dog.name?.trim().toLowerCase();
+                            return (
+                              <button
+                                key={dog.id}
+                                type="button"
+                                onClick={() => {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    dog_name: dog.name,
+                                    dog_weight: dog.weight ? String(dog.weight) : '',
+                                    dog_age: dog.age_stage || 'adult_normal'
+                                  }));
+                                }}
+                                className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition border ${
+                                  isSelected
+                                    ? 'bg-primary-green text-white border-primary-green shadow-xs'
+                                    : 'bg-white text-gray-700 border-gray-300 hover:border-primary-green'
+                                }`}
+                              >
+                                <span>🐾 {dog.name}</span>
+                                {dog.weight && <span className="opacity-80 text-[10px]">({dog.weight} kg)</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-sm text-gray-600 mb-1">Nombre del Perro *</label>

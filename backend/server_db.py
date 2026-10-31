@@ -269,6 +269,39 @@ def init_database():
                 );
             """)
 
+            # 9. Tablas de Portal de Clientes y Mascotas
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS customers (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    email TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    phone TEXT,
+                    address TEXT,
+                    city TEXT,
+                    region TEXT DEFAULT 'Región Metropolitana',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS customer_dogs (
+                    id SERIAL PRIMARY KEY,
+                    customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+                    name TEXT NOT NULL,
+                    weight NUMERIC NOT NULL,
+                    age_stage TEXT DEFAULT 'adulto',
+                    favorite_diet TEXT,
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
+            cursor.execute("""
+                ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL;
+            """)
+
             # Cargar datos semilla si la base de datos es nueva
             cursor.execute("SELECT COUNT(*) FROM products")
             if cursor.fetchone()['count'] == 0:

@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Menu, X } from 'lucide-react';
+import { ShoppingBag, Menu, X, User, PawPrint } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
+import { useCustomer } from '../../context/CustomerContext';
+import { Link, useNavigate } from 'react-router-dom';
 
 const Navbar = () => {
   const { isCartOpen, setIsCartOpen, itemCount } = useCart();
+  const { customer, openAuthModal } = useCustomer();
+  const navigate = useNavigate();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -52,11 +56,31 @@ const Navbar = () => {
         </a>
 
         {/* Desktop Menu */}
-        <div className="hidden md:flex items-center gap-8 font-header text-lg text-secondary-brown">
+        <div className="hidden md:flex items-center gap-6 font-header text-lg text-secondary-brown">
           <a href="#planes" onClick={(e) => scrollTo(e, 'planes')} className="hover:text-primary-green transition">Planes Mensuales</a>
           <a href="#despacho" onClick={(e) => scrollTo(e, 'despacho')} className="hover:text-primary-green transition">Despacho</a>
           <a href="#tienda" onClick={(e) => scrollTo(e, 'tienda')} className="hover:text-primary-green transition">Tienda</a>
           
+          {/* Customer Account Button */}
+          {customer ? (
+            <Link 
+              to="/mi-cuenta" 
+              className="flex items-center gap-2 bg-primary-green/10 text-primary-green px-3.5 py-1.5 rounded-full hover:bg-primary-green hover:text-white transition text-sm font-sans font-bold shadow-sm"
+              title="Ir a mi portal de cliente"
+            >
+              <PawPrint size={16} />
+              <span>Hola, {customer.name.split(' ')[0]}</span>
+            </Link>
+          ) : (
+            <button 
+              onClick={() => openAuthModal('login')} 
+              className="flex items-center gap-1.5 text-secondary-brown hover:text-primary-green transition text-sm font-sans font-bold px-3 py-1.5 rounded-xl hover:bg-gray-100"
+            >
+              <User size={18} />
+              <span>Mi Cuenta</span>
+            </button>
+          )}
+
           <button 
             onClick={() => setIsCartOpen(true)}
             className="relative p-2 text-primary-green hover:bg-primary-green/10 rounded-full transition"
@@ -71,7 +95,25 @@ const Navbar = () => {
         </div>
 
         {/* Mobile Menu Toggle */}
-        <div className="md:hidden flex items-center gap-4">
+        <div className="md:hidden flex items-center gap-3">
+          {customer ? (
+            <Link 
+              to="/mi-cuenta" 
+              className="p-2 text-primary-green bg-primary-green/10 rounded-full"
+              title="Mi Cuenta"
+            >
+              <PawPrint size={20} />
+            </Link>
+          ) : (
+            <button 
+              onClick={() => openAuthModal('login')} 
+              className="p-2 text-secondary-brown"
+              title="Iniciar Sesión"
+            >
+              <User size={22} />
+            </button>
+          )}
+
           <button 
             onClick={() => setIsCartOpen(true)}
             className="relative p-2 text-primary-green"
@@ -94,7 +136,26 @@ const Navbar = () => {
         <div className="md:hidden absolute top-full left-0 right-0 bg-white shadow-xl border-t border-gray-100 flex flex-col py-4 px-6 font-header text-xl text-secondary-brown z-50">
           <a href="#planes" onClick={(e) => scrollTo(e, 'planes')} className="py-3 border-b border-gray-100 hover:text-primary-green">Planes Mensuales</a>
           <a href="#despacho" onClick={(e) => scrollTo(e, 'despacho')} className="py-3 border-b border-gray-100 hover:text-primary-green">Despacho</a>
-          <a href="#tienda" onClick={(e) => scrollTo(e, 'tienda')} className="py-3 hover:text-primary-green">Tienda</a>
+          <a href="#tienda" onClick={(e) => scrollTo(e, 'tienda')} className="py-3 border-b border-gray-100 hover:text-primary-green">Tienda</a>
+          
+          {customer ? (
+            <Link 
+              to="/mi-cuenta" 
+              onClick={() => setMobileMenuOpen(false)}
+              className="py-3 hover:text-primary-green flex items-center gap-2 text-primary-green"
+            >
+              <PawPrint size={20} />
+              Mi Cuenta ({customer.name.split(' ')[0]})
+            </Link>
+          ) : (
+            <button 
+              onClick={() => { setMobileMenuOpen(false); openAuthModal('login'); }}
+              className="py-3 hover:text-primary-green text-left flex items-center gap-2"
+            >
+              <User size={20} />
+              Ingresar a Mi Cuenta
+            </button>
+          )}
         </div>
       )}
     </nav>
