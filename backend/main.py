@@ -1002,8 +1002,8 @@ async def mercadopago_webhook(request: Request):
     except Exception:
         payload = {}
         
-    topic = payload.get("type") or payload.get("topic")
-    data_id = (payload.get("data") or {}).get("id") or payload.get("id")
+    topic = payload.get("type") or payload.get("topic") or request.query_params.get("type") or request.query_params.get("topic")
+    data_id = (payload.get("data") or {}).get("id") or payload.get("id") or request.query_params.get("data.id") or request.query_params.get("id")
     
     if topic == "payment" and data_id:
         with get_connection() as conn:
