@@ -282,3 +282,4 @@ const PaymentSettingsManager = ({ fetchWithAuth }) => {
 };
 
 export default PaymentSettingsManager;
+

@@ -268,7 +268,7 @@ def init_database():
                         'Alimento crudo biológicamente apropiado para perros.',
                         json.dumps(['Huesos carnosos', 'Carne magra', 'Vísceras', 'Vegetales triturados']),
                         json.dumps(['Digestión óptima', 'Dientes más limpios', 'Mayor energía']),
-                        'https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=500&auto=format&fit=crop&q=60',
+                        '/images/products/dieta-barf.jpg',
                         1
                     ),
                     (
@@ -279,7 +279,7 @@ def init_database():
                         'Comida suave cocinada a baja temperatura para fácil digestión.',
                         json.dumps(['Cerdo magro', 'Arroz integral', 'Zanahoria', 'Zapallo', 'Suplementos']),
                         json.dumps(['Fácil digestión', 'Alta palatabilidad', 'Ideal para estómagos sensibles']),
-                        'https://images.unsplash.com/photo-1596492784531-6e6eb5ea9993?w=500&auto=format&fit=crop&q=60',
+                        '/images/products/dieta-cocinada-cerdo.jpg',
                         0
                     ),
                     (
@@ -290,7 +290,7 @@ def init_database():
                         'El formato perfecto para probar la dieta cocinada por primera vez. Ideal para la transición.',
                         json.dumps(['Cerdo magro', 'Arroz integral', 'Zanahoria', 'Zapallo', 'Suplementos']),
                         json.dumps(['Ideal para probar', 'Fácil digestión', 'Transición segura']),
-                        'https://images.unsplash.com/photo-1596492784531-6e6eb5ea9993?w=500&auto=format&fit=crop&q=60',
+                        '/images/products/pack-inicia-cerdo.jpg',
                         1
                     ),
                     (
@@ -301,7 +301,7 @@ def init_database():
                         'Snack natural deshidratado a baja temperatura, ideal para la limpieza dental y articulaciones.',
                         json.dumps(['Patas de pollo 100% naturales']),
                         json.dumps(['Limpieza dental', 'Fuente natural de condroitina', 'Entretenimiento seguro']),
-                        'https://images.unsplash.com/photo-1626082264629-652f205ab016?w=500&auto=format&fit=crop&q=60',
+                        '/images/products/patitas-pollo.jpg',
                         1
                     ),
                     (
@@ -312,7 +312,7 @@ def init_database():
                         'Caldo de huesos cocinado a fuego lento por más de 24 horas, repleto de nutrientes.',
                         json.dumps(['Huesos de vacuno', 'Agua purificada', 'Vinagre de manzana']),
                         json.dumps(['Salud articular', 'Hidratación profunda', 'Refuerzo inmunológico']),
-                        'https://images.unsplash.com/photo-1579567761406-4684ee0c75b6?w=500&auto=format&fit=crop&q=60',
+                        '/images/products/caldo-huesos.jpg',
                         1
                     )
                 ]

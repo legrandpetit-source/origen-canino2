@@ -384,3 +384,4 @@ const NfcManager = ({ fetchWithAuth }) => {
 };
 
 export default NfcManager;
+
