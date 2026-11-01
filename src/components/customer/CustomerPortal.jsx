@@ -125,7 +125,8 @@ const CustomerPortal = () => {
       addItem({
         id: item.product_id,
         name: item.product_name,
-        price: item.price
+        price: item.price,
+        weight: item.weight
       }, item.quantity);
     });
 
@@ -350,7 +351,7 @@ const CustomerPortal = () => {
                         <ul className="list-disc list-inside space-y-0.5">
                           {o.items.map((item, idx) => (
                             <li key={idx}>
-                              <span className="font-semibold">{item.quantity}x</span> {item.product_name}
+                              <span className="font-semibold">{item.quantity}x</span> {item.product_name} {item.weight ? <span className="text-gray-500 text-xs font-normal">({item.weight})</span> : ''}
                             </li>
                           ))}
                         </ul>

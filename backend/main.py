@@ -125,6 +125,7 @@ class OrderItem(BaseModel):
     name: str
     price: int
     quantity: int
+    weight: Optional[str] = None
 
 class OrderCreate(BaseModel):
     customer_name: str
@@ -725,7 +726,12 @@ def get_customer_orders(customer_id: int = Depends(get_current_customer)):
         for o in orders:
             if isinstance(o.get("created_at"), datetime):
                 o["created_at"] = o["created_at"].strftime("%d/%m/%Y %H:%M")
-            cursor.execute("SELECT product_id, product_name, quantity, price_at_purchase as price FROM order_items WHERE order_id = %s", (o["id"],))
+            cursor.execute("""
+                SELECT oi.product_id, oi.product_name, oi.quantity, oi.price_at_purchase as price, p.weight 
+                FROM order_items oi 
+                LEFT JOIN products p ON oi.product_id = p.id 
+                WHERE oi.order_id = %s
+            """, (o["id"],))
             o["items"] = cursor.fetchall()
             
         return orders

@@ -48,9 +48,9 @@ const SuggestedPlans = () => {
             Guía de Compra Mensual
           </h2>
           <p className="text-secondary-brown-light/80 text-lg">
-            Nuestros packs son de 1 Kg. Compra exactamente lo que necesitas. 
+            Compra la combinación perfecta de recetas y formatos para tu mascota. 
             <br className="hidden md:block"/> 
-            Revisa esta guía para saber cuántos kilos requiere tu perrito en un mes completo.
+            Revisa esta guía para saber cuántos kilos de alimento requiere tu perrito en un mes completo.
           </p>
         </div>
 

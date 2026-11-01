@@ -24,7 +24,24 @@ const CartDrawer = () => {
     .filter(p => !items.some(i => i.id === p.id) && !p.name.toLowerCase().includes("pack inicial"))
     .slice(0, 3);
 
-  const totalKilos = items.reduce((sum, item) => sum + item.quantity, 0);
+  // Helper para convertir peso a kilos numéricos
+  const parseWeightToKg = (weightStr) => {
+    if (!weightStr) return 1;
+    const str = String(weightStr).toLowerCase().trim();
+    const numMatch = str.match(/([0-9]+(?:[\.,][0-9]+)?)/);
+    if (!numMatch) return 1;
+    const num = parseFloat(numMatch[1].replace(',', '.'));
+    if (str.includes('kg') || str.includes('kilo')) return num;
+    if (str.includes('g') || str.includes('gr') || str.includes('ml')) return num / 1000;
+    return num;
+  };
+
+  // Kilos reales de dietas para la meta de 10 kg de suscripción
+  const totalDietKilos = items
+    .filter(item => item.type !== 'snack')
+    .reduce((sum, item) => sum + (parseWeightToKg(item.weight) * item.quantity), 0);
+
+  const totalKilos = totalDietKilos;
 
   React.useEffect(() => {
     if (totalKilos < 10 && isSubscription) {
@@ -81,7 +98,9 @@ const CartDrawer = () => {
                     <div key={item.id} className="flex gap-4 border-b pb-4">
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-800">{item.name}</h4>
-                        <p className="text-gray-500 text-sm">${item.price.toLocaleString('es-CL')} / kg</p>
+                        <p className="text-gray-500 text-sm">
+                          ${item.price.toLocaleString('es-CL')} {item.weight ? `/ ${item.weight}` : ''}
+                        </p>
                         
                         <div className="flex items-center gap-3 mt-3">
                           <div className="flex items-center border rounded-lg">
@@ -108,7 +127,9 @@ const CartDrawer = () => {
                           <div key={product.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border">
                             <div>
                               <h5 className="font-bold text-sm text-secondary-brown">{product.name}</h5>
-                              <p className="text-xs text-gray-500">${product.price.toLocaleString('es-CL')}</p>
+                              <p className="text-xs text-gray-500">
+                                ${product.price.toLocaleString('es-CL')} {product.weight ? `· ${product.weight}` : ''}
+                              </p>
                             </div>
                             <button 
                               onClick={() => addItem(product)} 
@@ -186,7 +207,7 @@ const CartDrawer = () => {
                       </span>
                     </div>
                     <p className="text-xs text-gray-500">
-                      Agrega al menos <strong>10 kg</strong> a tu carrito (actualmente tienes <strong>{totalKilos} kg</strong>) para activar despachos automáticos cada mes con <strong>10% de descuento y despacho gratis</strong>.
+                      Agrega al menos <strong>10 kg</strong> de comida a tu carrito (actualmente tienes <strong>{totalKilos % 1 === 0 ? totalKilos : totalKilos.toFixed(1)} kg</strong>) para activar despachos automáticos cada mes con <strong>10% de descuento y despacho gratis</strong>.
                     </p>
                   </div>
                 )}

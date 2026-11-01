@@ -138,7 +138,8 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
           id: item.id,
           name: item.name,
           price: item.price,
-          quantity: item.quantity
+          quantity: item.quantity,
+          weight: item.weight || null
         })),
         is_subscription: isSubscription
       };
@@ -577,8 +578,20 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
 
                   {/* Resumen Financiero */}
                   <div className="bg-gray-50 p-4 rounded-2xl border space-y-2">
+                    {/* Lista resumida de productos */}
+                    <div className="bg-white rounded-xl p-3 border border-gray-200/60 mb-3 space-y-1.5 text-xs">
+                      {items.map(item => (
+                        <div key={item.id} className="flex justify-between items-center text-gray-700">
+                          <span className="truncate pr-2">
+                            <strong>{item.quantity}x</strong> {item.name} {item.weight ? <span className="text-gray-500 font-normal">({item.weight})</span> : ''}
+                          </span>
+                          <span className="font-semibold whitespace-nowrap">${(item.price * item.quantity).toLocaleString('es-CL')}</span>
+                        </div>
+                      ))}
+                    </div>
+
                     <div className="flex justify-between text-sm text-gray-600">
-                      <span>Subtotal ({items.length} productos)</span>
+                      <span>Subtotal ({items.reduce((acc, i) => acc + i.quantity, 0)} unidades)</span>
                       <span>${total.toLocaleString('es-CL')}</span>
                     </div>
 
