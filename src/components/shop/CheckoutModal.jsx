@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, ArrowLeft, CreditCard, Landmark, Sparkles, Building2, ShieldCheck, Copy, Check, UserCheck, Dog } from 'lucide-react';
+import { X, CheckCircle, ArrowLeft, CreditCard, Landmark, Sparkles, Building2, ShieldCheck, Copy, Check, UserCheck, Dog, RefreshCw, Info } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useCustomer } from '../../context/CustomerContext';
 
@@ -558,6 +558,22 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                       </div>
                     )}
                   </div>
+
+                  {/* Banner de Suscripción Mensual si está activa */}
+                  {isSubscription && (
+                    <div className="bg-emerald-50 border border-primary-green/30 rounded-2xl p-4 text-xs text-primary-green-dark">
+                      <div className="flex items-center gap-2 font-bold text-sm mb-1">
+                        <RefreshCw size={16} className="text-primary-green" />
+                        <span>Suscripción Mensual Automática</span>
+                        <span className="bg-primary-green text-white text-[10px] font-bold px-2 py-0.5 rounded-full ml-auto">
+                          10% OFF + Envío Gratis
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-600 leading-relaxed">
+                        Este pedido quedará registrado para despacho mensual programado. Antes de cada envío te contactaremos por WhatsApp para coordinar la fecha de entrega y procesar el cobro correspondiente.
+                      </p>
+                    </div>
+                  )}
 
                   {/* Resumen Financiero */}
                   <div className="bg-gray-50 p-4 rounded-2xl border space-y-2">

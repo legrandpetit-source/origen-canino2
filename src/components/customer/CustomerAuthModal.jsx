@@ -337,3 +337,4 @@ const CustomerAuthModal = () => {
 };
 
 export default CustomerAuthModal;
+

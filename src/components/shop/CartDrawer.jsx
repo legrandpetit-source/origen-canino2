@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useCart } from '../../context/CartContext';
-import { X, Plus, Minus, Trash2 } from 'lucide-react';
+import { X, Plus, Minus, Trash2, Info, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CheckoutModal from './CheckoutModal';
 
@@ -128,30 +128,66 @@ const CartDrawer = () => {
             {items.length > 0 && (
               <div className="border-t p-4 bg-gray-50">
                 {totalKilos >= 10 ? (
-                  <div className="bg-primary-cream/30 p-3 rounded-lg mb-4 border border-primary-green/20">
+                  <div className={`p-3.5 rounded-2xl mb-4 border transition-all ${
+                    isSubscription 
+                      ? 'bg-emerald-50/90 border-primary-green shadow-xs' 
+                      : 'bg-primary-cream/40 border-primary-green/30 hover:border-primary-green/50'
+                  }`}>
                     <label className="flex items-start gap-3 cursor-pointer">
                       <input 
                         type="checkbox" 
-                        className="mt-1 w-5 h-5 accent-primary-green"
+                        className="mt-1 w-5 h-5 accent-primary-green cursor-pointer rounded"
                         checked={isSubscription}
                         onChange={(e) => setIsSubscription(e.target.checked)}
                       />
                       <div className="flex-1">
-                        <span className="font-bold text-primary-green-dark">Suscribirme a este pedido</span>
-                        <p className="text-xs text-gray-600 mt-1">
-                          Obtén un <span className="font-bold text-green-600">10% de descuento</span> y <span className="font-bold text-green-600">despacho gratis</span> en todos tus envíos mensuales.
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-bold text-sm text-primary-green-dark flex items-center gap-1.5">
+                            <RefreshCw size={15} className={`text-primary-green ${isSubscription ? 'animate-spin-slow' : ''}`} />
+                            Suscribirme a entrega mensual con este pedido
+                          </span>
+                          <span className="bg-primary-green text-white text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
+                            10% OFF + Envío Gratis
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-1 font-medium">
+                          Recibe este mismo pedido automáticamente cada 30 días sin preocuparte de volver a comprar.
                         </p>
                       </div>
                     </label>
+
+                    {/* Explicación transparente de la mensualidad */}
+                    <div className="mt-3 pt-2.5 border-t border-primary-green/20 text-xs text-gray-700 bg-white/70 p-2.5 rounded-xl">
+                      <div className="flex items-center gap-1.5 font-bold text-primary-green-dark mb-1">
+                        <Info size={14} className="text-primary-green shrink-0" />
+                        <span>¿Cómo funciona tu suscripción mensual?</span>
+                      </div>
+                      <p className="text-[11px] leading-relaxed text-gray-600">
+                        Usted se está suscribiendo a una mensualidad donde se le avisará previamente por WhatsApp para coordinar el despacho del pedido y se generará el cobro correspondiente con su 10% de descuento y despacho gratis garantizados.
+                      </p>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-gray-500 pt-1.5 border-t border-gray-100 mt-1.5">
+                        <span className="flex items-center gap-1 text-emerald-700 font-medium">
+                          <CheckCircle2 size={12} className="text-primary-green" /> Sin contratos ni ataduras
+                        </span>
+                        <span className="flex items-center gap-1 text-emerald-700 font-medium">
+                          <CheckCircle2 size={12} className="text-primary-green" /> Pausa o cancela cuando quieras
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 ) : (
-                  <div className="bg-gray-100 p-3 rounded-lg mb-4 border border-gray-200">
-                    <div className="flex-1">
-                      <span className="font-bold text-gray-500">Suscripción Mensual</span>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Agrega al menos 10kg a tu carrito para habilitar la suscripción con un 10% de descuento y despacho gratis.
-                      </p>
+                  <div className="bg-gray-100/90 p-3.5 rounded-2xl mb-4 border border-gray-200">
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="font-bold text-xs text-gray-700 flex items-center gap-1.5">
+                        <RefreshCw size={14} className="text-gray-400" /> Suscripción Mensual Recurrente
+                      </span>
+                      <span className="bg-gray-200 text-gray-600 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        Desde 10 kg
+                      </span>
                     </div>
+                    <p className="text-xs text-gray-500">
+                      Agrega al menos <strong>10 kg</strong> a tu carrito (actualmente tienes <strong>{totalKilos} kg</strong>) para activar despachos automáticos cada mes con <strong>10% de descuento y despacho gratis</strong>.
+                    </p>
                   </div>
                 )}
                 
