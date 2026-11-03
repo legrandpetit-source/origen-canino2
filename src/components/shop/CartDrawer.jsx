@@ -46,6 +46,10 @@ const CartDrawer = () => {
 
   const totalKilos = totalDietKilos;
 
+  const MIN_PURCHASE = 30000;
+  const isMinMet = total >= MIN_PURCHASE;
+  const missingForMin = Math.max(0, MIN_PURCHASE - total);
+
   React.useEffect(() => {
     if (totalKilos < 10 && isSubscription) {
       setIsSubscription(false);
@@ -53,7 +57,7 @@ const CartDrawer = () => {
   }, [totalKilos, isSubscription]);
 
   const handleCheckout = () => {
-    if (items.length === 0) return;
+    if (items.length === 0 || !isMinMet) return;
     setIsCheckoutOpen(true);
     setIsCartOpen(false);
   };
@@ -236,6 +240,25 @@ const CartDrawer = () => {
                   </div>
                 )}
                 
+                {/* Barra y Alerta de Compra Mínima ($30.000) */}
+                {!isMinMet && (
+                  <div className="mb-3.5 p-3.5 bg-amber-50/90 border border-amber-200 rounded-2xl">
+                    <div className="flex items-center justify-between text-xs font-bold text-amber-900 mb-1.5 font-body">
+                      <span>Mínimo de compra: $30.000</span>
+                      <span className="text-[#c64a4c]">Faltan ${missingForMin.toLocaleString('es-CL')}</span>
+                    </div>
+                    <div className="w-full bg-amber-200/50 rounded-full h-2 overflow-hidden">
+                      <div 
+                        className="bg-[#db994b] h-full rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, Math.round((total / MIN_PURCHASE) * 100))}%` }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-amber-700 mt-1.5 font-body leading-tight">
+                      Para asegurar una entrega óptima y mantener la cadena de frío, el pedido mínimo es de $30.000 CLP.
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex justify-between font-bold text-lg mb-4 font-display">
                   <span>Total estimado:</span>
                   <div className="text-right">
@@ -254,11 +277,21 @@ const CartDrawer = () => {
                     )}
                   </div>
                 </div>
+
                 <button 
                   onClick={handleCheckout}
-                  className="w-full bg-secondary-orange text-white font-bold py-3 rounded-xl hover:bg-[#d65d21] transition shadow-md"
+                  disabled={!isMinMet}
+                  className={`w-full font-bold py-3.5 rounded-xl transition shadow-md flex items-center justify-center gap-2 font-body text-base ${
+                    isMinMet 
+                      ? 'bg-secondary-orange text-white hover:bg-[#d65d21] shadow-md hover:shadow-lg cursor-pointer' 
+                      : 'bg-stone-200 text-stone-500 cursor-not-allowed opacity-80'
+                  }`}
                 >
-                  Ir al Pago
+                  {isMinMet ? (
+                    'Ir al Pago'
+                  ) : (
+                    `Mínimo $30.000 (Faltan $${missingForMin.toLocaleString('es-CL')})`
+                  )}
                 </button>
               </div>
             )}

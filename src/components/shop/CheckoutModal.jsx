@@ -143,6 +143,10 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (items.length === 0) return;
+    if (total < 30000) {
+      alert("El monto mínimo de compra es de $30.000 CLP. Por favor agrega más productos a tu pedido.");
+      return;
+    }
     
     setIsSubmitting(true);
     try {

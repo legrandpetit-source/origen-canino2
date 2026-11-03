@@ -1304,9 +1304,16 @@ def submit_contact(msg: ContactMessage):
         raise HTTPException(status_code=500, detail="Error al guardar el mensaje.")
 
 # --- Orders Endpoints ---
+MIN_PURCHASE_AMOUNT = 30000
+
 @app.post("/api/orders")
 def create_order(order: OrderCreate):
     subtotal = sum(item.price * item.quantity for item in order.items)
+    if subtotal < MIN_PURCHASE_AMOUNT:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"El monto mínimo de compra es de ${MIN_PURCHASE_AMOUNT:,} CLP. Tu subtotal actual es de ${subtotal:,} CLP."
+        )
     discount = order.discount_amount or 0
     subtotal_after_discount = max(0, subtotal - discount)
     
