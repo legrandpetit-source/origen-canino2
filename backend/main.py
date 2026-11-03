@@ -1,7 +1,6 @@
 import os
 import re
 import json
-import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, Form, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +10,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 import urllib.request
 import urllib.parse
+import urllib.error
 from server_db import get_connection, init_database
 from PIL import Image, UnidentifiedImageError
 import io
@@ -341,21 +341,28 @@ def verify_telegram_bot_token(bot_token: str):
         return {"ok": False, "error": "Token vacío"}
     try:
         url = f"https://api.telegram.org/bot{bot_token}/getMe"
-        resp = requests.get(url, timeout=8)
-        data = resp.json()
-        if resp.status_code == 200 and data.get("ok"):
-            bot_result = data.get("result", {})
-            return {
-                "ok": True,
-                "bot_id": bot_result.get("id"),
-                "first_name": bot_result.get("first_name"),
-                "username": bot_result.get("username"),
-            }
-        else:
-            return {
-                "ok": False,
-                "error": data.get("description", "Token inválido o bot no encontrado")
-            }
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=8) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            if data.get("ok"):
+                bot_result = data.get("result", {})
+                return {
+                    "ok": True,
+                    "bot_id": bot_result.get("id"),
+                    "first_name": bot_result.get("first_name"),
+                    "username": bot_result.get("username"),
+                }
+            else:
+                return {
+                    "ok": False,
+                    "error": data.get("description", "Token inválido o bot no encontrado")
+                }
+    except urllib.error.HTTPError as e:
+        try:
+            err_data = json.loads(e.read().decode('utf-8'))
+            return {"ok": False, "error": err_data.get("description", str(e))}
+        except Exception:
+            return {"ok": False, "error": str(e)}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
@@ -366,10 +373,11 @@ def notify_telegram(message: str):
         print("Credenciales de Telegram faltantes, omitiendo notificación.")
         return
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'}
+    data = urllib.parse.urlencode({'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'}).encode('utf-8')
     try:
-        res = requests.post(url, json=payload, timeout=10)
-        res.raise_for_status()
+        req = urllib.request.Request(url, data=data)
+        with urllib.request.urlopen(req, timeout=10) as response:
+            pass
     except Exception as e:
         print("Error enviando notificación a Telegram:", e)
 
@@ -693,22 +701,26 @@ def test_admin_telegram_settings(payload: dict = None, current_user: str = Depen
         text = custom_text
 
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    payload_data = {'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'}
+    data = urllib.parse.urlencode({'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'}).encode('utf-8')
     try:
-        res = requests.post(url, json=payload_data, timeout=10)
-        data = res.json()
-        if res.status_code == 200 and data.get("ok"):
-            return {
-                "success": True,
-                "message": f"¡Mensaje de prueba recibido con éxito en el chat {chat_id}!"
-            }
-        else:
-            description = data.get("description", "Error desconocido de Telegram")
-            return {
-                "success": False,
-                "error": description,
-                "message": f"Telegram rechazó el envío: {description}"
-            }
+        req = urllib.request.Request(url, data=data)
+        with urllib.request.urlopen(req, timeout=10) as response:
+            res_body = json.loads(response.read().decode('utf-8'))
+            if res_body.get("ok"):
+                return {
+                    "success": True,
+                    "message": f"¡Mensaje de prueba recibido con éxito en el chat {chat_id}!"
+                }
+            else:
+                desc = res_body.get("description", "Error desconocido de Telegram")
+                return {"success": False, "error": desc, "message": f"Telegram rechazó el envío: {desc}"}
+    except urllib.error.HTTPError as e:
+        try:
+            err_data = json.loads(e.read().decode('utf-8'))
+            desc = err_data.get("description", str(e))
+            return {"success": False, "error": desc, "message": f"Telegram rechazó el envío: {desc}"}
+        except Exception:
+            return {"success": False, "error": str(e), "message": f"Error HTTP {e.code}: {e.reason}"}
     except Exception as e:
         return {
             "success": False,
