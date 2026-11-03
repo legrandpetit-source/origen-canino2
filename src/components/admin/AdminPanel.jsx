@@ -1,5 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Package, BookOpen, Edit2, Plus, Trash2, X, Save, ShoppingCart, MessageSquareHeart, Check, XCircle, LogOut, Key, ChefHat, BarChart, Building2, CreditCard, Calculator, Send, Gift } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Package, BookOpen, Edit2, Plus, Trash2, X, Save, ShoppingCart, 
+  MessageSquareHeart, Check, XCircle, LogOut, Key, ChefHat, BarChart, 
+  Building2, CreditCard, Calculator, Send, Gift, UploadCloud, 
+  Image as ImageIcon, Loader2, Sparkles, CheckCircle2 
+} from 'lucide-react';
 import AdminLogin from './AdminLogin';
 import IngredientsManager from './IngredientsManager';
 import ProductRecipeManager from './ProductRecipeManager';
@@ -13,6 +18,54 @@ import CalculatorSettingsManager from './CalculatorSettingsManager';
 import TelegramSettingsManager from './TelegramSettingsManager';
 import PromotionsManager from './PromotionsManager';
 
+// Comprime y convierte una imagen a WebP en el navegador antes de enviarla
+const compressImageToWebP = (file, maxDim = 1200, quality = 0.82) => {
+  return new Promise((resolve) => {
+    if (!file || !file.type.startsWith('image/')) {
+      return resolve(file);
+    }
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (e) => {
+      const img = new window.Image();
+      img.src = e.target.result;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return resolve(file);
+            const webpFile = new File(
+              [blob],
+              file.name.replace(/\.[^/.]+$/, '') + '.webp',
+              { type: 'image/webp', lastModified: Date.now() }
+            );
+            resolve(webpFile);
+          },
+          'image/webp',
+          quality
+        );
+      };
+      img.onerror = () => resolve(file);
+    };
+    reader.onerror = () => resolve(file);
+  });
+};
+
 const AdminPanel = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_token'));
   const [activeTab, setActiveTab] = useState('orders');
@@ -25,6 +78,9 @@ const AdminPanel = () => {
 
   // Modals state
   const [editingProduct, setEditingProduct] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadSuccessInfo, setUploadSuccessInfo] = useState(null);
+  const fileInputRef = useRef(null);
   const [recipeProduct, setRecipeProduct] = useState(null);
   const [editingPost, setEditingPost] = useState(null);
   const [isAddingPost, setIsAddingPost] = useState(false);
@@ -562,7 +618,7 @@ const AdminPanel = () => {
           <div className="bg-white rounded-2xl w-full max-w-2xl my-8 relative">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white rounded-t-2xl z-10">
               <h3 className="font-header text-2xl text-secondary-brown">Editar Producto</h3>
-              <button onClick={() => setEditingProduct(null)} className="text-gray-400 hover:text-gray-700 bg-gray-100 p-2 rounded-full"><X size={20}/></button>
+              <button onClick={() => { setEditingProduct(null); setUploadSuccessInfo(null); }} className="text-gray-400 hover:text-gray-700 bg-gray-100 p-2 rounded-full"><X size={20}/></button>
             </div>
             <form onSubmit={handleSaveProduct} className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -581,37 +637,111 @@ const AdminPanel = () => {
                   <input type="text" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-primary-green outline-none" required
                     value={editingProduct.weight} onChange={e => setEditingProduct({...editingProduct, weight: e.target.value})} />
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Imagen (Subir o URL)</label>
-                  <input 
-                    type="file" 
-                    accept="image/*"
-                    onChange={async (e) => {
-                      const file = e.target.files[0];
-                      if (!file) return;
-                      const formData = new FormData();
-                      formData.append('file', file);
-                      try {
-                        const res = await fetchWithAuth('/api/admin/products/upload-image', {
-                          method: 'POST',
-                          body: formData
-                        });
-                        if (res.ok) {
-                          const data = await res.json();
-                          setEditingProduct({...editingProduct, image: data.url});
-                        } else {
-                          alert("Error al subir la imagen");
-                        }
-                      } catch (err) {
-                        console.error(err);
-                        alert("Error de red al subir la imagen");
-                      }
-                    }}
-                    className="w-full border rounded-lg p-1.5 mb-2 focus:ring-2 focus:ring-primary-green outline-none text-sm"
-                  />
-                  <input type="text" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-primary-green outline-none text-sm" required
-                    placeholder="URL o ruta de la imagen"
-                    value={editingProduct.image} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} />
+                <div className="md:col-span-2 bg-[#FAF7F2] p-4 rounded-2xl border border-stone-200/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-bold text-[#3c2716] font-display">
+                      Imagen del Producto (Compresión WebP Automática)
+                    </label>
+                    {uploadSuccessInfo && (
+                      <span className="text-xs font-bold text-[#677333] bg-[#677333]/15 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                        <CheckCircle2 size={13} /> WebP Optimizado ({Math.round(uploadSuccessInfo.final_size / 1024)} KB)
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    {/* Thumbnail Preview */}
+                    <div className="w-20 h-20 rounded-xl bg-white border border-stone-200 overflow-hidden shrink-0 flex items-center justify-center shadow-inner relative group">
+                      {editingProduct.image ? (
+                        <img 
+                          src={editingProduct.image} 
+                          alt="Vista previa" 
+                          className="w-full h-full object-cover"
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                      ) : (
+                        <ImageIcon size={28} className="text-stone-300" />
+                      )}
+                    </div>
+
+                    {/* Action Area */}
+                    <div className="flex-1 space-y-2">
+                      <input 
+                        ref={fileInputRef}
+                        type="file" 
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setUploadingImage(true);
+                          setUploadSuccessInfo(null);
+                          try {
+                            // 1. Optimizar y comprimir en WebP en el navegador
+                            const compressedBlob = await compressImageToWebP(file);
+                            const formData = new FormData();
+                            formData.append('file', compressedBlob);
+
+                            // 2. Subir al servidor para almacenamiento y verificación
+                            const res = await fetchWithAuth('/api/admin/products/upload-image', {
+                              method: 'POST',
+                              body: formData
+                            });
+
+                            if (res.ok) {
+                              const data = await res.json();
+                              setEditingProduct(prev => ({ ...prev, image: data.url }));
+                              setUploadSuccessInfo(data);
+                            } else {
+                              const errData = await res.json().catch(() => ({}));
+                              alert(errData.detail || "Error al subir la imagen");
+                            }
+                          } catch (err) {
+                            console.error(err);
+                            alert("Error de red al procesar la imagen");
+                          } finally {
+                            setUploadingImage(false);
+                            if (fileInputRef.current) fileInputRef.current.value = '';
+                          }
+                        }}
+                      />
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={uploadingImage}
+                          onClick={() => fileInputRef.current?.click()}
+                          className="px-4 py-2 bg-[#677333] hover:bg-[#56602b] text-white rounded-xl font-bold text-xs flex items-center gap-2 transition shadow-sm disabled:opacity-50"
+                        >
+                          {uploadingImage ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" />
+                              Comprimiendo y guardando en WebP...
+                            </>
+                          ) : (
+                            <>
+                              <UploadCloud size={15} />
+                              Seleccionar y Comprimir Imagen (.webp)
+                            </>
+                          )}
+                        </button>
+
+                        <span className="text-[11px] text-stone-500">
+                          Formatos aceptados: JPG, PNG, WEBP (se autocomprime a WebP óptimo)
+                        </span>
+                      </div>
+
+                      {/* URL o ruta manual */}
+                      <input 
+                        type="text" 
+                        className="w-full bg-white border border-stone-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-[#677333] outline-none text-xs text-stone-700 font-mono" 
+                        required
+                        placeholder="/images/products/ejemplo.webp"
+                        value={editingProduct.image} 
+                        onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} 
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
               
@@ -636,7 +766,7 @@ const AdminPanel = () => {
               </div>
 
               <div className="pt-4 flex justify-end gap-3">
-                <button type="button" onClick={() => setEditingProduct(null)} className="px-5 py-2 text-gray-600 font-bold hover:bg-gray-100 rounded-lg">Cancelar</button>
+                <button type="button" onClick={() => { setEditingProduct(null); setUploadSuccessInfo(null); }} className="px-5 py-2 text-gray-600 font-bold hover:bg-gray-100 rounded-lg">Cancelar</button>
                 <button type="submit" className="px-5 py-2 bg-primary-green text-white font-bold rounded-lg hover:bg-primary-green-dark flex items-center gap-2"><Save size={18}/> Guardar Cambios</button>
               </div>
             </form>

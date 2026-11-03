@@ -12,7 +12,7 @@ import urllib.request
 import urllib.parse
 import urllib.error
 from server_db import get_connection, init_database
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, UnidentifiedImageError, ImageOps
 import io
 import uuid
 import random
@@ -973,21 +973,66 @@ def update_product(product_id: int, p: ProductUpdate, current_user: str = Depend
 async def upload_product_image(file: UploadFile = File(...), current_user: str = Depends(get_current_admin)):
     try:
         content = await file.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="El archivo está vacío.")
+
+        orig_size_bytes = len(content)
         image = Image.open(io.BytesIO(content))
         
-        if image.mode in ("RGBA", "P", "LA"):
+        # 1. Corregir orientación EXIF (típica en fotos de móviles)
+        try:
+            image = ImageOps.exif_transpose(image)
+        except Exception:
+            pass
+
+        # 2. Normalizar modos de color preservando canales y transparencia en WebP
+        if image.mode in ("P", "LA"):
+            image = image.convert("RGBA")
+        elif image.mode == "CMYK":
             image = image.convert("RGB")
-            
+        elif image.mode not in ("RGB", "RGBA", "L"):
+            image = image.convert("RGB")
+
+        # 3. Redimensionar inteligentemente si supera dimensiones de producto web (máx 1200x1200px)
+        max_dim = 1200
+        w, h = image.size
+        if w > max_dim or h > max_dim:
+            image.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+
+        # 4. Generar nombre único .webp y guardar comprimido
         filename = f"{uuid.uuid4().hex}.webp"
-        filepath = os.path.join("uploads", "products", filename)
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        
-        image.save(filepath, "WEBP", quality=80, method=6)
-        
-        return {"url": f"/uploads/products/{filename}"}
+        upload_dir = os.path.join("uploads", "products")
+        os.makedirs(upload_dir, exist_ok=True)
+        filepath = os.path.join(upload_dir, filename)
+
+        # WebP de alta eficiencia: method=6 maximiza compresión manteniendo calidad visual
+        image.save(
+            filepath,
+            "WEBP",
+            quality=82,
+            method=6,
+            optimize=True
+        )
+
+        final_size_bytes = os.path.getsize(filepath)
+        final_w, final_h = image.size
+
+        return {
+            "success": True,
+            "url": f"/uploads/products/{filename}",
+            "filename": filename,
+            "original_size": orig_size_bytes,
+            "final_size": final_size_bytes,
+            "saved_bytes": max(0, orig_size_bytes - final_size_bytes),
+            "width": final_w,
+            "height": final_h,
+            "format": "webp"
+        }
+    except UnidentifiedImageError:
+        raise HTTPException(status_code=400, detail="El archivo subido no es una imagen válida.")
     except Exception as e:
         print(f"Error uploading product image: {e}")
-        raise HTTPException(status_code=500, detail="Error procesando la imagen.")
+        raise HTTPException(status_code=500, detail=f"Error procesando la imagen: {str(e)}")
 
 # --- Endpoints Ingredientes (Inventario) ---
 @app.get("/api/admin/ingredients", response_model=List[IngredientResponse])
