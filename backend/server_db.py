@@ -8,7 +8,12 @@ from dotenv import load_dotenv
 import psycopg2.pool
 from contextlib import contextmanager
 
-load_dotenv()
+# Cargar .env de backend asegurando override
+env_path = os.path.join(os.path.dirname(__file__), '.env')
+if os.path.exists(env_path):
+    load_dotenv(env_path, override=True)
+else:
+    load_dotenv(override=True)
 
 DB_URL = os.environ.get('DATABASE_URL')
 
