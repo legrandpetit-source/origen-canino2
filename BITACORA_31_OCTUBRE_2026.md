@@ -143,3 +143,4 @@ Patricio detectó que en el carrito las **Patitas de Pollo Deshidratadas** apare
 - **Hash del Bundle en Producción:** `index-CTc7pRbn.js` / `index-sAyQP9y6.css`.
 - **Servidor:** Hetzner Cloud `167.233.122.18`, contenedor Coolify activo.
 - **Verificación:** HTTP 200 OK en `https://origencanino.cl` con certificados SSL válidos emitidos por Let's Encrypt.
+

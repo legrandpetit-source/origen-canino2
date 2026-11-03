@@ -1,5 +1,7 @@
 import os
+import re
 import json
+import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, Form, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -274,28 +276,102 @@ def get_current_customer(credentials: HTTPAuthorizationCredentials = Depends(sec
 
 # --- Endpoints Públicos ---
 # --- Utilidades ---
+def get_telegram_credentials():
+    token = None
+    chat_id = None
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT key, value FROM system_settings WHERE key IN ('telegram_bot_token', 'telegram_chat_id')")
+            rows = cursor.fetchall()
+            for r in rows:
+                k = r.get('key')
+                v = (r.get('value') or '').strip()
+                if k == 'telegram_bot_token' and v:
+                    token = v
+                elif k == 'telegram_chat_id' and v:
+                    chat_id = v
+    except Exception as e:
+        print("Error obteniendo credenciales de Telegram desde BD:", e)
+
+    if not token:
+        if os.path.exists("backend/.env"):
+            load_dotenv("backend/.env", override=True)
+        elif os.path.exists(".env"):
+            load_dotenv(".env", override=True)
+        token = os.getenv("TELEGRAM_BOT_TOKEN") or "9089876682:AAFeQDNJLqt7qGodbf7EH3fh5gTHlMH2FSQ"
+        if token.startswith("8623970624"):
+            token = "9089876682:AAFeQDNJLqt7qGodbf7EH3fh5gTHlMH2FSQ"
+
+    if not chat_id:
+        chat_id = os.getenv("TELEGRAM_CHAT_ID") or "1468481915"
+
+    return token.strip() if token else "", chat_id.strip() if chat_id else ""
+
+
+def sync_telegram_to_env(bot_token: str, chat_id: str):
+    env_paths = ["backend/.env", ".env"]
+    for env_path in env_paths:
+        if os.path.exists(env_path):
+            try:
+                with open(env_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+
+                if "TELEGRAM_BOT_TOKEN=" in content:
+                    content = re.sub(r"TELEGRAM_BOT_TOKEN=.*", f"TELEGRAM_BOT_TOKEN={bot_token}", content)
+                else:
+                    content += f"\nTELEGRAM_BOT_TOKEN={bot_token}"
+
+                if "TELEGRAM_CHAT_ID=" in content:
+                    content = re.sub(r"TELEGRAM_CHAT_ID=.*", f"TELEGRAM_CHAT_ID={chat_id}", content)
+                else:
+                    content += f"\nTELEGRAM_CHAT_ID={chat_id}"
+
+                with open(env_path, "w", encoding="utf-8") as f:
+                    f.write(content)
+            except Exception as e:
+                print(f"Error sincronizando Telegram a {env_path}: {e}")
+
+    os.environ["TELEGRAM_BOT_TOKEN"] = bot_token
+    os.environ["TELEGRAM_CHAT_ID"] = chat_id
+
+
+def verify_telegram_bot_token(bot_token: str):
+    if not bot_token:
+        return {"ok": False, "error": "Token vacío"}
+    try:
+        url = f"https://api.telegram.org/bot{bot_token}/getMe"
+        resp = requests.get(url, timeout=8)
+        data = resp.json()
+        if resp.status_code == 200 and data.get("ok"):
+            bot_result = data.get("result", {})
+            return {
+                "ok": True,
+                "bot_id": bot_result.get("id"),
+                "first_name": bot_result.get("first_name"),
+                "username": bot_result.get("username"),
+            }
+        else:
+            return {
+                "ok": False,
+                "error": data.get("description", "Token inválido o bot no encontrado")
+            }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 def notify_telegram(message: str):
-    if os.path.exists("backend/.env"):
-        load_dotenv("backend/.env", override=True)
-    elif os.path.exists(".env"):
-        load_dotenv(".env", override=True)
-        
-    token = os.getenv("TELEGRAM_BOT_TOKEN") or "9089876682:AAFeQDNJLqt7qGodbf7EH3fh5gTHlMH2FSQ"
-    # Si sigue con el token viejo de GetContact, forzar el nuevo
-    if token.startswith("8623970624"):
-        token = "9089876682:AAFeQDNJLqt7qGodbf7EH3fh5gTHlMH2FSQ"
-        
-    chat_id = os.getenv("TELEGRAM_CHAT_ID") or "1468481915"
+    token, chat_id = get_telegram_credentials()
     if not token or not chat_id:
-        print("Telegram env vars missing, skipping notification.")
+        print("Credenciales de Telegram faltantes, omitiendo notificación.")
         return
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    data = urllib.parse.urlencode({'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'}).encode('utf-8')
+    payload = {'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'}
     try:
-        req = urllib.request.Request(url, data=data)
-        urllib.request.urlopen(req)
+        res = requests.post(url, json=payload, timeout=10)
+        res.raise_for_status()
     except Exception as e:
-        print("Error sending telegram notification:", e)
+        print("Error enviando notificación a Telegram:", e)
 
 def log_security_event(user_email: str, action: str, status: str = "success", ip_address: str = "127.0.0.1", details: str = ""):
     try:
@@ -419,8 +495,9 @@ def get_security_overview(current_user: str = Depends(get_current_admin)):
         cursor.execute("SELECT COUNT(*) as count FROM admin_audit_logs WHERE created_at >= NOW() - INTERVAL '24 hours'")
         activity_24h = cursor.fetchone()["count"]
         
-        token = os.getenv("TELEGRAM_BOT_TOKEN") or "9089876682:AAFeQDNJLqt7qGodbf7EH3fh5gTHlMH2FSQ"
-        chat_id = os.getenv("TELEGRAM_CHAT_ID") or "1468481915"
+        token, chat_id = get_telegram_credentials()
+        verification = verify_telegram_bot_token(token) if token else {"ok": False}
+        bot_uname = f"@{verification.get('username')}" if verification.get("username") else "@OrigenCanino_bot"
         masked_token = f"{token[:8]}...{token[-4:]}" if len(token) > 12 else "***"
         
         return {
@@ -428,10 +505,11 @@ def get_security_overview(current_user: str = Depends(get_current_admin)):
             "total_admins": total_admins,
             "activity_24h": activity_24h,
             "telegram": {
-                "active": bool(token and chat_id),
-                "bot_username": "@OrigenCanino_bot",
+                "active": bool(token and chat_id and verification.get("ok")),
+                "bot_username": bot_uname,
                 "masked_token": masked_token,
-                "chat_id": chat_id
+                "chat_id": chat_id,
+                "verification": verification
             }
         }
 
@@ -541,6 +619,102 @@ def test_telegram_alert(current_user: str = Depends(get_current_admin)):
     msg = f"🔔 *Prueba de Alerta de Seguridad*\n\nConexión exitosa verificada por `{current_user}`.\nFecha: {now_str}\nEstado: ✅ Todo operativo"
     notify_telegram(msg)
     return {"success": True, "message": "Alerta de prueba enviada a Telegram"}
+
+
+@app.get("/api/admin/telegram-settings")
+def get_admin_telegram_settings(current_user: str = Depends(get_current_admin)):
+    token, chat_id = get_telegram_credentials()
+    verification = verify_telegram_bot_token(token) if token else {"ok": False, "error": "Token no configurado"}
+    return {
+        "bot_token": token,
+        "chat_id": chat_id,
+        "is_configured": bool(token and chat_id),
+        "verification": verification
+    }
+
+
+@app.post("/api/admin/telegram-settings")
+def update_admin_telegram_settings(payload: dict, current_user: str = Depends(get_current_admin)):
+    bot_token = (payload.get("bot_token") or "").strip()
+    chat_id = (payload.get("chat_id") or "").strip()
+
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO system_settings (key, value, updated_at)
+                VALUES ('telegram_bot_token', %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
+            """, (bot_token,))
+            cursor.execute("""
+                INSERT INTO system_settings (key, value, updated_at)
+                VALUES ('telegram_chat_id', %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
+            """, (chat_id,))
+            conn.commit()
+
+        sync_telegram_to_env(bot_token, chat_id)
+        verification = verify_telegram_bot_token(bot_token) if bot_token else {"ok": False, "error": "Token vacío"}
+
+        log_security_event(current_user, "Actualización credenciales Telegram", "success", details=f"Chat ID: {chat_id}")
+
+        return {
+            "success": True,
+            "message": "Credenciales de Telegram guardadas correctamente",
+            "bot_token": bot_token,
+            "chat_id": chat_id,
+            "verification": verification
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/admin/telegram-test")
+def test_admin_telegram_settings(payload: dict = None, current_user: str = Depends(get_current_admin)):
+    bot_token, chat_id = get_telegram_credentials()
+    if not bot_token or not chat_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Debe configurar tanto el Bot Token como el Chat ID antes de enviar una prueba."
+        )
+
+    now_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    custom_text = (payload or {}).get("message")
+    if not custom_text:
+        text = (
+            "🐶 *¡Prueba de Telegram Exitosa en Origen Canino!*\n\n"
+            f"Conexión verificada por `{current_user}` el {now_str}.\n\n"
+            "✅ Códigos 2FA para inicio de sesión en panel\n"
+            "✅ Notificaciones de nuevos pedidos de comida BARF\n"
+            "✅ Confirmaciones de pagos aprobados en Mercado Pago\n"
+            "✅ Alertas de seguridad del sistema"
+        )
+    else:
+        text = custom_text
+
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload_data = {'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'}
+    try:
+        res = requests.post(url, json=payload_data, timeout=10)
+        data = res.json()
+        if res.status_code == 200 and data.get("ok"):
+            return {
+                "success": True,
+                "message": f"¡Mensaje de prueba recibido con éxito en el chat {chat_id}!"
+            }
+        else:
+            description = data.get("description", "Error desconocido de Telegram")
+            return {
+                "success": False,
+                "error": description,
+                "message": f"Telegram rechazó el envío: {description}"
+            }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": f"Error de conexión con Telegram: {str(e)}"
+        }
 
 # ==========================================
 # --- PORTAL DE CLIENTES & MASCOTAS ---
@@ -1436,6 +1610,69 @@ def update_admin_settings(payload: SettingsUpdate, current_user: str = Depends(g
                     """, (k, str(v)))
             conn.commit()
             return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- Configuración de Calculadora de Raciones ---
+DEFAULT_CALCULATOR_SETTINGS = {
+    # Dieta BARF (Cruda) - Referencia Médica Veterinaria Oficial
+    "barf_puppy_2_4": 10.0,
+    "barf_puppy_4_6": 8.0,
+    "barf_puppy_6_8": 6.0,
+    "barf_puppy_8_10": 4.0,
+    "barf_puppy_10_12": 3.0,
+    "barf_adult_normal": 3.0,
+    "barf_adult_medium": 2.5,
+    "barf_adult_low": 2.0,
+    # Comida Cocinada al Vapor
+    "cooked_puppy_small": 8.0,
+    "cooked_puppy_large": 5.0,
+    "cooked_adult_low": 2.0,
+    "cooked_adult_normal": 2.5,
+    "cooked_adult_high": 3.5,
+}
+
+@app.get("/api/calculator/settings")
+def get_public_calculator_settings():
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM system_settings WHERE key = 'calculator_percentages'")
+            row = cursor.fetchone()
+            if row and row.get('value'):
+                data = json.loads(row['value'])
+                return {**DEFAULT_CALCULATOR_SETTINGS, **data}
+            return DEFAULT_CALCULATOR_SETTINGS
+    except Exception:
+        return DEFAULT_CALCULATOR_SETTINGS
+
+@app.get("/api/admin/calculator-settings")
+def get_admin_calculator_settings(current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM system_settings WHERE key = 'calculator_percentages'")
+            row = cursor.fetchone()
+            if row and row.get('value'):
+                data = json.loads(row['value'])
+                return {**DEFAULT_CALCULATOR_SETTINGS, **data}
+            return DEFAULT_CALCULATOR_SETTINGS
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/admin/calculator-settings")
+def update_admin_calculator_settings(payload: SettingsUpdate, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            val_json = json.dumps(payload.settings)
+            cursor.execute("""
+                INSERT INTO system_settings (key, value, updated_at)
+                VALUES ('calculator_percentages', %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
+            """, (val_json,))
+            conn.commit()
+            return {"success": True, "settings": payload.settings}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

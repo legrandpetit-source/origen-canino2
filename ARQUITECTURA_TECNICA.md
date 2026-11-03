@@ -230,3 +230,4 @@ erDiagram
 5. **Evolución Futura: Mercado Pago Preapproval (Débito Automático Directo):**
    - Actualmente, la suscripción mensual registra el compromiso recurrente, aplica el 10% de descuento y despacho gratis, y notifica a la empresa para contactar al cliente antes de cada despacho.
    - *Siguiente Paso:* Implementar la API de **Mercado Pago Subscriptions / Preapproval** para que los clientes puedan suscribir su tarjeta de crédito y el cargo se efectúe de forma 100% automatizada cada 30 días.
+

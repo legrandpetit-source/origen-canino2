@@ -20,6 +20,7 @@ import {
   Activity, 
   Globe
 } from 'lucide-react';
+import TelegramSettingsManager from './TelegramSettingsManager';
 
 const SecurityManager = ({ fetchWithAuth }) => {
   const [activeSubTab, setActiveSubTab] = useState('users'); // 'users', 'password', 'activity', 'telegram'
@@ -344,14 +345,23 @@ const SecurityManager = ({ fetchWithAuth }) => {
               <p className="text-[11px] text-gray-400">Chat ID: {overview.telegram?.chat_id || '1468481915'}</p>
             </div>
           </div>
-          <button 
-            onClick={handleTestTelegram} 
-            disabled={testingTelegram}
-            className="p-2 text-primary-green hover:bg-primary-green/10 rounded-lg transition"
-            title="Enviar mensaje de prueba a Telegram"
-          >
-            <Send size={18} className={testingTelegram ? "animate-pulse" : ""} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={() => setActiveSubTab('telegram')}
+              className="px-2.5 py-1.5 text-xs font-bold text-primary-green hover:bg-primary-green/10 rounded-lg transition"
+              title="Configurar Bot"
+            >
+              Configurar
+            </button>
+            <button 
+              onClick={handleTestTelegram} 
+              disabled={testingTelegram}
+              className="p-2 text-primary-green hover:bg-primary-green/10 rounded-lg transition"
+              title="Enviar mensaje de prueba a Telegram"
+            >
+              <Send size={18} className={testingTelegram ? "animate-pulse" : ""} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -391,6 +401,18 @@ const SecurityManager = ({ fetchWithAuth }) => {
         >
           <History size={18} />
           Registro de Auditoría ({logs.length})
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('telegram')}
+          className={`pb-3 px-4 font-bold text-sm flex items-center gap-2 border-b-2 transition ${
+            activeSubTab === 'telegram'
+              ? 'border-primary-green text-primary-green'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Send size={18} />
+          Bot Telegram (2FA & Alertas)
         </button>
       </div>
 
@@ -667,6 +689,11 @@ const SecurityManager = ({ fetchWithAuth }) => {
             </table>
           </div>
         </div>
+      )}
+
+      {/* --- TAB 4: TELEGRAM BOT --- */}
+      {activeSubTab === 'telegram' && (
+        <TelegramSettingsManager fetchWithAuth={fetchWithAuth} />
       )}
 
       {/* --- MODAL: AGREGAR ADMINISTRADOR --- */}

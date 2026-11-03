@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, BookOpen, Edit2, Plus, Trash2, X, Save, ShoppingCart, MessageSquareHeart, Check, XCircle, LogOut, Key, ChefHat, BarChart, Building2, CreditCard } from 'lucide-react';
+import { Package, BookOpen, Edit2, Plus, Trash2, X, Save, ShoppingCart, MessageSquareHeart, Check, XCircle, LogOut, Key, ChefHat, BarChart, Building2, CreditCard, Calculator, Send } from 'lucide-react';
 import AdminLogin from './AdminLogin';
 import IngredientsManager from './IngredientsManager';
 import ProductRecipeManager from './ProductRecipeManager';
@@ -9,6 +9,8 @@ import RetentionManager from './RetentionManager';
 import NfcManager from './NfcManager';
 import PaymentSettingsManager from './PaymentSettingsManager';
 import SecurityManager from './SecurityManager';
+import CalculatorSettingsManager from './CalculatorSettingsManager';
+import TelegramSettingsManager from './TelegramSettingsManager';
 
 const AdminPanel = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_token'));
@@ -286,10 +288,22 @@ const AdminPanel = () => {
             <Building2 size={20} /> Puntos NFC (Edificios)
           </button>
           <button 
+            onClick={() => setActiveTab('calculator')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'calculator' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
+          >
+            <Calculator size={20} /> Calculadora de Raciones
+          </button>
+          <button 
             onClick={() => setActiveTab('payments')}
             className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'payments' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
           >
             <CreditCard size={20} /> Pagos & Mercado Pago
+          </button>
+          <button 
+            onClick={() => setActiveTab('telegram')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'telegram' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
+          >
+            <Send size={20} /> Bot Telegram
           </button>
           <button 
             onClick={() => setActiveTab('settings')}
@@ -493,9 +507,19 @@ const AdminPanel = () => {
                 <NfcManager fetchWithAuth={fetchWithAuth} />
               )}
 
+              {/* --- CALCULATOR SETTINGS TAB --- */}
+              {activeTab === 'calculator' && (
+                <CalculatorSettingsManager fetchWithAuth={fetchWithAuth} />
+              )}
+
               {/* --- PAYMENTS & MERCADO PAGO TAB --- */}
               {activeTab === 'payments' && (
                 <PaymentSettingsManager fetchWithAuth={fetchWithAuth} />
+              )}
+
+              {/* --- TELEGRAM SETTINGS TAB --- */}
+              {activeTab === 'telegram' && (
+                <TelegramSettingsManager fetchWithAuth={fetchWithAuth} />
               )}
 
               {/* --- SETTINGS / SECURITY TAB --- */}
