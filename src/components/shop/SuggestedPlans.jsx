@@ -1,108 +1,178 @@
 import React from 'react';
-import { ShoppingCart } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Sparkles } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const plans = [
   {
     id: 1,
+    tag: 'Toy & Pequeño',
+    icon: '🐶',
     title: 'Perro Pequeño',
+    breeds: 'Chihuahua, Poodle Toy, Dachshund, Schnauzer mini',
     weightRange: '1 a 10 kg',
-    monthlyKilos: '3 a 6 kg / mes',
+    monthlyKilos: '3 a 6 kg/mes',
     estimatedPrice: 'Desde $24.000',
-    description: 'Perfecto para razas pequeñas que necesitan porciones concentradas en nutrientes.',
-    recommendation: 'Agrega 3 a 6 packs al carrito.'
+    bullets: [
+      'Porciones individuales selladas de 100g a 200g',
+      'Menú rotativo semanal (Vacuno & Pollo)',
+      'Monitoreo de adaptación por WhatsApp'
+    ],
+    buttonText: 'Elegir Plan Pequeño',
+    isPopular: false
   },
   {
     id: 2,
+    tag: 'Mediano Activo',
+    icon: '🐶',
     title: 'Perro Mediano',
+    breeds: 'Bulldog Francés, Border Collie, Beagle, Cocker',
     weightRange: '11 a 25 kg',
-    monthlyKilos: '9 a 15 kg / mes',
+    monthlyKilos: '9 a 15 kg/mes',
     estimatedPrice: 'Desde $72.000',
-    description: 'La energía exacta que necesita un perro activo de tamaño medio para todo el mes.',
-    recommendation: 'Agrega 9 a 15 packs al carrito.',
+    bullets: [
+      'Porciones optimizadas de 300g a 500g',
+      '3 recetas gourmet rotativas con superfoods',
+      'Despacho programado quincenal o mensual',
+      'Snack dental crunchy de cortesía incluido'
+    ],
+    buttonText: 'Elegir Plan Mediano',
     isPopular: true
   },
   {
     id: 3,
+    tag: 'Grande & Gigante',
+    icon: '🐕',
     title: 'Perro Grande',
+    breeds: 'Golden Retriever, Pastor Alemán, Labrador, Bernés',
     weightRange: '26+ kg',
-    monthlyKilos: '18+ kg / mes',
+    monthlyKilos: '18+ kg/mes',
     estimatedPrice: 'Desde $144.000',
-    description: 'Porciones abundantes para mantener la masa muscular y vitalidad de razas grandes.',
-    recommendation: 'Agrega 18+ packs al carrito.'
+    bullets: [
+      'Packs familiares económicos al por mayor',
+      'Refuerzo articular extra con glucosamina natural',
+      'Frecuencia flexible para espacios de freezer reducidos'
+    ],
+    buttonText: 'Elegir Plan Grande',
+    isPopular: false
   }
 ];
 
 const SuggestedPlans = () => {
   const scrollToShop = () => {
-    const shopSection = document.getElementById('shop-section');
+    const shopSection = document.getElementById('tienda');
     if (shopSection) {
       shopSection.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
   return (
-    <section id="planes" className="py-16 bg-white relative scroll-mt-24">
-      <div className="container mx-auto px-4">
-        <div className="text-center max-w-3xl mx-auto mb-12">
-          <h2 className="font-header text-3xl md:text-4xl text-secondary-brown mb-4">
-            Guía de Compra Mensual
+    <section id="planes" className="py-10 md:py-16 bg-white scroll-mt-20">
+      <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
+        
+        {/* Encabezado */}
+        <div className="text-center max-w-2xl mx-auto mb-10 md:mb-12">
+          <span className="inline-block bg-[#EBF2DA] text-[#4E5824] text-[11px] sm:text-xs font-bold tracking-widest uppercase px-3.5 py-1 rounded-full mb-2.5">
+            Planes Sugeridos
+          </span>
+          <h2 className="font-header text-3xl sm:text-4xl md:text-5xl font-extrabold text-secondary-brown tracking-tight mb-3">
+            Planes Sugeridos – Guía de Compra Mensual
           </h2>
-          <p className="text-secondary-brown-light/80 text-lg">
-            Compra la combinación perfecta de recetas y formatos para tu mascota. 
-            <br className="hidden md:block"/> 
-            Revisa esta guía para saber cuántos kilos de alimento requiere tu perrito en un mes completo.
+          <p className="text-xs sm:text-sm text-secondary-brown-light/80 font-sans max-w-xl mx-auto">
+            Porciones calculadas para cubrir la nutrición de 30 días con despacho programado.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {plans.map((plan) => (
-            <div 
-              key={plan.id} 
-              className={`bg-bg-cream rounded-3xl p-8 border-2 flex flex-col h-full relative ${
-                plan.isPopular ? 'border-secondary-orange shadow-xl shadow-secondary-orange/10 transform md:-translate-y-4' : 'border-transparent shadow-lg shadow-primary-green-dark/5'
-              }`}
-            >
-              {plan.isPopular && (
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-secondary-orange text-white px-4 py-1 rounded-full font-bold text-sm tracking-wide shadow-md">
-                  MÁS COMÚN
-                </div>
-              )}
-              
-              <div className="text-center mb-6">
-                <h3 className="font-header text-2xl text-secondary-brown mb-2">{plan.title}</h3>
-                <div className="inline-block bg-white px-4 py-1 rounded-full text-sm font-medium text-primary-green-dark border border-primary-green-light/30">
-                  {plan.weightRange}
-                </div>
-              </div>
+        {/* 3 Tarjetas (Stitch Style) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-stretch pt-4">
+          {plans.map((plan) => {
+            return (
+              <motion.div
+                key={plan.id}
+                whileHover={{ y: -5 }}
+                transition={{ duration: 0.2 }}
+                className={`bg-white rounded-3xl p-6 sm:p-7 flex flex-col justify-between transition-all relative ${
+                  plan.isPopular 
+                    ? 'border-2 border-secondary-orange shadow-xl md:-translate-y-2' 
+                    : 'border border-[#EBE4DA] shadow-sm hover:shadow-md'
+                }`}
+              >
+                {/* Badge Flotante "MÁS COMÚN" */}
+                {plan.isPopular && (
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-secondary-orange text-white text-[11px] font-extrabold uppercase px-4 py-1 rounded-full shadow-md tracking-wider">
+                    Más Común
+                  </div>
+                )}
 
-              <div className="text-center mb-6 border-b border-secondary-brown/10 pb-6">
-                <div className="text-4xl font-header text-secondary-brown mb-2">{plan.estimatedPrice}</div>
-                <div className="text-primary-green font-bold text-lg">{plan.monthlyKilos}</div>
-              </div>
+                <div>
+                  {/* Etiqueta de Categoría */}
+                  <div className="flex items-center justify-between mb-3 pt-1">
+                    <span className="bg-[#FAF3E8] text-[#935223] text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full flex items-center gap-1.5">
+                      {plan.tag}
+                    </span>
+                    <span className="text-xl">{plan.icon}</span>
+                  </div>
 
-              <p className="text-secondary-brown-light mb-6 flex-grow text-center">
-                {plan.description}
-              </p>
+                  {/* Título de Raza / Tamaño */}
+                  <h3 className="font-header text-2xl font-bold text-secondary-brown mb-1">
+                    {plan.title}
+                  </h3>
+                  <p className="text-xs text-gray-500 mb-5 leading-relaxed min-h-[32px]">
+                    {plan.breeds}
+                  </p>
 
-              <div className="mt-auto">
-                <div className="text-sm font-medium text-center text-secondary-brown mb-4">
-                  💡 {plan.recommendation}
+                  {/* Métricas de Peso y Kilos */}
+                  <div className="bg-[#FAF7F2] rounded-2xl p-3.5 mb-5 space-y-1.5 text-xs">
+                    <div className="flex justify-between items-center text-gray-500 font-medium">
+                      <span>Rango de peso:</span>
+                      <strong className="text-secondary-brown">{plan.weightRange}</strong>
+                    </div>
+                    <div className="flex justify-between items-center text-gray-500 font-medium">
+                      <span>Cantidad estimada:</span>
+                      <strong className="text-secondary-brown">{plan.monthlyKilos}</strong>
+                    </div>
+                  </div>
+
+                  {/* Inversión Mensual */}
+                  <div className="mb-5 pb-5 border-b border-[#F0EBE3]">
+                    <span className="text-[10px] uppercase tracking-wider font-extrabold text-gray-400 block mb-0.5">
+                      Inversión Mensual:
+                    </span>
+                    <div className="flex items-baseline gap-1">
+                      <span className="font-header text-3xl font-extrabold text-secondary-brown">
+                        {plan.estimatedPrice}
+                      </span>
+                      <span className="text-xs font-bold text-gray-500">CLP</span>
+                    </div>
+                  </div>
+
+                  {/* Lista de Beneficios */}
+                  <ul className="space-y-2.5 text-xs text-secondary-brown mb-6 font-medium">
+                    {plan.bullets.map((b, bIdx) => (
+                      <li key={bIdx} className="flex items-start gap-2">
+                        <CheckCircle2 size={16} className="text-primary-green shrink-0 mt-0.5" />
+                        <span>{b}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <button 
+
+                {/* Botón CTA */}
+                <button
                   onClick={scrollToShop}
-                  className={`w-full py-3 rounded-full font-bold flex items-center justify-center gap-2 transition-all ${
-                    plan.isPopular 
-                      ? 'bg-secondary-orange text-white hover:bg-[#d65d21] hover:shadow-lg' 
-                      : 'bg-primary-green text-white hover:bg-primary-green-dark hover:shadow-lg'
+                  className={`w-full py-3.5 px-4 rounded-2xl font-header font-bold text-sm transition shadow-sm hover:shadow flex items-center justify-center gap-2 group ${
+                    plan.isPopular
+                      ? 'bg-secondary-orange hover:bg-[#c98336] text-white'
+                      : 'bg-white hover:bg-[#FAF7F2] text-primary-green border-2 border-primary-green'
                   }`}
                 >
-                  <ShoppingCart size={20} />
-                  Ir a comprar
+                  <span>{plan.buttonText}</span>
+                  <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                 </button>
-              </div>
-            </div>
-          ))}
+              </motion.div>
+            );
+          })}
         </div>
+
       </div>
     </section>
   );

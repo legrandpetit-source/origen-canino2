@@ -31,78 +31,78 @@ const Navbar = () => {
   };
 
   return (
-    <nav className={`bg-bg-cream text-primary-green-dark sticky top-0 z-40 transition-all duration-300 ${isScrolled ? 'shadow-md py-2' : 'shadow-sm py-3'}`}>
-      <div className="container mx-auto px-4 flex justify-between items-center">
+    <nav className={`bg-[#FAF7F2] text-secondary-brown sticky top-0 z-40 transition-all duration-300 border-b border-[#EBE4DA] ${isScrolled ? 'shadow-md py-2.5' : 'py-3.5'}`}>
+      <div className="container mx-auto px-4 sm:px-6 flex justify-between items-center max-w-6xl">
         
-        <a href="#inicio" onClick={(e) => scrollTo(e, 'inicio')} className="flex items-center gap-3 md:gap-4">
-          {/* Circular logo badge */}
-          <div className="h-14 w-14 md:h-20 md:w-20 rounded-full bg-white flex items-center justify-center overflow-hidden">
-            <img src="/logo.jpg" alt="Origen Canino Logo" className="w-full h-full object-contain" />
+        {/* Logo de Marca */}
+        <a href="#inicio" onClick={(e) => scrollTo(e, 'inicio')} className="flex items-center gap-2.5 sm:gap-3 group">
+          {/* Logo Badge Circular */}
+          <div className="h-11 w-11 sm:h-13 sm:w-13 rounded-2xl bg-white flex items-center justify-center overflow-hidden border border-[#E5DACD] shadow-2xs shrink-0 group-hover:scale-105 transition-transform">
+            <img src="/logo.jpg" alt="Origen Canino Logo" className="w-full h-full object-contain p-0.5" />
           </div>
           
-          {/* Text Logo */}
+          {/* Logotipo Tipográfico */}
           <div className="flex flex-col justify-center">
-            <div className="flex items-center gap-1.5 md:gap-2 mb-0.5">
-              <span className="font-script text-3xl md:text-5xl text-primary-green leading-none transform -translate-y-1">Origen</span>
-              <i className="fa-solid fa-paw text-primary-green text-lg md:text-2xl"></i>
-              <span className="font-header text-3xl md:text-5xl font-bold text-secondary-brown tracking-wide leading-none uppercase">Canino</span>
+            <div className="flex items-center gap-1.5 leading-none mb-0.5">
+              <span className="font-header text-xl sm:text-2xl font-black text-primary-green tracking-tight">Origen</span>
+              <span className="font-header text-xl sm:text-2xl font-black text-secondary-brown uppercase tracking-wider">Canino</span>
             </div>
-            <div className="border-t border-gray-300 w-full pt-1">
-              <span className="font-sans text-[9px] md:text-xs font-bold tracking-[0.15em] md:tracking-[0.25em] text-primary-green uppercase block w-full text-center">
-                Comida Real, Vida Saludable
-              </span>
-            </div>
+            <span className="font-sans text-[8px] sm:text-[9.5px] font-bold tracking-[0.2em] text-[#7C8B3E] uppercase block">
+              Comida Real • Vida Saludable
+            </span>
           </div>
         </a>
 
-        {/* Desktop Menu */}
-        <div className="hidden md:flex items-center gap-6 font-header text-lg text-secondary-brown">
+        {/* Menú Desktop */}
+        <div className="hidden md:flex items-center gap-6 font-header text-sm font-bold text-secondary-brown">
           <a href="#planes" onClick={(e) => scrollTo(e, 'planes')} className="hover:text-primary-green transition">Planes Mensuales</a>
           <a href="#despacho" onClick={(e) => scrollTo(e, 'despacho')} className="hover:text-primary-green transition">Despacho</a>
           <a href="#tienda" onClick={(e) => scrollTo(e, 'tienda')} className="hover:text-primary-green transition">Tienda</a>
           
-          {/* Customer Account Button */}
+          {/* Botón Mi Cuenta */}
           {customer ? (
             <Link 
               to="/mi-cuenta" 
-              className="flex items-center gap-2 bg-primary-green/10 text-primary-green px-3.5 py-1.5 rounded-full hover:bg-primary-green hover:text-white transition text-sm font-sans font-bold shadow-sm"
+              className="flex items-center gap-2 bg-primary-green/10 text-primary-green px-3.5 py-1.5 rounded-full hover:bg-primary-green hover:text-white transition text-xs font-sans font-bold shadow-2xs"
               title="Ir a mi portal de cliente"
             >
-              <PawPrint size={16} />
+              <PawPrint size={15} />
               <span>Hola, {customer.name.split(' ')[0]}</span>
             </Link>
           ) : (
             <button 
               onClick={() => openAuthModal('login')} 
-              className="flex items-center gap-1.5 text-secondary-brown hover:text-primary-green transition text-sm font-sans font-bold px-3 py-1.5 rounded-xl hover:bg-gray-100"
+              className="flex items-center gap-1.5 text-secondary-brown hover:text-primary-green transition text-xs font-sans font-bold px-3 py-1.5 rounded-xl hover:bg-white"
             >
-              <User size={18} />
+              <User size={16} />
               <span>Mi Cuenta</span>
             </button>
           )}
 
+          {/* Botón Carrito */}
           <button 
             onClick={() => setIsCartOpen(true)}
-            className="relative p-2 text-primary-green hover:bg-primary-green/10 rounded-full transition"
+            className="relative p-2.5 text-primary-green hover:bg-primary-green/10 rounded-2xl transition bg-white border border-[#E5DACD] shadow-2xs"
+            title="Ver carrito de compras"
           >
-            <ShoppingBag size={28} />
+            <ShoppingBag size={20} />
             {itemCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-1.5 bg-accent-red text-white text-[10px] font-black rounded-full h-5 w-5 flex items-center justify-center shadow-xs">
                 {itemCount}
               </span>
             )}
           </button>
         </div>
 
-        {/* Mobile Menu Toggle */}
-        <div className="md:hidden flex items-center gap-3">
+        {/* Controles Móviles (Motorola / Smartphones / Tablets) */}
+        <div className="md:hidden flex items-center gap-2">
           {customer ? (
             <Link 
               to="/mi-cuenta" 
-              className="p-2 text-primary-green bg-primary-green/10 rounded-full"
+              className="p-2 text-primary-green bg-primary-green/10 rounded-xl"
               title="Mi Cuenta"
             >
-              <PawPrint size={20} />
+              <PawPrint size={18} />
             </Link>
           ) : (
             <button 
@@ -110,50 +110,55 @@ const Navbar = () => {
               className="p-2 text-secondary-brown"
               title="Iniciar Sesión"
             >
-              <User size={22} />
+              <User size={20} />
             </button>
           )}
 
           <button 
             onClick={() => setIsCartOpen(true)}
-            className="relative p-2 text-primary-green"
+            className="relative p-2 text-primary-green bg-white rounded-xl border border-[#E5DACD]"
           >
-            <ShoppingBag size={24} />
+            <ShoppingBag size={20} />
             {itemCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-1.5 bg-accent-red text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center shadow-xs">
                 {itemCount}
               </span>
             )}
           </button>
-          <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="text-secondary-brown">
-            {mobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
+
+          <button 
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
+            className="p-2 text-secondary-brown hover:text-primary-green transition rounded-xl"
+            aria-label="Abrir menú"
+          >
+            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
       </div>
 
-      {/* Mobile Menu Dropdown */}
+      {/* Menú Desplegable Móvil */}
       {mobileMenuOpen && (
-        <div className="md:hidden absolute top-full left-0 right-0 bg-white shadow-xl border-t border-gray-100 flex flex-col py-4 px-6 font-header text-xl text-secondary-brown z-50">
-          <a href="#planes" onClick={(e) => scrollTo(e, 'planes')} className="py-3 border-b border-gray-100 hover:text-primary-green">Planes Mensuales</a>
-          <a href="#despacho" onClick={(e) => scrollTo(e, 'despacho')} className="py-3 border-b border-gray-100 hover:text-primary-green">Despacho</a>
-          <a href="#tienda" onClick={(e) => scrollTo(e, 'tienda')} className="py-3 border-b border-gray-100 hover:text-primary-green">Tienda</a>
+        <div className="md:hidden bg-white border-t border-[#EBE4DA] shadow-xl flex flex-col py-3 px-6 font-header text-base text-secondary-brown animate-fadeIn">
+          <a href="#planes" onClick={(e) => scrollTo(e, 'planes')} className="py-3 border-b border-[#F0EBE3] hover:text-primary-green">Planes Mensuales</a>
+          <a href="#despacho" onClick={(e) => scrollTo(e, 'despacho')} className="py-3 border-b border-[#F0EBE3] hover:text-primary-green">Despacho</a>
+          <a href="#tienda" onClick={(e) => scrollTo(e, 'tienda')} className="py-3 border-b border-[#F0EBE3] hover:text-primary-green">Tienda</a>
           
           {customer ? (
             <Link 
               to="/mi-cuenta" 
               onClick={() => setMobileMenuOpen(false)}
-              className="py-3 hover:text-primary-green flex items-center gap-2 text-primary-green"
+              className="py-3 hover:text-primary-green flex items-center gap-2 text-primary-green font-bold"
             >
-              <PawPrint size={20} />
-              Mi Cuenta ({customer.name.split(' ')[0]})
+              <PawPrint size={18} />
+              <span>Mi Cuenta ({customer.name.split(' ')[0]})</span>
             </Link>
           ) : (
             <button 
               onClick={() => { setMobileMenuOpen(false); openAuthModal('login'); }}
               className="py-3 hover:text-primary-green text-left flex items-center gap-2"
             >
-              <User size={20} />
-              Ingresar a Mi Cuenta
+              <User size={18} />
+              <span>Ingresar a Mi Cuenta</span>
             </button>
           )}
         </div>

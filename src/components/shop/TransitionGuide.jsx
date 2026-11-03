@@ -3,86 +3,141 @@ import { motion } from 'framer-motion';
 
 const TransitionGuide = () => {
   return (
-    <section className="py-16 bg-bg-cream">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="font-header text-4xl text-secondary-brown mb-4">Deja el pellet sin que le caiga mal</h2>
-          <p className="text-lg text-secondary-brown-light max-w-2xl mx-auto">
-            Cambiar la alimentación de tu perro es fácil si lo haces progresivamente. 
-            Su estómago necesita unos días para volver a un nivel de acidez óptimo y natural.
+    <section className="py-10 md:py-14 bg-white">
+      <div className="container mx-auto px-4 sm:px-6 max-w-5xl">
+        <div className="text-center max-w-xl mx-auto mb-8 md:mb-10">
+          <span className="inline-block bg-[#EBF2DA] text-[#4E5824] text-[11px] sm:text-xs font-bold tracking-widest uppercase px-3.5 py-1 rounded-full mb-2">
+            Transición Suave
+          </span>
+          <h2 className="font-header text-3xl sm:text-4xl font-extrabold text-secondary-brown tracking-tight">
+            Deja el Pellet sin Molestia Estomacal
+          </h2>
+          <p className="text-xs sm:text-sm text-secondary-brown-light/80 mt-1.5 font-sans">
+            Cambiar la alimentación de tu perro es fácil si lo haces progresivamente. Su estómago se adapta en pocos días a su flora natural.
           </p>
         </div>
 
-        <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            
-            <motion.div 
-              whileHover={{ y: -5 }}
-              className="bg-white rounded-2xl p-6 shadow-md border-t-4 border-red-300"
-            >
-              <h3 className="font-bold text-xl text-secondary-brown mb-1">Días 1 a 3</h3>
-              <p className="text-sm text-gray-500 mb-4">Adaptación inicial</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
+          {/* Card 1 */}
+          <motion.div 
+            whileHover={{ y: -3 }}
+            className="bg-[#FAF7F2] rounded-3xl p-5 border border-[#EBE4DA] shadow-2xs flex flex-col justify-between"
+          >
+            <div>
               <div className="flex justify-between items-center mb-2">
-                <span className="font-bold text-gray-400">75%</span>
-                <span className="font-bold text-primary-green">25%</span>
+                <span className="font-header font-bold text-base text-secondary-brown">Días 1 a 3</span>
+                <span className="bg-white text-[11px] font-bold px-2.5 py-0.5 rounded-full text-secondary-orange border border-[#E5DACD]">Fase 1</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5 flex overflow-hidden">
-                <div className="bg-gray-400 h-2.5 w-3/4"></div>
-                <div className="bg-primary-green h-2.5 w-1/4"></div>
-              </div>
-              <p className="text-xs text-gray-500 mt-4 text-center">Pellet vs Origen Canino</p>
-            </motion.div>
+              <p className="text-[11px] text-gray-500 mb-3 font-sans">Adaptación inicial suave</p>
+              
+              <div className="space-y-2 text-xs font-sans">
+                <div className="flex justify-between text-gray-600">
+                  <span>Pellet actual:</span>
+                  <strong>75%</strong>
+                </div>
+                <div className="w-full bg-[#E8E0D2] h-2 rounded-full overflow-hidden">
+                  <div className="bg-gray-400 h-full w-3/4"></div>
+                </div>
 
-            <motion.div 
-              whileHover={{ y: -5 }}
-              className="bg-white rounded-2xl p-6 shadow-md border-t-4 border-orange-300"
-            >
-              <h3 className="font-bold text-xl text-secondary-brown mb-1">Días 4 a 6</h3>
-              <p className="text-sm text-gray-500 mb-4">Mitad y mitad</p>
+                <div className="flex justify-between text-primary-green pt-1">
+                  <span>Origen Canino:</span>
+                  <strong>25%</strong>
+                </div>
+                <div className="w-full bg-[#E8E0D2] h-2 rounded-full overflow-hidden">
+                  <div className="bg-primary-green h-full w-1/4"></div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Card 2 */}
+          <motion.div 
+            whileHover={{ y: -3 }}
+            className="bg-[#FAF7F2] rounded-3xl p-5 border border-[#EBE4DA] shadow-2xs flex flex-col justify-between"
+          >
+            <div>
               <div className="flex justify-between items-center mb-2">
-                <span className="font-bold text-gray-400">50%</span>
-                <span className="font-bold text-primary-green">50%</span>
+                <span className="font-header font-bold text-base text-secondary-brown">Días 4 a 6</span>
+                <span className="bg-white text-[11px] font-bold px-2.5 py-0.5 rounded-full text-secondary-orange border border-[#E5DACD]">Fase 2</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5 flex overflow-hidden">
-                <div className="bg-gray-400 h-2.5 w-2/4"></div>
-                <div className="bg-primary-green h-2.5 w-2/4"></div>
-              </div>
-              <p className="text-xs text-gray-500 mt-4 text-center">Pellet vs Origen Canino</p>
-            </motion.div>
+              <p className="text-[11px] text-gray-500 mb-3 font-sans">Balance medio</p>
+              
+              <div className="space-y-2 text-xs font-sans">
+                <div className="flex justify-between text-gray-600">
+                  <span>Pellet actual:</span>
+                  <strong>50%</strong>
+                </div>
+                <div className="w-full bg-[#E8E0D2] h-2 rounded-full overflow-hidden">
+                  <div className="bg-gray-400 h-full w-1/2"></div>
+                </div>
 
-            <motion.div 
-              whileHover={{ y: -5 }}
-              className="bg-white rounded-2xl p-6 shadow-md border-t-4 border-yellow-400"
-            >
-              <h3 className="font-bold text-xl text-secondary-brown mb-1">Días 7 a 9</h3>
-              <p className="text-sm text-gray-500 mb-4">Casi listos</p>
+                <div className="flex justify-between text-primary-green pt-1">
+                  <span>Origen Canino:</span>
+                  <strong>50%</strong>
+                </div>
+                <div className="w-full bg-[#E8E0D2] h-2 rounded-full overflow-hidden">
+                  <div className="bg-primary-green h-full w-1/2"></div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Card 3 */}
+          <motion.div 
+            whileHover={{ y: -3 }}
+            className="bg-[#FAF7F2] rounded-3xl p-5 border border-[#EBE4DA] shadow-2xs flex flex-col justify-between"
+          >
+            <div>
               <div className="flex justify-between items-center mb-2">
-                <span className="font-bold text-gray-400">25%</span>
-                <span className="font-bold text-primary-green">75%</span>
+                <span className="font-header font-bold text-base text-secondary-brown">Días 7 a 9</span>
+                <span className="bg-white text-[11px] font-bold px-2.5 py-0.5 rounded-full text-secondary-orange border border-[#E5DACD]">Fase 3</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5 flex overflow-hidden">
-                <div className="bg-gray-400 h-2.5 w-1/4"></div>
-                <div className="bg-primary-green h-2.5 w-3/4"></div>
-              </div>
-              <p className="text-xs text-gray-500 mt-4 text-center">Pellet vs Origen Canino</p>
-            </motion.div>
+              <p className="text-[11px] text-gray-500 mb-3 font-sans">Mayoría comida real</p>
+              
+              <div className="space-y-2 text-xs font-sans">
+                <div className="flex justify-between text-gray-600">
+                  <span>Pellet actual:</span>
+                  <strong>25%</strong>
+                </div>
+                <div className="w-full bg-[#E8E0D2] h-2 rounded-full overflow-hidden">
+                  <div className="bg-gray-400 h-full w-1/4"></div>
+                </div>
 
-            <motion.div 
-              whileHover={{ y: -5 }}
-              className="bg-white rounded-2xl p-6 shadow-md border-t-4 border-green-500"
-            >
-              <h3 className="font-bold text-xl text-secondary-brown mb-1">Día 10+</h3>
-              <p className="text-sm text-gray-500 mb-4">Transición exitosa</p>
-              <div className="flex justify-end items-center mb-2">
-                <span className="font-bold text-primary-green">100%</span>
+                <div className="flex justify-between text-primary-green pt-1">
+                  <span>Origen Canino:</span>
+                  <strong>75%</strong>
+                </div>
+                <div className="w-full bg-[#E8E0D2] h-2 rounded-full overflow-hidden">
+                  <div className="bg-primary-green h-full w-3/4"></div>
+                </div>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5 flex overflow-hidden">
-                <div className="bg-primary-green h-2.5 w-full"></div>
-              </div>
-              <p className="text-xs text-gray-500 mt-4 text-center">¡Solo Origen Canino!</p>
-            </motion.div>
+            </div>
+          </motion.div>
 
-          </div>
+          {/* Card 4 */}
+          <motion.div 
+            whileHover={{ y: -3 }}
+            className="bg-primary-green/10 rounded-3xl p-5 border-2 border-primary-green shadow-xs flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-header font-bold text-base text-secondary-brown">Día 10 en adelante</span>
+                <span className="bg-primary-green text-white text-[11px] font-bold px-2 py-0.5 rounded-full">¡Éxito! 🎉</span>
+              </div>
+              <p className="text-[11px] text-primary-green-dark font-medium mb-3 font-sans">100% Nutrición Natural</p>
+              
+              <div className="space-y-2 text-xs font-sans">
+                <div className="flex justify-between text-primary-green-dark font-bold pt-1">
+                  <span>Origen Canino:</span>
+                  <strong>100%</strong>
+                </div>
+                <div className="w-full bg-[#E8E0D2] h-2 rounded-full overflow-hidden">
+                  <div className="bg-primary-green h-full w-full"></div>
+                </div>
+                <p className="text-[10px] text-gray-500 pt-1">Digestión óptima y heces compactas.</p>
+              </div>
+            </div>
+          </motion.div>
         </div>
       </div>
     </section>

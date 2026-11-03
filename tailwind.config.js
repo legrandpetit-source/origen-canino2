@@ -7,18 +7,20 @@ export default {
   theme: {
     extend: {
       colors: {
-        'primary-green': '#5f992f',
-        'primary-green-light': '#7cb84a',
-        'primary-green-dark': '#3a6b1c',
-        'secondary-brown': '#2e1e14',
-        'secondary-brown-light': '#5e4334',
-        'secondary-orange': '#e56c32',
-        'bg-cream': '#fcf9f2',
+        // Paleta Cromática Unificada del Logo Oficial de Origen Canino
+        'primary-green': '#677333',         // Verde oliva exacto del plato y hojas
+        'primary-green-light': '#7c8b3e',   // Verde oliva luminoso
+        'primary-green-dark': '#4e5824',    // Verde oliva profundo
+        'secondary-brown': '#3c2716',       // Café tierra cacao exacto de "CANINO"
+        'secondary-brown-light': '#5c3f27', // Café tostado medio
+        'secondary-orange': '#db994b',      // Naranja miel cálido exacto de las orejas del perrito
+        'accent-red': '#c64a4c',            // Rojo salmón exacto de la carne en el tazón
+        'bg-cream': '#faf7f2',              // Crema suave orgánico de fondo
       },
       fontFamily: {
-        sans: ['Outfit', 'sans-serif'],
-        header: ['Fredoka', 'sans-serif'],
-        script: ['Pacifico', 'cursive'],
+        sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        header: ['"Outfit"', '"Plus Jakarta Sans"', 'sans-serif'],
+        script: ['"Outfit"', 'sans-serif'], // Unificamos script a Outfit redondeada para respetar la regla de solo 2 tipografías
       },
       animation: {
         marquee: 'marquee 30s linear infinite',
@@ -33,4 +35,3 @@ export default {
   },
   plugins: [],
 }
-
