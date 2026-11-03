@@ -3,7 +3,7 @@ import {
   Package, BookOpen, Edit2, Plus, Trash2, X, Save, ShoppingCart, 
   MessageSquareHeart, Check, XCircle, LogOut, Key, ChefHat, BarChart, 
   Building2, CreditCard, Calculator, Send, Gift, UploadCloud, 
-  Image as ImageIcon, Loader2, Sparkles, CheckCircle2 
+  Image as ImageIcon, Loader2, Sparkles, CheckCircle2, ExternalLink 
 } from 'lucide-react';
 import AdminLogin from './AdminLogin';
 import IngredientsManager from './IngredientsManager';
@@ -78,9 +78,11 @@ const AdminPanel = () => {
 
   // Modals state
   const [editingProduct, setEditingProduct] = useState(null);
+  const [newProduct, setNewProduct] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadSuccessInfo, setUploadSuccessInfo] = useState(null);
   const fileInputRef = useRef(null);
+  const newFileInputRef = useRef(null);
   const [recipeProduct, setRecipeProduct] = useState(null);
   const [editingPost, setEditingPost] = useState(null);
   const [isAddingPost, setIsAddingPost] = useState(false);
@@ -135,6 +137,29 @@ const AdminPanel = () => {
   };
 
   // --- Products Logic ---
+  const handleCreateProduct = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetchWithAuth('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newProduct)
+      });
+      if (res.ok) {
+        setNewProduct(null);
+        setUploadSuccessInfo(null);
+        fetchData();
+        alert('¡Producto creado exitosamente!');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || 'Error al crear el producto');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error de red al crear el producto');
+    }
+  };
+
   const handleSaveProduct = async (e) => {
     e.preventDefault();
     try {
@@ -287,12 +312,32 @@ const AdminPanel = () => {
   }
 
   return (
-    <div className="flex flex-col md:flex-row min-h-[calc(100vh-160px)] w-full bg-gray-50 border-t border-gray-200">
+    <div className="flex flex-col md:flex-row min-h-screen w-full bg-gray-50">
       
       {/* Sidebar */}
       <div className="w-full md:w-64 bg-primary-green-dark text-white flex flex-col shadow-xl z-10 shrink-0">
-        <div className="p-6 border-b border-white/10">
-          <h2 className="font-header text-3xl">Admin</h2>
+        <div className="p-5 border-b border-white/10 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <img 
+              src="/images/products/logo.jpg" 
+              alt="Logo" 
+              className="w-8 h-8 rounded-lg object-contain bg-white p-0.5 shadow-sm shrink-0" 
+              onError={(e) => { e.target.style.display = 'none'; }} 
+            />
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#db994b] font-body block leading-tight">ORIGEN CANINO</span>
+              <h2 className="font-header text-xl font-bold leading-tight">Panel Admin</h2>
+            </div>
+          </div>
+          <a 
+            href="/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-xl transition text-xs flex items-center gap-1 font-body"
+            title="Abrir tienda en nueva pestaña"
+          >
+            <ExternalLink size={17} />
+          </a>
         </div>
         
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
@@ -415,8 +460,35 @@ const AdminPanel = () => {
               {/* --- PRODUCTS TAB --- */}
               {activeTab === 'products' && (
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-header text-2xl text-secondary-brown">Tus Productos ({products.length})</h3>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-2">
+                    <div>
+                      <h3 className="font-header text-2xl text-secondary-brown font-bold">
+                        Tus Productos ({products.length})
+                      </h3>
+                      <p className="text-xs text-gray-500 font-body">
+                        Gestiona recetas, precios, inventario y catálogo de la tienda.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setNewProduct({
+                          name: '',
+                          type: 'barf',
+                          price: 5000,
+                          weight: '1 Kg',
+                          description: '',
+                          ingredients: [],
+                          benefits: [],
+                          isNew: true,
+                          image: '',
+                          fixed_cost: 0
+                        });
+                        setUploadSuccessInfo(null);
+                      }}
+                      className="bg-primary-green hover:bg-primary-green-dark text-white px-4 py-2.5 rounded-xl font-bold font-body text-sm flex items-center gap-2 shadow-sm transition cursor-pointer"
+                    >
+                      <Plus size={18} /> Agregar Nuevo Producto
+                    </button>
                   </div>
                   <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     {products.map((product) => (
@@ -637,6 +709,18 @@ const AdminPanel = () => {
                   <input type="text" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-primary-green outline-none" required
                     value={editingProduct.weight} onChange={e => setEditingProduct({...editingProduct, weight: e.target.value})} />
                 </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Categoría / Tipo</label>
+                  <select
+                    className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-primary-green outline-none text-sm font-body bg-white"
+                    value={editingProduct.type || 'barf'}
+                    onChange={e => setEditingProduct({...editingProduct, type: e.target.value})}
+                  >
+                    <option value="barf">🥩 Dieta BARF (Cruda)</option>
+                    <option value="cocinada">🍲 Comida Cocinada al Vapor</option>
+                    <option value="snack">🦴 Snack Natural Deshidratado</option>
+                  </select>
+                </div>
                 <div className="md:col-span-2 bg-[#FAF7F2] p-4 rounded-2xl border border-stone-200/80 space-y-3">
                   <div className="flex items-center justify-between">
                     <label className="block text-sm font-bold text-[#3c2716] font-display">
@@ -768,6 +852,237 @@ const AdminPanel = () => {
               <div className="pt-4 flex justify-end gap-3">
                 <button type="button" onClick={() => { setEditingProduct(null); setUploadSuccessInfo(null); }} className="px-5 py-2 text-gray-600 font-bold hover:bg-gray-100 rounded-lg">Cancelar</button>
                 <button type="submit" className="px-5 py-2 bg-primary-green text-white font-bold rounded-lg hover:bg-primary-green-dark flex items-center gap-2"><Save size={18}/> Guardar Cambios</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL: CREATE PRODUCT --- */}
+      {newProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-2xl w-full max-w-2xl my-8 relative shadow-2xl">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white rounded-t-2xl z-10">
+              <div>
+                <h3 className="font-header text-2xl text-secondary-brown font-bold">Agregar Nuevo Producto</h3>
+                <p className="text-xs text-gray-500 font-body">Ingresa los datos del nuevo producto para el catálogo.</p>
+              </div>
+              <button 
+                onClick={() => { setNewProduct(null); setUploadSuccessInfo(null); }} 
+                className="text-gray-400 hover:text-gray-700 bg-gray-100 p-2 rounded-full transition cursor-pointer"
+              >
+                <X size={20}/>
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateProduct} className="p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Nombre */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Nombre del Producto *</label>
+                  <input 
+                    type="text" 
+                    className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-primary-green outline-none text-sm font-body" 
+                    required
+                    placeholder="Ej: Dieta Pavo Silvestre & Calabaza"
+                    value={newProduct.name} 
+                    onChange={e => setNewProduct({...newProduct, name: e.target.value})} 
+                  />
+                </div>
+
+                {/* Tipo de Producto */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Categoría / Tipo *</label>
+                  <select
+                    className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-primary-green outline-none text-sm font-body bg-white"
+                    value={newProduct.type}
+                    onChange={e => setNewProduct({...newProduct, type: e.target.value})}
+                    required
+                  >
+                    <option value="barf">🥩 Dieta BARF (Cruda)</option>
+                    <option value="cocinada">🍲 Comida Cocinada al Vapor</option>
+                    <option value="snack">🦴 Snack Natural Deshidratado</option>
+                  </select>
+                </div>
+
+                {/* Precio */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Precio CLP ($) *</label>
+                  <input 
+                    type="number" 
+                    min="100"
+                    className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-primary-green outline-none text-sm font-body font-bold" 
+                    required
+                    placeholder="5990"
+                    value={newProduct.price} 
+                    onChange={e => setNewProduct({...newProduct, price: parseInt(e.target.value) || 0})} 
+                  />
+                </div>
+
+                {/* Peso */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Peso / Formato (Ej: 1 Kg, 500g, 120g) *</label>
+                  <input 
+                    type="text" 
+                    className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-primary-green outline-none text-sm font-body" 
+                    required
+                    placeholder="Pouch 500g"
+                    value={newProduct.weight} 
+                    onChange={e => setNewProduct({...newProduct, weight: e.target.value})} 
+                  />
+                </div>
+
+                {/* Imagen del Producto con Compresión WebP */}
+                <div className="md:col-span-2 bg-[#FAF7F2] p-4 rounded-2xl border border-stone-200/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-bold text-[#3c2716] font-display">
+                      Imagen del Producto (Compresión WebP Automática)
+                    </label>
+                    {uploadSuccessInfo && (
+                      <span className="text-xs font-bold text-[#677333] bg-[#677333]/15 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                        <CheckCircle2 size={13} /> WebP Optimizado ({Math.round(uploadSuccessInfo.final_size / 1024)} KB)
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    {/* Thumbnail Preview */}
+                    <div className="w-20 h-20 rounded-xl bg-white border border-stone-200 overflow-hidden shrink-0 flex items-center justify-center shadow-inner relative">
+                      {newProduct.image ? (
+                        <img 
+                          src={newProduct.image} 
+                          alt="Vista previa" 
+                          className="w-full h-full object-cover"
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                      ) : (
+                        <ImageIcon size={28} className="text-stone-300" />
+                      )}
+                    </div>
+
+                    {/* Action Area */}
+                    <div className="flex-1 space-y-2">
+                      <input 
+                        ref={newFileInputRef}
+                        type="file" 
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setUploadingImage(true);
+                          setUploadSuccessInfo(null);
+                          try {
+                            // 1. Comprimir a WebP en el navegador
+                            const compressedBlob = await compressImageToWebP(file);
+                            const formData = new FormData();
+                            formData.append('file', compressedBlob);
+
+                            // 2. Subir al servidor
+                            const res = await fetchWithAuth('/api/admin/products/upload-image', {
+                              method: 'POST',
+                              body: formData
+                            });
+
+                            if (res.ok) {
+                              const data = await res.json();
+                              setNewProduct(prev => ({ ...prev, image: data.url }));
+                              setUploadSuccessInfo(data);
+                            } else {
+                              const errData = await res.json().catch(() => ({}));
+                              alert(errData.detail || "Error al subir la imagen");
+                            }
+                          } catch (err) {
+                            console.error(err);
+                            alert("Error de red al procesar la imagen");
+                          } finally {
+                            setUploadingImage(false);
+                            if (newFileInputRef.current) newFileInputRef.current.value = '';
+                          }
+                        }}
+                      />
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={uploadingImage}
+                          onClick={() => newFileInputRef.current?.click()}
+                          className="px-4 py-2 bg-[#677333] hover:bg-[#56602b] text-white rounded-xl font-bold text-xs flex items-center gap-2 transition shadow-sm disabled:opacity-50 cursor-pointer"
+                        >
+                          {uploadingImage ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" />
+                              Comprimiendo y guardando en WebP...
+                            </>
+                          ) : (
+                            <>
+                              <UploadCloud size={15} />
+                              Seleccionar y Comprimir Imagen (.webp)
+                            </>
+                          )}
+                        </button>
+                        <span className="text-[11px] text-stone-500">
+                          Formatos: JPG, PNG, WEBP (se autocomprime a WebP óptimo)
+                        </span>
+                      </div>
+
+                      <input 
+                        type="text" 
+                        className="w-full bg-white border border-stone-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-[#677333] outline-none text-xs text-stone-700 font-mono" 
+                        placeholder="/images/products/ejemplo.webp"
+                        value={newProduct.image} 
+                        onChange={e => setNewProduct({...newProduct, image: e.target.value})} 
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Descripción Corta *</label>
+                <textarea 
+                  className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-primary-green outline-none h-20 text-sm font-body" 
+                  required
+                  placeholder="Descripción atractiva del producto para el catálogo..."
+                  value={newProduct.description} 
+                  onChange={e => setNewProduct({...newProduct, description: e.target.value})} 
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Ingredientes (Separados por coma)</label>
+                <textarea 
+                  className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-primary-green outline-none h-20 text-sm font-body" 
+                  placeholder="Carne de vacuno de libre pastoreo, Corazón bovino, Calabaza dulce, Semillas de chía..."
+                  value={newProduct.ingredients.join(', ')} 
+                  onChange={e => setNewProduct({...newProduct, ingredients: e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})} 
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Beneficios (Separados por coma)</label>
+                <textarea 
+                  className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-primary-green outline-none h-20 text-sm font-body" 
+                  placeholder="Pelaje ultra brillante, Digestión suave sin gases, Mayor energía y vitalidad..."
+                  value={newProduct.benefits.join(', ')} 
+                  onChange={e => setNewProduct({...newProduct, benefits: e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})} 
+                />
+              </div>
+
+              <div className="pt-4 flex justify-end gap-3 border-t border-gray-100">
+                <button 
+                  type="button" 
+                  onClick={() => { setNewProduct(null); setUploadSuccessInfo(null); }} 
+                  className="px-5 py-2.5 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition font-body text-sm cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-6 py-2.5 bg-primary-green text-white font-bold rounded-xl hover:bg-primary-green-dark flex items-center gap-2 shadow-sm transition font-body text-sm cursor-pointer"
+                >
+                  <Save size={18}/> Crear Producto
+                </button>
               </div>
             </form>
           </div>

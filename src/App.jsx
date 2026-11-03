@@ -21,8 +21,8 @@ function App() {
           <CartProvider>
             <Router>
               <Routes>
-                {/* Rutas del E-commerce (Shop) */}
-                <Route path="/" element={
+                {/* Rutas del E-commerce (Shop): Incluyen TopBanner, Navbar, Carrito y Footer */}
+                <Route element={
                   <div className="min-h-screen flex flex-col font-sans text-secondary-brown">
                     <TopBanner />
                     <Navbar />
@@ -37,8 +37,10 @@ function App() {
                   <Route index element={<Home />} />
                   <Route path="blog/:slug" element={<BlogPost />} />
                   <Route path="mi-cuenta" element={<CustomerPortal />} />
-                  <Route path="admin" element={<AdminPanel />} />
                 </Route>
+
+                {/* Ruta Dedicada del Panel de Administración (Sin banners ni menú de tienda) */}
+                <Route path="admin" element={<AdminPanel />} />
 
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>

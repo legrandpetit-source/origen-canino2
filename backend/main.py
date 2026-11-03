@@ -60,8 +60,21 @@ class ProductResponse(BaseModel):
     isNew: bool
     fixed_cost: int = 0
 
+class ProductCreate(BaseModel):
+    name: str
+    type: str = "barf"
+    price: int
+    weight: str = "1 Kg"
+    description: str = ""
+    ingredients: List[str] = []
+    benefits: List[str] = []
+    isNew: bool = True
+    image: str = ""
+    fixed_cost: int = 0
+
 class ProductUpdate(BaseModel):
     name: str
+    type: Optional[str] = None
     price: int
     weight: str
     description: str
@@ -954,15 +967,39 @@ def get_products():
             ))
         return products
 
+@app.post("/api/products")
+def create_product(p: ProductCreate, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO products (
+                    name, type, price, weight, description, 
+                    ingredients, benefits, is_new, active, image, fixed_cost
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1, %s, %s)
+                RETURNING id
+            """, (
+                p.name, p.type, p.price, p.weight, p.description,
+                json.dumps(p.ingredients), json.dumps(p.benefits),
+                int(p.isNew), p.image, p.fixed_cost
+            ))
+            new_id = cursor.fetchone()["id"]
+            conn.commit()
+            return {"success": True, "id": new_id, "message": "Producto creado exitosamente."}
+    except Exception as e:
+        print(f"Error creating product: {e}")
+        raise HTTPException(status_code=500, detail="Error creando el producto: " + str(e))
+
 @app.put("/api/products/{product_id}")
 def update_product(product_id: int, p: ProductUpdate, current_user: str = Depends(get_current_admin)):
     try:
         with get_connection() as conn:
             conn.cursor().execute("""
                 UPDATE products 
-                SET name = %s, price = %s, weight = %s, description = %s, ingredients = %s, benefits = %s, is_new = %s, image = %s, fixed_cost = %s
+                SET name = %s, type = COALESCE(%s, type), price = %s, weight = %s, description = %s, ingredients = %s, benefits = %s, is_new = %s, image = %s, fixed_cost = %s
                 WHERE id = %s
-            """, (p.name, p.price, p.weight, p.description, json.dumps(p.ingredients), json.dumps(p.benefits), int(p.isNew), p.image, p.fixed_cost, product_id))
+            """, (p.name, p.type, p.price, p.weight, p.description, json.dumps(p.ingredients), json.dumps(p.benefits), int(p.isNew), p.image, p.fixed_cost, product_id))
             conn.commit()
         return {"success": True}
     except Exception as e:
