@@ -2,7 +2,7 @@ import os
 import re
 import json
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request, Form, UploadFile, File
+from fastapi import FastAPI, HTTPException, Request, Form, UploadFile, File, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -162,6 +162,13 @@ class BuildingCreateUpdate(BaseModel):
 
 class SettingsUpdate(BaseModel):
     settings: dict
+
+class PromoSettingsUpdate(BaseModel):
+    enabled: bool = True
+    percent: int = 10
+    code: str = "BIENVENIDO10"
+    title: str = "¡10% OFF en tu primera compra!"
+    description: Optional[str] = "Descuento automático exclusivo para nuevos clientes en su primer pedido."
 
 class TestimonialCreate(BaseModel):
     owner_name: str
@@ -1339,6 +1346,8 @@ def create_order(order: OrderCreate):
 
             if order.nfc_building_code:
                 msg += f"🏢 Tag NFC Comunidad: {order.nfc_building_code} (Descuento: -${discount:,})\n"
+            elif discount > 0:
+                msg += f"🎉 Descuento 1ra Compra Aplicado: -${discount:,}\n"
 
             msg += f"💰 Total a Pagar: ${total:,}\n\n"
             
@@ -1685,6 +1694,80 @@ def update_admin_calculator_settings(payload: SettingsUpdate, current_user: str 
             """, (val_json,))
             conn.commit()
             return {"success": True, "settings": payload.settings}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- First-Order Promotions Endpoints ---
+DEFAULT_PROMO_SETTINGS = {
+    "enabled": True,
+    "percent": 10,
+    "code": "BIENVENIDO10",
+    "title": "¡10% OFF en tu primera compra!",
+    "description": "Descuento automático exclusivo para nuevos clientes en su primer pedido."
+}
+
+@app.get("/api/promotions/first-order")
+def get_public_first_order_promo():
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM system_settings WHERE key = 'first_order_promo'")
+            row = cursor.fetchone()
+            if row and row.get('value'):
+                data = json.loads(row['value'])
+                return {**DEFAULT_PROMO_SETTINGS, **data}
+            return DEFAULT_PROMO_SETTINGS
+    except Exception:
+        return DEFAULT_PROMO_SETTINGS
+
+@app.get("/api/promotions/check-eligibility")
+def check_first_order_eligibility(email: str = Query("")):
+    clean_email = email.strip().lower()
+    if not clean_email:
+        return {"eligible": True, "order_count": 0}
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT COUNT(*) as cnt FROM orders 
+                WHERE LOWER(customer_email) = %s AND payment_status != 'Cancelado'
+            """, (clean_email,))
+            row = cursor.fetchone()
+            order_count = row['cnt'] if row else 0
+            return {
+                "eligible": order_count == 0,
+                "order_count": order_count
+            }
+    except Exception as e:
+        return {"eligible": True, "order_count": 0, "error": str(e)}
+
+@app.get("/api/admin/promotions/first-order")
+def get_admin_first_order_promo(current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM system_settings WHERE key = 'first_order_promo'")
+            row = cursor.fetchone()
+            if row and row.get('value'):
+                data = json.loads(row['value'])
+                return {**DEFAULT_PROMO_SETTINGS, **data}
+            return DEFAULT_PROMO_SETTINGS
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/admin/promotions/first-order")
+def update_admin_first_order_promo(payload: PromoSettingsUpdate, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            val_json = json.dumps(payload.dict())
+            cursor.execute("""
+                INSERT INTO system_settings (key, value, updated_at)
+                VALUES ('first_order_promo', %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
+            """, (val_json,))
+            conn.commit()
+            return {"success": True, "settings": payload.dict()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

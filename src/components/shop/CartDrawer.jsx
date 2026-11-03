@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { useCart } from '../../context/CartContext';
-import { X, Plus, Minus, Trash2, Info, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { X, Plus, Minus, Trash2, Info, RefreshCw, CheckCircle2, Sparkles, Gift } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CheckoutModal from './CheckoutModal';
 
 const CartDrawer = () => {
-  const { items, isCartOpen, setIsCartOpen, updateQuantity, removeItem, total, addItem } = useCart();
+  const { 
+    items, isCartOpen, setIsCartOpen, updateQuantity, removeItem, total, addItem,
+    firstOrderPromo, firstOrderDiscount, isFirstPurchaseEligible, nfcDiscount, nfcCommunity
+  } = useCart();
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isSubscription, setIsSubscription] = useState(false);
 
@@ -212,13 +215,39 @@ const CartDrawer = () => {
                   </div>
                 )}
                 
-                <div className="flex justify-between font-bold text-lg mb-4">
+                {/* Desglose de Descuentos (NFC o 1ra Compra) */}
+                {!isSubscription && (nfcDiscount > 0 || firstOrderDiscount > 0) && (
+                  <div className="mb-3 space-y-1.5 text-xs font-body">
+                    {nfcDiscount > 0 ? (
+                      <div className="flex justify-between font-bold text-[#677333] bg-[#677333]/10 px-2.5 py-1.5 rounded-xl">
+                        <span className="flex items-center gap-1.5">
+                          <Sparkles size={13} /> Descuento Comunidad ({nfcCommunity?.discount_percent}%):
+                        </span>
+                        <span>-${nfcDiscount.toLocaleString('es-CL')}</span>
+                      </div>
+                    ) : firstOrderDiscount > 0 ? (
+                      <div className="flex justify-between font-bold text-[#677333] bg-[#677333]/10 px-2.5 py-1.5 rounded-xl">
+                        <span className="flex items-center gap-1.5">
+                          <Gift size={13} /> Descuento 1ra Compra ({firstOrderPromo?.percent}%):
+                        </span>
+                        <span>-${firstOrderDiscount.toLocaleString('es-CL')}</span>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+                
+                <div className="flex justify-between font-bold text-lg mb-4 font-display">
                   <span>Total estimado:</span>
                   <div className="text-right">
                     {isSubscription ? (
                       <>
                         <span className="line-through text-gray-400 text-sm mr-2">${total.toLocaleString('es-CL')}</span>
-                        <span className="text-primary-green-dark">${(total * 0.9).toLocaleString('es-CL')}</span>
+                        <span className="text-[#677333]">${Math.round(total * 0.9).toLocaleString('es-CL')}</span>
+                      </>
+                    ) : (nfcDiscount > 0 || firstOrderDiscount > 0) ? (
+                      <>
+                        <span className="line-through text-gray-400 text-sm mr-2">${total.toLocaleString('es-CL')}</span>
+                        <span className="text-[#677333]">${Math.max(0, total - (nfcDiscount > 0 ? nfcDiscount : firstOrderDiscount)).toLocaleString('es-CL')}</span>
                       </>
                     ) : (
                       <span>${total.toLocaleString('es-CL')}</span>

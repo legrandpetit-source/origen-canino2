@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, ArrowLeft, CreditCard, Landmark, Sparkles, Building2, ShieldCheck, Copy, Check, UserCheck, Dog, RefreshCw, Info } from 'lucide-react';
+import { X, CheckCircle, ArrowLeft, CreditCard, Landmark, Sparkles, Building2, ShieldCheck, Copy, Check, UserCheck, Dog, RefreshCw, Info, Gift } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useCustomer } from '../../context/CustomerContext';
 
 const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
-  const { items, total, clearCart, dogData, nfcCommunity, nfcDiscount } = useCart();
+  const { 
+    items, total, clearCart, dogData, nfcCommunity, nfcDiscount, 
+    firstOrderPromo, isFirstPurchaseEligible, markAsPurchased 
+  } = useCart();
   const { customer, dogs, openAuthModal } = useCustomer();
   
   const [formData, setFormData] = useState({
@@ -93,10 +96,34 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
     }
   }, [customer, dogs, isOpen]);
 
-  // Descuentos: Suscripción (10%) o Descuento de Comunidad NFC
+  const [emailCheckEligible, setEmailCheckEligible] = useState(null);
+
+  useEffect(() => {
+    const email = formData.customer_email?.trim().toLowerCase();
+    if (email && email.includes('@') && email.includes('.')) {
+      fetch(`/api/promotions/check-eligibility?email=${encodeURIComponent(email)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && typeof data.eligible === 'boolean') {
+            setEmailCheckEligible(data.eligible);
+          }
+        })
+        .catch(() => {});
+    } else {
+      setEmailCheckEligible(null);
+    }
+  }, [formData.customer_email]);
+
+  // Descuentos: Suscripción (10%), Comunidad NFC o Primera Compra
   const subscriptionDiscount = isSubscription ? Math.round(total * 0.1) : 0;
   const appliedNfcDiscount = (!isSubscription && nfcDiscount > 0) ? nfcDiscount : 0;
-  const totalDiscount = subscriptionDiscount + appliedNfcDiscount;
+  
+  const isEligibleForFirstOrder = emailCheckEligible !== null ? emailCheckEligible : isFirstPurchaseEligible;
+  const appliedFirstOrderDiscount = (!isSubscription && appliedNfcDiscount === 0 && isEligibleForFirstOrder && firstOrderPromo?.enabled)
+    ? Math.round(total * (Number(firstOrderPromo.percent) / 100))
+    : 0;
+
+  const totalDiscount = subscriptionDiscount + appliedNfcDiscount + appliedFirstOrderDiscount;
 
   const subtotalAfterDiscount = Math.max(0, total - totalDiscount);
   const shippingCost = isSubscription ? 0 : (subtotalAfterDiscount < 100000 ? 5000 : 0);
@@ -168,6 +195,7 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
 
         const mpData = await mpRes.json();
         if (mpRes.ok && mpData.init_point) {
+          markAsPurchased();
           clearCart();
           window.location.href = mpData.init_point;
           return;
@@ -181,6 +209,7 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
       }
 
       // 3. Si eligió Transferencia Bancaria, mostrar pantalla de confirmación
+      markAsPurchased();
       setOrderSuccess(createdOrderId);
       clearCart();
     } catch (error) {
@@ -608,6 +637,15 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                           <Building2 size={16} /> Descuento Comunidad ({nfcCommunity.name} -{nfcCommunity.discount_percent}%)
                         </span>
                         <span>-${appliedNfcDiscount.toLocaleString('es-CL')}</span>
+                      </div>
+                    )}
+
+                    {appliedFirstOrderDiscount > 0 && (
+                      <div className="flex justify-between text-sm text-[#677333] font-bold bg-[#677333]/10 p-2 rounded-xl">
+                        <span className="flex items-center gap-1.5">
+                          <Gift size={16} /> Descuento 1ra Compra ({firstOrderPromo?.percent}% OFF)
+                        </span>
+                        <span>-${appliedFirstOrderDiscount.toLocaleString('es-CL')}</span>
                       </div>
                     )}
 

@@ -13,6 +13,7 @@ import SuggestedPlans from './SuggestedPlans';
 import DeliveryArea from './DeliveryArea';
 import Testimonials from './Testimonials';
 import ProductCard from './ProductCard';
+import FloatingFirstOrderPromo from './FloatingFirstOrderPromo';
 
 const Home = () => {
   const { addItem, nfcCommunity, setNfcCommunity } = useCart();
@@ -311,6 +312,9 @@ const Home = () => {
       {/* Blog */}
       <Blog />
       
+      {/* Widget Flotante de Descuento 1ra Compra */}
+      <FloatingFirstOrderPromo />
+
       {/* Modal de Calculadora de Raciones */}
       <CalculatorModal 
         isOpen={isCalculatorOpen} 

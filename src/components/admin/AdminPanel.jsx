@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, BookOpen, Edit2, Plus, Trash2, X, Save, ShoppingCart, MessageSquareHeart, Check, XCircle, LogOut, Key, ChefHat, BarChart, Building2, CreditCard, Calculator, Send } from 'lucide-react';
+import { Package, BookOpen, Edit2, Plus, Trash2, X, Save, ShoppingCart, MessageSquareHeart, Check, XCircle, LogOut, Key, ChefHat, BarChart, Building2, CreditCard, Calculator, Send, Gift } from 'lucide-react';
 import AdminLogin from './AdminLogin';
 import IngredientsManager from './IngredientsManager';
 import ProductRecipeManager from './ProductRecipeManager';
@@ -11,6 +11,7 @@ import PaymentSettingsManager from './PaymentSettingsManager';
 import SecurityManager from './SecurityManager';
 import CalculatorSettingsManager from './CalculatorSettingsManager';
 import TelegramSettingsManager from './TelegramSettingsManager';
+import PromotionsManager from './PromotionsManager';
 
 const AdminPanel = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_token'));
@@ -288,6 +289,12 @@ const AdminPanel = () => {
             <Building2 size={20} /> Puntos NFC (Edificios)
           </button>
           <button 
+            onClick={() => setActiveTab('promotions')}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'promotions' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
+          >
+            <Gift size={20} /> Promociones & 1ra Compra
+          </button>
+          <button 
             onClick={() => setActiveTab('calculator')}
             className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'calculator' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
           >
@@ -505,6 +512,11 @@ const AdminPanel = () => {
               {/* --- NFC BUILDINGS TAB --- */}
               {activeTab === 'nfc' && (
                 <NfcManager fetchWithAuth={fetchWithAuth} />
+              )}
+
+              {/* --- PROMOTIONS TAB --- */}
+              {activeTab === 'promotions' && (
+                <PromotionsManager fetchWithAuth={fetchWithAuth} />
               )}
 
               {/* --- CALCULATOR SETTINGS TAB --- */}

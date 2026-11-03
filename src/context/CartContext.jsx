@@ -9,6 +9,36 @@ export const CartProvider = ({ children }) => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [dogData, setDogData] = useState({ name: '', weight: '', age: '' });
   
+  // Promoción de Primera Compra
+  const [firstOrderPromo, setFirstOrderPromo] = useState({
+    enabled: true,
+    percent: 10,
+    code: 'BIENVENIDO10',
+    title: '¡10% OFF en tu primera compra!'
+  });
+
+  const [hasPurchased, setHasPurchased] = useState(() => {
+    return localStorage.getItem('origencanino_has_purchased') === 'true';
+  });
+
+  useEffect(() => {
+    fetch('/api/promotions/first-order')
+      .then(res => res.json())
+      .then(data => {
+        if (data) setFirstOrderPromo(data);
+      })
+      .catch(err => console.error("Error cargando promo:", err));
+  }, []);
+
+  const markAsPurchased = () => {
+    setHasPurchased(true);
+    try {
+      localStorage.setItem('origencanino_has_purchased', 'true');
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   // Comunidad NFC (Edificio/Condominio)
   const [nfcCommunity, setNfcCommunityState] = useState(() => {
     try {
@@ -73,11 +103,18 @@ export const CartProvider = ({ children }) => {
     ? Math.round(total * (nfcCommunity.discount_percent / 100))
     : 0;
 
+  // Descuento Primera Compra (si está habilitado y es nuevo comprador)
+  const isFirstPurchaseEligible = !hasPurchased;
+  const firstOrderDiscount = (firstOrderPromo?.enabled && isFirstPurchaseEligible && total > 0)
+    ? Math.round(total * (Number(firstOrderPromo.percent) / 100))
+    : 0;
+
   return (
     <CartContext.Provider value={{
       items, addItem, removeItem, updateQuantity, clearCart, total, itemCount,
       isCartOpen, setIsCartOpen, dogData, setDogData,
-      nfcCommunity, setNfcCommunity, clearNfcCommunity, nfcDiscount
+      nfcCommunity, setNfcCommunity, clearNfcCommunity, nfcDiscount,
+      firstOrderPromo, firstOrderDiscount, isFirstPurchaseEligible, markAsPurchased
     }}>
       {children}
     </CartContext.Provider>
