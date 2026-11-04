@@ -58,6 +58,17 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://sdk.mercadopago.com https://http2.mlstatic.com; "
+        "connect-src 'self' https: wss:; "
+        "img-src 'self' https: data: blob:; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' data: https://fonts.gstatic.com; "
+        "frame-src 'self' https://www.mercadopago.com https://sdk.mercadopago.com;"
+    )
+    response.headers["Server"] = "OrigenCanino-Protected-Gateway"
     return response
 
 # --- Motor de Mitigación de Ataques y Rate Limiting en Memoria ---
@@ -442,6 +453,25 @@ def log_security_event(user_email: str, action: str, status: str = "success", ip
                     VALUES (%s, %s, %s, %s, %s)
                 """, (user_email, action, status, ip_address or "127.0.0.1", details or ""))
             conn.commit()
+
+        # Si el evento es anómalo o crítico, despachar alerta inmediata a Telegram
+        if status in ["critical", "warning", "danger"]:
+            emoji = "🚨" if status in ["critical", "danger"] else "⚠️"
+            now_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            telegram_alert = (
+                f"{emoji} *ALERTA DE SEGURIDAD - ORIGEN CANINO*\n\n"
+                f"🛡️ *Evento Anómalo:* {action}\n"
+                f"📊 *Nivel de Severidad:* `{status.upper()}`\n"
+                f"👤 *Identidad / Origen:* `{user_email or 'Anónimo'}`\n"
+                f"🌐 *Dirección IP:* `{ip_address}`\n"
+                f"📝 *Detalle Técnico:* {details}\n"
+                f"⏰ *Fecha y Hora:* {now_str}"
+            )
+            try:
+                notify_telegram(telegram_alert)
+            except Exception as tg_err:
+                print("Error enviando alerta de seguridad a Telegram:", tg_err)
+
     except Exception as e:
         print("Error logging security event:", e)
 
@@ -1405,6 +1435,7 @@ def create_order(order: OrderCreate, req: Request):
     ip = get_client_ip(req)
     # Límite anti-spam: máximo 10 pedidos cada 5 minutos por IP
     if rate_limiter.is_rate_limited(f"orders_{ip}", max_requests=10, window_seconds=300):
+        log_security_event(order.customer_email or "Anónimo", "Bloqueo por exceso de pedidos (Flood/Spam)", status="warning", ip_address=ip, details="Límite de 10 pedidos cada 5 minutos excedido")
         raise HTTPException(status_code=429, detail="Has alcanzado el límite de creación de pedidos. Por favor espera unos minutos.")
 
     # Sanitización de longitudes de campo

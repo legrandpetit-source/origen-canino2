@@ -38,6 +38,7 @@ const SecurityManager = ({ fetchWithAuth }) => {
 
   const [users, setUsers] = useState([]);
   const [logs, setLogs] = useState([]);
+  const [logFilter, setLogFilter] = useState('all'); // 'all', 'alerts', 'success'
   const [loading, setLoading] = useState(true);
   const [refreshingLogs, setRefreshingLogs] = useState(false);
 
@@ -621,15 +622,79 @@ const SecurityManager = ({ fetchWithAuth }) => {
                 <History size={20} className="text-primary-green" />
                 Registro de Auditoría & Actividad de Seguridad
               </h4>
-              <p className="text-sm text-gray-500">Trazabilidad de cada inicio de sesión, generación de código 2FA y cambios críticos.</p>
+              <p className="text-sm text-gray-500">Trazabilidad de cada inicio de sesión, generación de código 2FA y eventos anómalos.</p>
             </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  setTestingTelegram(true);
+                  try {
+                    const res = await fetchWithAuth('/api/admin/security/telegram-test', { method: 'POST' });
+                    if (res.ok) {
+                      notify('success', '🔔 Alerta de prueba enviada exitosamente a tu bot de Telegram.');
+                    } else {
+                      notify('error', 'No se pudo enviar la alerta de prueba a Telegram.');
+                    }
+                  } catch (e) {
+                    notify('error', 'Error contactando el servidor.');
+                  } finally {
+                    setTestingTelegram(false);
+                  }
+                }}
+                disabled={testingTelegram}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#db994b]/10 text-[#db994b] border border-[#db994b]/30 rounded-xl text-xs font-bold hover:bg-[#db994b]/20 transition"
+                title="Prueba el envío instantáneo de alertas de anomalías a tu Telegram"
+              >
+                <Send size={13} className={testingTelegram ? "animate-spin" : ""} />
+                Probar Alerta Telegram
+              </button>
+              <button
+                onClick={refreshLogsOnly}
+                disabled={refreshingLogs}
+                className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-50 transition"
+              >
+                <RefreshCw size={14} className={refreshingLogs ? "animate-spin" : ""} />
+                Refrescar Logs
+              </button>
+            </div>
+          </div>
+
+          {/* Banner de Monitoreo Activo & Despacho Automático a Telegram */}
+          <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3.5 flex items-start gap-3">
+            <ShieldCheck size={20} className="text-emerald-700 shrink-0 mt-0.5" />
+            <div className="text-xs text-emerald-900 leading-relaxed">
+              <strong>Protección y Notificación en Tiempo Real:</strong> El motor defensivo audita continuamente intentos de acceso. 
+              Cualquier anomalía detectada (fuerza bruta en login o 2FA, flood de órdenes o accesos sospechosos) dispara automáticamente un mensaje de alerta a tu bot de Telegram con la IP y el detalle técnico.
+            </div>
+          </div>
+
+          {/* Filtros de Logs */}
+          <div className="flex gap-2 border-b border-gray-100 pb-3 text-xs font-bold">
             <button
-              onClick={refreshLogsOnly}
-              disabled={refreshingLogs}
-              className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-50 transition"
+              onClick={() => setLogFilter('all')}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                logFilter === 'all' ? 'bg-primary-green text-white shadow-xs' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
             >
-              <RefreshCw size={14} className={refreshingLogs ? "animate-spin" : ""} />
-              Refrescar Logs
+              Todos ({logs.length})
+            </button>
+            <button
+              onClick={() => setLogFilter('alerts')}
+              className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+                logFilter === 'alerts' ? 'bg-amber-600 text-white shadow-xs' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+              }`}
+            >
+              <AlertCircle size={14} />
+              Alertas & Anomalías ({logs.filter(l => ['warning', 'critical', 'danger'].includes(l.status)).length})
+            </button>
+            <button
+              onClick={() => setLogFilter('success')}
+              className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+                logFilter === 'success' ? 'bg-emerald-700 text-white shadow-xs' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+              }`}
+            >
+              <CheckCircle size={14} />
+              Exitosos ({logs.filter(l => l.status === 'success' || l.status === 'info').length})
             </button>
           </div>
 
@@ -646,44 +711,58 @@ const SecurityManager = ({ fetchWithAuth }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-sm text-gray-700">
-                {logs.length === 0 ? (
+                {logs
+                  .filter(l => {
+                    if (logFilter === 'alerts') return ['warning', 'critical', 'danger'].includes(l.status);
+                    if (logFilter === 'success') return l.status === 'success' || l.status === 'info';
+                    return true;
+                  })
+                  .length === 0 ? (
                   <tr>
                     <td colSpan="6" className="text-center py-8 text-gray-400">
-                      No hay registros de auditoría recientes.
+                      No hay registros que coincidan con el filtro seleccionado.
                     </td>
                   </tr>
                 ) : (
-                  logs.map((log) => {
-                    const isSuccess = log.status === 'success';
-                    const isWarning = log.status === 'warning';
-                    return (
-                      <tr key={log.id} className="hover:bg-gray-50/50 transition">
-                        <td className="py-3.5 px-4 text-xs font-mono text-gray-500 whitespace-nowrap">
-                          {log.created_at}
-                        </td>
-                        <td className="py-3.5 px-4 font-semibold text-gray-900">
-                          {log.user_email}
-                        </td>
-                        <td className="py-3.5 px-4 font-medium text-gray-800">
-                          {log.action}
-                        </td>
-                        <td className="py-3.5 px-4 text-xs text-gray-500 max-w-xs truncate" title={log.details}>
-                          {log.details || '—'}
-                        </td>
-                        <td className="py-3.5 px-4 text-xs font-mono text-gray-400">
-                          {log.ip_address || '—'}
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                            isSuccess ? 'bg-green-100 text-green-800' :
-                            isWarning ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {isSuccess ? 'Exitoso' : isWarning ? 'Alerta' : 'Info'}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })
+                  logs
+                    .filter(l => {
+                      if (logFilter === 'alerts') return ['warning', 'critical', 'danger'].includes(l.status);
+                      if (logFilter === 'success') return l.status === 'success' || l.status === 'info';
+                      return true;
+                    })
+                    .map((log) => {
+                      const isSuccess = log.status === 'success';
+                      const isCritical = log.status === 'critical' || log.status === 'danger';
+                      const isWarning = log.status === 'warning';
+                      return (
+                        <tr key={log.id} className="hover:bg-gray-50/50 transition">
+                          <td className="py-3.5 px-4 text-xs font-mono text-gray-500 whitespace-nowrap">
+                            {log.created_at}
+                          </td>
+                          <td className="py-3.5 px-4 font-semibold text-gray-900">
+                            {log.user_email}
+                          </td>
+                          <td className="py-3.5 px-4 font-medium text-gray-800">
+                            {log.action}
+                          </td>
+                          <td className="py-3.5 px-4 text-xs text-gray-500 max-w-xs truncate" title={log.details}>
+                            {log.details || '—'}
+                          </td>
+                          <td className="py-3.5 px-4 text-xs font-mono text-gray-400">
+                            {log.ip_address || '—'}
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                              isCritical ? 'bg-red-100 text-red-800' :
+                              isWarning ? 'bg-amber-100 text-amber-800' :
+                              isSuccess ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {isCritical ? '🚨 Crítico' : isWarning ? '⚠️ Alerta' : isSuccess ? 'Exitoso' : 'Info'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
                 )}
               </tbody>
             </table>
