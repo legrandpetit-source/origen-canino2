@@ -64,3 +64,4 @@
 ## 3. Estado de la Rama Git y Despliegue
 - **Rama:** `main` al día con `origin/main` (últimos commits: `6079fac`, `91710b8`, `24835c2`).
 - **Servidor:** Docker container `5bdfecb7cd53` actualizado y corriendo con el último bundle compilado.
+
