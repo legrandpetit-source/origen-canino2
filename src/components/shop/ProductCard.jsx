@@ -48,7 +48,7 @@ const ProductCard = ({ product, addItem }) => {
         {/* Contenedor de Imagen con Badges Sobrepuestos */}
         <div className="h-48 sm:h-52 w-full rounded-2xl overflow-hidden relative mb-3.5 bg-[#FAF7F2]">
           <img 
-            src={product.image || '/logo.jpg'} 
+            src={product.image || '/logo.webp'} 
             alt={product.name} 
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />

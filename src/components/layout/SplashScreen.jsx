@@ -74,7 +74,7 @@ const SplashScreen = ({ onComplete }) => {
                   
                   <div className="bg-white p-4 rounded-full shadow-2xl relative">
                     <img 
-                      src="/logo.jpg" 
+                      src="/logo.webp" 
                       alt="Origen Canino" 
                       className="w-48 md:w-56 h-48 md:h-56 object-cover rounded-full"
                     />

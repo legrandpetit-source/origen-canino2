@@ -319,7 +319,7 @@ const AdminPanel = () => {
         <div className="p-5 border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <img 
-              src="/images/products/logo.jpg" 
+              src="/logo.webp" 
               alt="Logo" 
               className="w-8 h-8 rounded-lg object-contain bg-white p-0.5 shadow-sm shrink-0" 
               onError={(e) => { e.target.style.display = 'none'; }} 

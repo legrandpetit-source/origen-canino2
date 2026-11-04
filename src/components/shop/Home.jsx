@@ -182,7 +182,7 @@ const Home = () => {
             {/* Logo en tarjeta blanca limpia */}
             <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-xl border border-[#EBE4DA] max-w-[320px] sm:max-w-[380px]">
               <img 
-                src="/logo.jpg" 
+                src="/logo.webp" 
                 alt="Origen Canino Logo Oficial" 
                 className="w-full h-auto object-contain rounded-2xl" 
               />
