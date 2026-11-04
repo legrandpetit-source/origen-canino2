@@ -257,8 +257,12 @@ def init_database():
                     rating INTEGER NOT NULL,
                     status TEXT DEFAULT 'pending',
                     image_path TEXT,
+                    diet_tag TEXT DEFAULT '🌿 Nutrición 100% Real',
+                    location TEXT DEFAULT 'Santiago, CL',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
+                ALTER TABLE testimonials ADD COLUMN IF NOT EXISTS diet_tag TEXT DEFAULT '🌿 Nutrición 100% Real';
+                ALTER TABLE testimonials ADD COLUMN IF NOT EXISTS location TEXT DEFAULT 'Santiago, CL';
             """)
 
             # 8. Tabla de Auditoría y Logs de Seguridad

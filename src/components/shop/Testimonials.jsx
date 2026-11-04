@@ -137,13 +137,13 @@ const Testimonials = () => {
                   </p>
                 </div>
 
-                {/* Footer de la tarjeta con tag del producto */}
+                {/* Footer de la tarjeta con tag del producto y comuna/ciudad */}
                 <div className="pt-3 border-t border-stone-100 flex items-center justify-between">
                   <span className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border ${diet.tagBg}`}>
-                    {diet.label}
+                    {testimonial.diet_tag || diet.label}
                   </span>
                   <span className="text-[11px] font-medium text-stone-400">
-                    Santiago, CL
+                    {testimonial.location || 'Santiago, CL'}
                   </span>
                 </div>
               </motion.div>

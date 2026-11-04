@@ -242,6 +242,8 @@ class TestimonialUpdate(BaseModel):
     rating: int = 5
     status: str = "approved"
     image_path: Optional[str] = None
+    diet_tag: Optional[str] = "🌿 Nutrición 100% Real"
+    location: Optional[str] = "Santiago, CL"
 
 class LoginRequest(BaseModel):
     email: str
@@ -2242,6 +2244,23 @@ def update_testimonial_status(t_id: int, update: TestimonialStatusUpdate, curren
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error al actualizar el estado")
 
+@app.post("/api/admin/testimonials")
+def admin_create_testimonial(data: TestimonialUpdate, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO testimonials (owner_name, dog_name, content, rating, status, image_path, diet_tag, location)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (data.owner_name, data.dog_name, data.content, data.rating, data.status, data.image_path, data.diet_tag or "🌿 Nutrición 100% Real", data.location or "Santiago, CL"))
+            new_id = cursor.fetchone()["id"]
+            conn.commit()
+            return {"success": True, "id": new_id, "message": "Testimonio creado exitosamente"}
+    except Exception as e:
+        print("Error creating testimonial:", e)
+        raise HTTPException(status_code=500, detail="Error creando el testimonio")
+
 @app.put("/api/admin/testimonials/{t_id}")
 def admin_update_testimonial(t_id: int, data: TestimonialUpdate, current_user: str = Depends(get_current_admin)):
     try:
@@ -2249,9 +2268,9 @@ def admin_update_testimonial(t_id: int, data: TestimonialUpdate, current_user: s
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE testimonials 
-                SET owner_name = %s, dog_name = %s, content = %s, rating = %s, status = %s, image_path = %s
+                SET owner_name = %s, dog_name = %s, content = %s, rating = %s, status = %s, image_path = %s, diet_tag = %s, location = %s
                 WHERE id = %s
-            """, (data.owner_name, data.dog_name, data.content, data.rating, data.status, data.image_path, t_id))
+            """, (data.owner_name, data.dog_name, data.content, data.rating, data.status, data.image_path, data.diet_tag or "🌿 Nutrición 100% Real", data.location or "Santiago, CL", t_id))
             conn.commit()
             return {"success": True, "message": "Testimonio actualizado correctamente"}
     except Exception as e:

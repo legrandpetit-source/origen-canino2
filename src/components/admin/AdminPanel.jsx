@@ -265,8 +265,12 @@ const AdminPanel = () => {
     e.preventDefault();
     if (!editingTestimonial) return;
     try {
-      const res = await fetchWithAuth(`/api/admin/testimonials/${editingTestimonial.id}`, {
-        method: 'PUT',
+      const isNew = !editingTestimonial.id;
+      const url = isNew ? '/api/admin/testimonials' : `/api/admin/testimonials/${editingTestimonial.id}`;
+      const method = isNew ? 'POST' : 'PUT';
+
+      const res = await fetchWithAuth(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           owner_name: editingTestimonial.owner_name,
@@ -274,7 +278,9 @@ const AdminPanel = () => {
           content: editingTestimonial.content,
           rating: parseInt(editingTestimonial.rating || 5),
           status: editingTestimonial.status || 'approved',
-          image_path: editingTestimonial.image_path || null
+          image_path: editingTestimonial.image_path || null,
+          diet_tag: editingTestimonial.diet_tag || '🌿 Nutrición 100% Real',
+          location: editingTestimonial.location || 'Santiago, CL'
         })
       });
       if (res.ok) {
@@ -282,7 +288,7 @@ const AdminPanel = () => {
         fetchData();
       } else {
         const err = await res.json().catch(() => ({}));
-        alert(err.detail || "Error al actualizar testimonio");
+        alert(err.detail || "Error al guardar testimonio");
       }
     } catch (err) {
       console.error(err);
@@ -649,7 +655,26 @@ const AdminPanel = () => {
               {activeTab === 'testimonials' && (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-header text-2xl text-secondary-brown font-bold">Testimonios ({testimonials.length})</h3>
+                    <div>
+                      <h3 className="font-header text-2xl text-secondary-brown font-bold">Testimonios ({testimonials.length})</h3>
+                      <p className="text-xs text-stone-500 font-body">Administra las opiniones, fotos, dietas consumidas y comunas de tus clientes.</p>
+                    </div>
+                    <button
+                      onClick={() => setEditingTestimonial({
+                        id: null,
+                        owner_name: '',
+                        dog_name: '',
+                        rating: 5,
+                        status: 'approved',
+                        content: '',
+                        diet_tag: '🌿 Nutrición 100% Real',
+                        location: 'Santiago, CL',
+                        image_path: null
+                      })}
+                      className="bg-[#677333] hover:bg-[#56602b] text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition shadow-sm cursor-pointer"
+                    >
+                      <Plus size={16} /> Registrar Nuevo Testimonio
+                    </button>
                   </div>
                   <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden divide-y divide-gray-100">
                     {testimonials.map((test) => (
@@ -1393,6 +1418,57 @@ const AdminPanel = () => {
                 </div>
               </div>
 
+              {/* Etiqueta de Dieta y Ubicación (Marcados en captura) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Etiqueta de Dieta / Menú *</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={editingTestimonial.diet_tag || ''}
+                    onChange={e => setEditingTestimonial({ ...editingTestimonial, diet_tag: e.target.value })}
+                    className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-primary-green outline-none text-sm font-body"
+                    placeholder="Ej. 🥩 Menú Cocinado al Vapor"
+                  />
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {['🥩 Menú Cocinado al Vapor', '🥘 Dieta Cerdo Cocinada', '🐾 Dieta BARF Equilibrada', '🌿 Nutrición 100% Real'].map(preset => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setEditingTestimonial({ ...editingTestimonial, diet_tag: preset })}
+                        className="text-[10px] bg-stone-100 hover:bg-[#677333]/15 text-stone-700 hover:text-[#4E5824] px-2 py-0.5 rounded-md font-medium transition cursor-pointer"
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Comuna / Ciudad *</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={editingTestimonial.location || ''}
+                    onChange={e => setEditingTestimonial({ ...editingTestimonial, location: e.target.value })}
+                    className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-primary-green outline-none text-sm font-body"
+                    placeholder="Ej. Santiago, CL o Las Condes"
+                  />
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {['Santiago, CL', 'Las Condes', 'Vitacura', 'Providencia', 'Ñuñoa', 'Lo Barnechea'].map(preset => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setEditingTestimonial({ ...editingTestimonial, location: preset })}
+                        className="text-[10px] bg-stone-100 hover:bg-[#677333]/15 text-stone-700 hover:text-[#4E5824] px-2 py-0.5 rounded-md font-medium transition cursor-pointer"
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">Fotografía del Perrito</label>
                 <div className="flex items-center gap-4 p-3 bg-stone-50 border border-stone-200 rounded-2xl">
@@ -1417,7 +1493,10 @@ const AdminPanel = () => {
                         try {
                           const formData = new FormData();
                           formData.append('file', file);
-                          const res = await fetchWithAuth(`/api/admin/testimonials/${editingTestimonial.id}/upload-photo`, {
+                          const uploadUrl = editingTestimonial.id 
+                            ? `/api/admin/testimonials/${editingTestimonial.id}/upload-photo`
+                            : `/api/admin/products/upload-image`;
+                          const res = await fetchWithAuth(uploadUrl, {
                             method: 'POST',
                             body: formData
                           });
