@@ -13,6 +13,7 @@ export default {
         'primary-green-dark': '#4e5824',    // Verde oliva profundo
         'secondary-brown': '#3c2716',       // Café tierra cacao exacto de "CANINO"
         'secondary-brown-light': '#5c3f27', // Café tostado medio
+        'primary-orange': '#db994b',        // Naranja miel de acción
         'secondary-orange': '#db994b',      // Naranja miel cálido exacto de las orejas del perrito
         'accent-red': '#c64a4c',            // Rojo salmón exacto de la carne en el tazón
         'bg-cream': '#faf7f2',              // Crema suave orgánico de fondo

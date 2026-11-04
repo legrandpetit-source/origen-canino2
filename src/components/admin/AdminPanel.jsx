@@ -3,7 +3,7 @@ import {
   Package, BookOpen, Edit2, Plus, Trash2, X, Save, ShoppingCart, 
   MessageSquareHeart, Check, XCircle, LogOut, Key, ChefHat, BarChart, 
   Building2, CreditCard, Calculator, Send, Gift, UploadCloud, 
-  Image as ImageIcon, Loader2, Sparkles, CheckCircle2, ExternalLink 
+  Image as ImageIcon, Loader2, Sparkles, CheckCircle2, ExternalLink, Menu 
 } from 'lucide-react';
 import AdminLogin from './AdminLogin';
 import IngredientsManager from './IngredientsManager';
@@ -66,9 +66,26 @@ const compressImageToWebP = (file, maxDim = 1200, quality = 0.82) => {
   });
 };
 
+const NAV_TABS = [
+  { id: 'orders', label: 'Pedidos', icon: ShoppingCart },
+  { id: 'products', label: 'Productos', icon: Package },
+  { id: 'ingredients', label: 'Ingredientes', icon: ChefHat },
+  { id: 'blog', label: 'Blog SEO', icon: BookOpen },
+  { id: 'testimonials', label: 'Testimonios', icon: MessageSquareHeart },
+  { id: 'finance', label: 'Finanzas', icon: BarChart },
+  { id: 'retention', label: 'Retención', icon: MessageSquareHeart },
+  { id: 'nfc', label: 'Puntos NFC (Edificios)', icon: Building2 },
+  { id: 'promotions', label: 'Promociones & 1ra Compra', icon: Gift },
+  { id: 'calculator', label: 'Calculadora de Raciones', icon: Calculator },
+  { id: 'payments', label: 'Pagos & Mercado Pago', icon: CreditCard },
+  { id: 'telegram', label: 'Bot Telegram', icon: Send },
+  { id: 'settings', label: 'Seguridad', icon: Key },
+];
+
 const AdminPanel = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_token'));
   const [activeTab, setActiveTab] = useState('orders');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [blogPosts, setBlogPosts] = useState([]);
@@ -311,12 +328,71 @@ const AdminPanel = () => {
     return <AdminLogin onLoginSuccess={() => setIsAuthenticated(true)} />;
   }
 
+  const currentTabObj = NAV_TABS.find(t => t.id === activeTab) || NAV_TABS[0];
+  const CurrentTabIcon = currentTabObj.icon;
+
   return (
     <div className="flex flex-col md:flex-row min-h-screen w-full bg-gray-50">
       
-      {/* Sidebar */}
-      <div className="w-full md:w-64 bg-primary-green-dark text-white flex flex-col shadow-xl z-10 shrink-0">
-        <div className="p-5 border-b border-white/10 flex items-center justify-between">
+      {/* Top Navbar Sticky solo para Móvil y Tablet */}
+      <header className="md:hidden sticky top-0 z-30 bg-primary-green-dark text-white px-3 sm:px-4 py-2.5 sm:py-3 shadow-md flex items-center justify-between border-b border-white/10">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <img 
+            src="/logo.webp" 
+            alt="Logo" 
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg object-contain bg-white p-0.5 shadow-sm shrink-0" 
+            onError={(e) => { e.target.style.display = 'none'; }} 
+          />
+          <div className="min-w-0">
+            <span className="text-[9px] font-extrabold uppercase tracking-wider text-[#db994b] font-body block leading-tight">ORIGEN CANINO</span>
+            <div className="flex items-center gap-1.5 truncate">
+              <span className="font-header text-sm font-bold leading-tight">Admin</span>
+              <span className="text-white/40 text-xs">/</span>
+              <span className="bg-white/15 text-[#db994b] px-2 py-0.5 rounded-md font-bold text-xs truncate flex items-center gap-1">
+                <CurrentTabIcon size={12} className="shrink-0" />
+                <span className="truncate">{currentTabObj.label}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <a 
+            href="/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-white/80 hover:text-white p-2 hover:bg-white/10 rounded-xl transition"
+            title="Abrir tienda en nueva pestaña"
+          >
+            <ExternalLink size={18} />
+          </a>
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="bg-white/15 active:bg-white/25 text-white p-2 rounded-xl transition flex items-center justify-center border border-white/20 cursor-pointer"
+            aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
+      </header>
+
+      {/* Backdrop para cerrar el Drawer en Móvil */}
+      {mobileMenuOpen && (
+        <div 
+          onClick={() => setMobileMenuOpen(false)}
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden transition-opacity"
+        />
+      )}
+
+      {/* Sidebar: Drawer en Móvil, Barra Lateral Fija en Desktop */}
+      <aside className={`
+        fixed md:static top-0 left-0 bottom-0 z-50 md:z-10
+        w-72 md:w-64 bg-primary-green-dark text-white flex flex-col shadow-2xl md:shadow-xl shrink-0
+        transition-transform duration-300 ease-in-out
+        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
+        {/* Cabecera del Sidebar */}
+        <div className="p-4 md:p-5 border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <img 
               src="/logo.webp" 
@@ -329,114 +405,70 @@ const AdminPanel = () => {
               <h2 className="font-header text-xl font-bold leading-tight">Panel Admin</h2>
             </div>
           </div>
-          <a 
-            href="/" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-xl transition text-xs flex items-center gap-1 font-body"
-            title="Abrir tienda en nueva pestaña"
-          >
-            <ExternalLink size={17} />
-          </a>
+          
+          <div className="flex items-center gap-1">
+            <a 
+              href="/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hidden md:flex text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-xl transition text-xs items-center gap-1 font-body"
+              title="Abrir tienda en nueva pestaña"
+            >
+              <ExternalLink size={17} />
+            </a>
+            {/* Botón cerrar en móvil dentro del drawer */}
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="md:hidden text-white/80 hover:text-white p-1.5 hover:bg-white/10 rounded-lg transition cursor-pointer"
+              title="Cerrar menú"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
-          <button 
-            onClick={() => setActiveTab('orders')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'orders' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
-          >
-            <ShoppingCart size={20} /> Pedidos
-          </button>
-          <button 
-            onClick={() => setActiveTab('products')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'products' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
-          >
-            <Package size={20} /> Productos
-          </button>
-          <button 
-            onClick={() => setActiveTab('ingredients')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'ingredients' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
-          >
-            <ChefHat size={20} /> Ingredientes
-          </button>
-          <button 
-            onClick={() => setActiveTab('blog')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'blog' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
-          >
-            <BookOpen size={20} /> Blog SEO
-          </button>
-          <button 
-            onClick={() => setActiveTab('testimonials')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'testimonials' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
-          >
-            <MessageSquareHeart size={20} /> Testimonios
-          </button>
-          <button 
-            onClick={() => setActiveTab('finance')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'finance' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
-          >
-            <BarChart size={20} /> Finanzas
-          </button>
-          <button 
-            onClick={() => setActiveTab('retention')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'retention' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
-          >
-            <MessageSquareHeart size={20} /> Retención
-          </button>
-          <button 
-            onClick={() => setActiveTab('nfc')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'nfc' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
-          >
-            <Building2 size={20} /> Puntos NFC (Edificios)
-          </button>
-          <button 
-            onClick={() => setActiveTab('promotions')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'promotions' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
-          >
-            <Gift size={20} /> Promociones & 1ra Compra
-          </button>
-          <button 
-            onClick={() => setActiveTab('calculator')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'calculator' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
-          >
-            <Calculator size={20} /> Calculadora de Raciones
-          </button>
-          <button 
-            onClick={() => setActiveTab('payments')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'payments' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
-          >
-            <CreditCard size={20} /> Pagos & Mercado Pago
-          </button>
-          <button 
-            onClick={() => setActiveTab('telegram')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'telegram' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
-          >
-            <Send size={20} /> Bot Telegram
-          </button>
-          <button 
-            onClick={() => setActiveTab('settings')}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'settings' ? 'bg-white text-primary-green-dark shadow-sm' : 'hover:bg-white/10'}`}
-          >
-            <Key size={20} /> Seguridad
-          </button>
+        {/* Opciones del Menú */}
+        <div className="flex-1 overflow-y-auto p-3 md:p-4 flex flex-col gap-1.5 md:gap-2">
+          {NAV_TABS.map((tab) => {
+            const TabIcon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button 
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setMobileMenuOpen(false); // Cierra automáticamente el drawer en móvil
+                }}
+                className={`flex items-center gap-3 px-3.5 py-2.5 md:px-4 md:py-3 rounded-xl font-bold text-sm md:text-base transition text-left cursor-pointer ${
+                  isActive 
+                    ? 'bg-white text-primary-green-dark shadow-sm' 
+                    : 'text-white/85 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <TabIcon size={19} className="shrink-0" />
+                <span className="truncate">{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
 
-        <div className="p-4 border-t border-white/10">
+        {/* Footer Sidebar con botón Salir */}
+        <div className="p-3 md:p-4 border-t border-white/10">
           <button 
             onClick={() => {
               localStorage.removeItem('admin_token');
               setIsAuthenticated(false);
             }}
-            className="w-full flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-xl font-bold transition shadow-sm"
+            className="w-full flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2.5 md:py-3 rounded-xl font-bold transition shadow-sm text-sm md:text-base cursor-pointer"
           >
             <LogOut size={18} /> Salir
           </button>
         </div>
-      </div>
+      </aside>
 
       {/* Main Content Area */}
       <div className="flex-1 bg-gray-50 flex flex-col min-w-0">
-        <div className="p-6 md:p-8 lg:p-10 flex-1 overflow-x-hidden">
+        <main className="p-3 sm:p-5 md:p-8 lg:p-10 flex-1 overflow-x-hidden">
           {loading ? (
             <div className="text-center py-10 text-gray-500">Cargando datos...</div>
           ) : (
@@ -668,7 +700,7 @@ const AdminPanel = () => {
               )}
             </>
           )}
-        </div>
+        </main>
       </div>
 
       {/* --- MODAL: RECIPE --- */}

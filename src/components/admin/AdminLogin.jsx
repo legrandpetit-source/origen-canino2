@@ -151,7 +151,7 @@ const AdminLogin = ({ onLoginSuccess }) => {
               <button 
                 type="submit" 
                 disabled={loading || code.length !== 5}
-                className="w-full bg-primary-orange text-white font-bold py-3 rounded-lg hover:bg-orange-600 transition mt-4 disabled:opacity-70"
+                className="w-full bg-[#db994b] hover:bg-[#c58235] text-white font-bold py-3.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 mt-4 disabled:opacity-50 font-body cursor-pointer"
               >
                 {loading ? 'Verificando...' : 'Confirmar Código'}
               </button>
