@@ -106,6 +106,9 @@ const AdminPanel = () => {
   const [uploadingBlogImage, setUploadingBlogImage] = useState(false);
   const [blogUploadInfo, setBlogUploadInfo] = useState(null);
   const blogFileInputRef = useRef(null);
+  const [editingTestimonial, setEditingTestimonial] = useState(null);
+  const [uploadingTestimonialPhoto, setUploadingTestimonialPhoto] = useState(false);
+  const testimonialFileInputRef = useRef(null);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -255,6 +258,35 @@ const AdminPanel = () => {
       if (res.ok) fetchData();
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleSaveTestimonial = async (e) => {
+    e.preventDefault();
+    if (!editingTestimonial) return;
+    try {
+      const res = await fetchWithAuth(`/api/admin/testimonials/${editingTestimonial.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          owner_name: editingTestimonial.owner_name,
+          dog_name: editingTestimonial.dog_name,
+          content: editingTestimonial.content,
+          rating: parseInt(editingTestimonial.rating || 5),
+          status: editingTestimonial.status || 'approved',
+          image_path: editingTestimonial.image_path || null
+        })
+      });
+      if (res.ok) {
+        setEditingTestimonial(null);
+        fetchData();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || "Error al actualizar testimonio");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error de conexión");
     }
   };
 
@@ -617,41 +649,61 @@ const AdminPanel = () => {
               {activeTab === 'testimonials' && (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-header text-2xl text-secondary-brown">Testimonios ({testimonials.length})</h3>
+                    <h3 className="font-header text-2xl text-secondary-brown font-bold">Testimonios ({testimonials.length})</h3>
                   </div>
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden divide-y divide-gray-100">
                     {testimonials.map((test) => (
-                      <div key={test.id} className="py-3 px-4 border-b border-gray-100 hover:bg-gray-50 transition flex flex-col md:flex-row justify-between md:items-center gap-4 last:border-0">
-                        <div className="flex-grow">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-bold text-sm text-secondary-brown">{test.owner_name} & {test.dog_name}</h4>
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                              test.status === 'approved' ? 'bg-green-100 text-green-700' : 
-                              test.status === 'rejected' ? 'bg-red-100 text-red-700' : 
-                              'bg-yellow-100 text-yellow-700'
-                            }`}>
-                              {test.status === 'approved' ? 'Aprobado' : test.status === 'rejected' ? 'Rechazado' : 'Pendiente'}
-                            </span>
+                      <div key={test.id} className="p-4 hover:bg-gray-50/80 transition flex flex-col md:flex-row justify-between md:items-center gap-4">
+                        <div className="flex items-start sm:items-center gap-3.5 flex-grow">
+                          <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-xs border-2 border-white ring-2 ring-[#677333]/20 shrink-0 bg-stone-100 flex items-center justify-center">
+                            {test.image_path ? (
+                              <img src={test.image_path} alt={test.dog_name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-[#677333] font-bold text-lg uppercase font-header">
+                                {test.dog_name ? test.dog_name.charAt(0) : 'P'}
+                              </span>
+                            )}
                           </div>
-                          <p className="text-xs text-gray-500">Calificación: {test.rating} estrellas</p>
-                          <p className="text-sm text-gray-700 italic mt-1 line-clamp-2">"{test.content}"</p>
+                          <div>
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <h4 className="font-bold text-base text-secondary-brown">"{test.dog_name}" <span className="text-xs font-normal text-stone-500 font-body">(de {test.owner_name})</span></h4>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                test.status === 'approved' ? 'bg-green-100 text-green-700' : 
+                                test.status === 'rejected' ? 'bg-red-100 text-red-700' : 
+                                'bg-yellow-100 text-yellow-700'
+                              }`}>
+                                {test.status === 'approved' ? 'Aprobado' : test.status === 'rejected' ? 'Rechazado' : 'Pendiente'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 text-xs text-[#db994b] font-medium">
+                              {'★'.repeat(test.rating || 5)}{'☆'.repeat(5 - (test.rating || 5))}
+                              <span className="text-stone-400 ml-1">({test.rating || 5} estrellas)</span>
+                            </div>
+                            <p className="text-sm text-gray-700 italic mt-1 line-clamp-2 max-w-2xl">"{test.content}"</p>
+                          </div>
                         </div>
                         
-                        <div className="flex gap-2 shrink-0">
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => setEditingTestimonial(test)}
+                            className="flex items-center justify-center gap-1.5 bg-[#677333]/10 hover:bg-[#677333] text-[#677333] hover:text-white px-3.5 py-1.5 rounded-xl font-bold transition text-xs cursor-pointer shadow-xs"
+                          >
+                            <Edit2 size={14} /> Editar
+                          </button>
                           {test.status !== 'approved' && (
                             <button 
                               onClick={() => handleUpdateTestimonialStatus(test.id, 'approved')}
-                              className="flex items-center justify-center gap-1 text-green-600 hover:bg-green-50 px-3 py-1.5 rounded-lg font-semibold transition text-sm"
+                              className="flex items-center justify-center gap-1 text-green-600 hover:bg-green-50 px-3 py-1.5 rounded-xl font-semibold transition text-xs cursor-pointer"
                             >
-                              <Check size={16} /> Aprobar
+                              <Check size={14} /> Aprobar
                             </button>
                           )}
                           {test.status !== 'rejected' && (
                             <button 
                               onClick={() => handleUpdateTestimonialStatus(test.id, 'rejected')}
-                              className="flex items-center justify-center gap-1 text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg font-semibold transition text-sm"
+                              className="flex items-center justify-center gap-1 text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-xl font-semibold transition text-xs cursor-pointer"
                             >
-                              <XCircle size={16} /> Rechazar
+                              <XCircle size={14} /> Rechazar
                             </button>
                           )}
                         </div>
@@ -1260,6 +1312,192 @@ const AdminPanel = () => {
                 <button type="button" onClick={() => setEditingPost(null)} className="px-5 py-2 text-gray-600 font-bold hover:bg-gray-100 rounded-lg">Cancelar</button>
                 <button type="submit" className="px-5 py-2 bg-primary-green text-white font-bold rounded-lg hover:bg-primary-green-dark flex items-center gap-2">
                   <Save size={18}/> {isAddingPost ? 'Publicar Artículo' : 'Guardar Cambios'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL: EDIT TESTIMONIAL --- */}
+      {editingTestimonial && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-2xl w-full max-w-xl my-8 relative shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
+              <div>
+                <h3 className="font-header text-2xl text-secondary-brown font-bold">Editar Testimonio</h3>
+                <p className="text-xs text-gray-500 font-body">Modifica el texto, calificación y fotografía de la mascota.</p>
+              </div>
+              <button 
+                onClick={() => setEditingTestimonial(null)} 
+                className="text-gray-400 hover:text-gray-700 bg-gray-100 p-2 rounded-full transition cursor-pointer"
+              >
+                <X size={20}/>
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveTestimonial} className="p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Nombre del Tutor *</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={editingTestimonial.owner_name}
+                    onChange={e => setEditingTestimonial({ ...editingTestimonial, owner_name: e.target.value })}
+                    className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-primary-green outline-none text-sm font-body"
+                    placeholder="Ej. Valentina"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Nombre del Perrito *</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={editingTestimonial.dog_name}
+                    onChange={e => setEditingTestimonial({ ...editingTestimonial, dog_name: e.target.value })}
+                    className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-primary-green outline-none text-sm font-body"
+                    placeholder="Ej. Max"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Calificación</label>
+                  <select
+                    value={editingTestimonial.rating || 5}
+                    onChange={e => setEditingTestimonial({ ...editingTestimonial, rating: parseInt(e.target.value) })}
+                    className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-primary-green outline-none text-sm font-body"
+                  >
+                    <option value={5}>⭐⭐⭐⭐⭐ 5 Estrellas</option>
+                    <option value={4}>⭐⭐⭐⭐ 4 Estrellas</option>
+                    <option value={3}>⭐⭐⭐ 3 Estrellas</option>
+                    <option value={2}>⭐⭐ 2 Estrellas</option>
+                    <option value={1}>⭐ 1 Estrella</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Estado de Publicación</label>
+                  <select
+                    value={editingTestimonial.status || 'approved'}
+                    onChange={e => setEditingTestimonial({ ...editingTestimonial, status: e.target.value })}
+                    className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-primary-green outline-none text-sm font-body"
+                  >
+                    <option value="approved">✅ Aprobado (Visible en tienda)</option>
+                    <option value="pending">⏳ Pendiente de revisión</option>
+                    <option value="rejected">❌ Rechazado (Oculto)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Fotografía del Perrito</label>
+                <div className="flex items-center gap-4 p-3 bg-stone-50 border border-stone-200 rounded-2xl">
+                  <div className="w-16 h-16 rounded-xl overflow-hidden shadow-xs border-2 border-white ring-2 ring-[#677333]/20 shrink-0 bg-stone-200 flex items-center justify-center">
+                    {editingTestimonial.image_path ? (
+                      <img src={editingTestimonial.image_path} alt="Perrito" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-stone-400 font-bold text-xs">Sin foto</span>
+                    )}
+                  </div>
+
+                  <div className="flex-grow">
+                    <input
+                      ref={testimonialFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadingTestimonialPhoto(true);
+                        try {
+                          const formData = new FormData();
+                          formData.append('file', file);
+                          const res = await fetchWithAuth(`/api/admin/testimonials/${editingTestimonial.id}/upload-photo`, {
+                            method: 'POST',
+                            body: formData
+                          });
+                          if (res.ok) {
+                            const data = await res.json();
+                            setEditingTestimonial(prev => ({ ...prev, image_path: data.url }));
+                          } else {
+                            const err = await res.json().catch(() => ({}));
+                            alert(err.detail || "Error subiendo la foto");
+                          }
+                        } catch (err) {
+                          console.error(err);
+                          alert("Error de conexión");
+                        } finally {
+                          setUploadingTestimonialPhoto(false);
+                          if (testimonialFileInputRef.current) testimonialFileInputRef.current.value = '';
+                        }
+                      }}
+                    />
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={uploadingTestimonialPhoto}
+                        onClick={() => testimonialFileInputRef.current?.click()}
+                        className="px-3.5 py-2 bg-[#677333] hover:bg-[#56602b] text-white rounded-xl font-bold text-xs flex items-center gap-2 transition disabled:opacity-50 cursor-pointer shadow-xs"
+                      >
+                        {uploadingTestimonialPhoto ? (
+                          <>
+                            <Loader2 size={13} className="animate-spin" />
+                            Comprimiendo a WebP...
+                          </>
+                        ) : (
+                          <>
+                            <Upload size={13} />
+                            Subir/Cambiar Foto
+                          </>
+                        )}
+                      </button>
+
+                      {editingTestimonial.image_path && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingTestimonial(prev => ({ ...prev, image_path: null }))}
+                          className="px-3 py-2 text-stone-500 hover:text-red-600 text-xs font-semibold hover:bg-stone-100 rounded-xl transition cursor-pointer"
+                        >
+                          Quitar foto
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-stone-400 mt-1 font-body">Se recorta cuadrada y se comprime automáticamente en WebP.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Texto del Testimonio *</label>
+                <textarea 
+                  required
+                  rows={4}
+                  value={editingTestimonial.content}
+                  onChange={e => setEditingTestimonial({ ...editingTestimonial, content: e.target.value })}
+                  className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm font-body leading-relaxed"
+                  placeholder="Escribe la experiencia del cliente..."
+                />
+              </div>
+
+              <div className="pt-4 flex justify-end gap-3 border-t border-gray-100">
+                <button 
+                  type="button" 
+                  onClick={() => setEditingTestimonial(null)} 
+                  className="px-5 py-2 text-gray-600 font-bold hover:bg-gray-100 rounded-xl text-sm cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-5 py-2 bg-primary-green hover:bg-primary-green-dark text-white font-bold rounded-xl text-sm flex items-center gap-2 shadow-md cursor-pointer"
+                >
+                  <Save size={16}/> Guardar Cambios
                 </button>
               </div>
             </form>

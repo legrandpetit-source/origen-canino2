@@ -235,6 +235,14 @@ class TestimonialCreate(BaseModel):
 class TestimonialStatusUpdate(BaseModel):
     status: str
 
+class TestimonialUpdate(BaseModel):
+    owner_name: str
+    dog_name: str
+    content: str
+    rating: int = 5
+    status: str = "approved"
+    image_path: Optional[str] = None
+
 class LoginRequest(BaseModel):
     email: str
     password: str
@@ -2233,6 +2241,74 @@ def update_testimonial_status(t_id: int, update: TestimonialStatusUpdate, curren
             return {"success": True, "message": "Estado actualizado"}
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error al actualizar el estado")
+
+@app.put("/api/admin/testimonials/{t_id}")
+def admin_update_testimonial(t_id: int, data: TestimonialUpdate, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE testimonials 
+                SET owner_name = %s, dog_name = %s, content = %s, rating = %s, status = %s, image_path = %s
+                WHERE id = %s
+            """, (data.owner_name, data.dog_name, data.content, data.rating, data.status, data.image_path, t_id))
+            conn.commit()
+            return {"success": True, "message": "Testimonio actualizado correctamente"}
+    except Exception as e:
+        print("Error updating testimonial:", e)
+        raise HTTPException(status_code=500, detail="Error actualizando el testimonio")
+
+@app.post("/api/admin/testimonials/{t_id}/upload-photo")
+async def admin_upload_testimonial_photo(t_id: int, file: UploadFile = File(...), current_user: str = Depends(get_current_admin)):
+    try:
+        if not file.content_type or not file.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="El archivo debe ser una imagen válida.")
+
+        MAX_UPLOAD_SIZE = 10 * 1024 * 1024
+        content = await file.read(MAX_UPLOAD_SIZE + 1)
+        if not content:
+            raise HTTPException(status_code=400, detail="El archivo está vacío.")
+        if len(content) > MAX_UPLOAD_SIZE:
+            raise HTTPException(status_code=413, detail="La imagen excede el límite permitido de 10 MB.")
+
+        Image.MAX_IMAGE_PIXELS = 30_000_000
+        image = Image.open(io.BytesIO(content))
+        try:
+            image = ImageOps.exif_transpose(image)
+        except Exception:
+            pass
+
+        if image.mode != "RGB":
+            image = image.convert("RGB")
+
+        w, h = image.size
+        min_dim = min(w, h)
+        left = (w - min_dim) / 2
+        top = (h - min_dim) / 2
+        image = image.crop((left, top, left + min_dim, top + min_dim))
+        image = image.resize((600, 600), Image.Resampling.LANCZOS)
+
+        filename = f"test_{uuid.uuid4().hex[:12]}.webp"
+        upload_dir = os.path.join("uploads", "testimonials")
+        os.makedirs(upload_dir, exist_ok=True)
+        filepath = os.path.join(upload_dir, filename)
+
+        image.save(filepath, "WEBP", quality=85, method=6, optimize=True)
+        image_url = f"/uploads/testimonials/{filename}"
+
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE testimonials SET image_path = %s WHERE id = %s", (image_url, t_id))
+            conn.commit()
+
+        return {
+            "success": True,
+            "url": image_url,
+            "filename": filename
+        }
+    except Exception as e:
+        print("Error uploading testimonial photo:", e)
+        raise HTTPException(status_code=500, detail="Error procesando la foto del testimonio")
 
 # --- Serve Frontend (for Nixpacks / Production) ---
 dist_path = os.path.join(os.path.dirname(__file__), "..", "dist")
