@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, Gift, ArrowRight, Tag } from 'lucide-react';
+import { Sparkles, X, Gift, ArrowRight, Tag, Copy, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useCustomer } from '../../context/CustomerContext';
 
@@ -10,6 +10,7 @@ export default function FloatingFirstOrderPromo() {
   const [loading, setLoading] = useState(true);
   const [isDismissed, setIsDismissed] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     // Si ya compró según localStorage, no mostrar
@@ -17,12 +18,6 @@ export default function FloatingFirstOrderPromo() {
     if (hasPurchased === 'true') {
       setLoading(false);
       return;
-    }
-
-    // Si ya lo cerró en esta sesión, recordar
-    const sessionDismissed = sessionStorage.getItem('origencanino_promo_closed');
-    if (sessionDismissed === 'true') {
-      setIsDismissed(true);
     }
 
     // Consultar configuración pública de la promoción
@@ -41,13 +36,13 @@ export default function FloatingFirstOrderPromo() {
   useEffect(() => {
     if (loading || !promo || !promo.enabled || isDismissed || isMinimized) return;
 
-    const duration = 12 * 1000; // 12 segundos exactos
+    const duration = 12 * 1000; // 12 segundos
     const animationEnd = Date.now() + duration;
 
     // Disparo inicial de celebración
     try {
       confetti({
-        particleCount: 50,
+        particleCount: 45,
         angle: 125,
         spread: 65,
         origin: { x: 0.88, y: 0.88 },
@@ -69,8 +64,8 @@ export default function FloatingFirstOrderPromo() {
 
       try {
         confetti({
-          particleCount: 22,
-          angle: 110 + Math.random() * 35, // se eleva hacia arriba y hacia la izquierda de la pantalla
+          particleCount: 20,
+          angle: 110 + Math.random() * 35,
           spread: 55,
           origin: { x: 0.88, y: 0.88 },
           colors: ['#db994b', '#f4a261', '#e9c46a', '#677333', '#ffffff'],
@@ -91,23 +86,34 @@ export default function FloatingFirstOrderPromo() {
     return null;
   }
 
-  // Si no está habilitado o no ha cargado o fue cerrado por completo
+  // Si no está habilitado o no ha cargado o fue cerrado por completo en esta vista
   if (loading || !promo || !promo.enabled || isDismissed) {
     return null;
   }
 
+  const codeToUse = promo.code || 'BIENVENIDO10';
+
+  const handleCopyCode = (e) => {
+    e.stopPropagation();
+    try {
+      navigator.clipboard.writeText(codeToUse);
+      localStorage.setItem('origencanino_coupon_code', codeToUse);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch (err) {
+      console.error("Error al copiar cupón:", err);
+    }
+  };
+
   const handleScrollToCatalog = () => {
+    // También guardamos el cupón para que se aplique en el checkout automáticamente
+    localStorage.setItem('origencanino_coupon_code', codeToUse);
     const catalogElement = document.getElementById('catalogo') || document.getElementById('productos');
     if (catalogElement) {
       catalogElement.scrollIntoView({ behavior: 'smooth' });
     } else {
       window.scrollTo({ top: 900, behavior: 'smooth' });
     }
-  };
-
-  const handleClose = () => {
-    setIsDismissed(true);
-    sessionStorage.setItem('origencanino_promo_closed', 'true');
   };
 
   return (
@@ -121,7 +127,7 @@ export default function FloatingFirstOrderPromo() {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.8, opacity: 0 }}
             onClick={() => setIsMinimized(false)}
-            className="flex items-center gap-2 bg-[#db994b] hover:bg-[#c58235] text-white px-4 py-2.5 rounded-full shadow-2xl border-2 border-white transition transform hover:scale-105 font-body"
+            className="flex items-center gap-2 bg-[#db994b] hover:bg-[#c58235] text-white px-4 py-2.5 rounded-full shadow-2xl border-2 border-white transition transform hover:scale-105 font-body cursor-pointer"
             title="Ver descuento de bienvenida"
           >
             <Sparkles size={16} className="text-white animate-spin-slow" />
@@ -142,19 +148,19 @@ export default function FloatingFirstOrderPromo() {
             {/* Glow decorativo de fondo en tono naranjo */}
             <div className="absolute top-0 right-0 w-36 h-36 bg-[#db994b]/15 rounded-full blur-2xl pointer-events-none -mr-10 -mt-10" />
 
-            {/* Botones de Minimizar y Cerrar */}
+            {/* Botones de Minimizar y Cerrar (Cerrar minimiza para que el usuario no pierda su cupón) */}
             <div className="absolute top-3 right-3 flex items-center gap-1 z-10">
               <button
                 onClick={() => setIsMinimized(true)}
-                className="text-stone-400 hover:text-stone-600 p-1 rounded-lg hover:bg-stone-100 transition text-xs font-bold leading-none"
-                title="Minimizar"
+                className="text-stone-400 hover:text-stone-600 p-1 rounded-lg hover:bg-stone-100 transition text-xs font-bold leading-none cursor-pointer"
+                title="Minimizar a botón flotante"
               >
                 _
               </button>
               <button
-                onClick={handleClose}
-                className="text-stone-400 hover:text-stone-700 p-1 rounded-lg hover:bg-stone-100 transition"
-                title="Cerrar notificación"
+                onClick={() => setIsMinimized(true)}
+                className="text-stone-400 hover:text-stone-700 p-1 rounded-lg hover:bg-stone-100 transition cursor-pointer"
+                title="Minimizar cupón"
               >
                 <X size={16} />
               </button>
@@ -174,19 +180,35 @@ export default function FloatingFirstOrderPromo() {
                   {promo.title || `¡${promo.percent}% OFF en tu primera compra!`}
                 </h4>
                 <p className="text-stone-500 text-xs font-body mt-1 leading-relaxed">
-                  {promo.description || 'Descuento automático aplicado al armar tu pedido.'}
+                  {promo.description || 'Descuento automático o con cupón al pagar tu pedido.'}
                 </p>
               </div>
             </div>
 
-            {/* CTA Action */}
+            {/* CTA Action con Botón Copiar */}
             <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between gap-2 relative z-10">
-              <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-[#b87528] bg-[#db994b]/10 border border-[#db994b]/20 px-2.5 py-1 rounded-lg">
-                <Tag size={12} className="text-[#db994b]" /> {promo.code || 'BIENVENIDO10'}
-              </div>
+              <button
+                type="button"
+                onClick={handleCopyCode}
+                className="flex items-center gap-1.5 text-xs font-mono font-bold text-[#b87528] bg-[#db994b]/10 hover:bg-[#db994b]/20 border border-[#db994b]/30 px-2.5 py-1.5 rounded-lg transition cursor-pointer"
+                title="Hacer clic para copiar el código"
+              >
+                <Tag size={12} className="text-[#db994b]" />
+                <span>{codeToUse}</span>
+                {copied ? (
+                  <span className="text-emerald-600 font-sans text-[11px] font-bold flex items-center gap-0.5 ml-1">
+                    <Check size={13} /> ¡Copiado!
+                  </span>
+                ) : (
+                  <span className="text-stone-400 hover:text-stone-600 ml-1 flex items-center gap-0.5 text-[10px] font-sans font-semibold">
+                    <Copy size={11} /> Copiar
+                  </span>
+                )}
+              </button>
+
               <button
                 onClick={handleScrollToCatalog}
-                className="bg-[#db994b] hover:bg-[#c58235] active:scale-95 text-white px-3.5 py-1.5 rounded-xl font-bold text-xs font-body transition flex items-center gap-1.5 shadow-md hover:shadow-lg"
+                className="bg-[#db994b] hover:bg-[#c58235] active:scale-95 text-white px-3.5 py-1.5 rounded-xl font-bold text-xs font-body transition flex items-center gap-1.5 shadow-md hover:shadow-lg cursor-pointer"
               >
                 Ver Catálogo <ArrowRight size={13} />
               </button>

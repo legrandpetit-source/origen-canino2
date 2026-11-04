@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, ArrowLeft, CreditCard, Landmark, Sparkles, Building2, ShieldCheck, Copy, Check, UserCheck, Dog, RefreshCw, Info, Gift } from 'lucide-react';
+import { X, CheckCircle, ArrowLeft, CreditCard, Landmark, Sparkles, Building2, ShieldCheck, Copy, Check, UserCheck, Dog, RefreshCw, Info, Gift, Tag } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useCustomer } from '../../context/CustomerContext';
 
@@ -39,6 +39,10 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(null);
   const [copiedBankInfo, setCopiedBankInfo] = useState(false);
+  const [couponInput, setCouponInput] = useState(() => localStorage.getItem('origencanino_coupon_code') || '');
+  const [appliedCoupon, setAppliedCoupon] = useState(() => localStorage.getItem('origencanino_coupon_code') || '');
+  const [couponError, setCouponError] = useState('');
+  const [couponSuccess, setCouponSuccess] = useState('');
 
   // Cargar datos de transferencia bancaria actualizados desde el backend
   useEffect(() => {
@@ -114,13 +118,24 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
     }
   }, [formData.customer_email]);
 
-  // Descuentos: Suscripción (10%), Comunidad NFC o Primera Compra
+  // Descuentos: Suscripción (10%), Comunidad NFC o Primera Compra (vía cupón o detección de 1ra compra)
   const subscriptionDiscount = isSubscription ? Math.round(total * 0.1) : 0;
   const appliedNfcDiscount = (!isSubscription && nfcDiscount > 0) ? nfcDiscount : 0;
   
   const isEligibleForFirstOrder = emailCheckEligible !== null ? emailCheckEligible : isFirstPurchaseEligible;
-  const appliedFirstOrderDiscount = (!isSubscription && appliedNfcDiscount === 0 && isEligibleForFirstOrder && firstOrderPromo?.enabled)
-    ? Math.round(total * (Number(firstOrderPromo.percent) / 100))
+
+  // Cupón válido si coincide con el código de bienvenida configurado (por defecto BIENVENIDO10)
+  const targetCoupon = (firstOrderPromo?.code || 'BIENVENIDO10').trim().toUpperCase();
+  const isCouponApplied = appliedCoupon.trim().toUpperCase() === targetCoupon;
+
+  // Se aplica si el usuario ingresó el cupón válido O si es detectado automáticamente como cliente nuevo
+  const canApplyWelcomeDiscount = !isSubscription && appliedNfcDiscount === 0 && (
+    (isCouponApplied && isEligibleForFirstOrder) ||
+    (isEligibleForFirstOrder && firstOrderPromo?.enabled && !appliedCoupon)
+  );
+
+  const appliedFirstOrderDiscount = canApplyWelcomeDiscount && firstOrderPromo?.enabled
+    ? Math.round(total * (Number(firstOrderPromo.percent || 10) / 100))
     : 0;
 
   const totalDiscount = subscriptionDiscount + appliedNfcDiscount + appliedFirstOrderDiscount;
@@ -622,6 +637,82 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                         </div>
                       ))}
                     </div>
+
+                    {/* Caja de Ingreso y Aplicación de Cupón */}
+                    {!isSubscription && appliedNfcDiscount === 0 && (
+                      <div className="bg-white border border-stone-200/90 rounded-2xl p-3 mb-3 shadow-xs">
+                        <label className="block text-xs font-bold text-stone-700 mb-1.5 flex items-center gap-1.5">
+                          <Tag size={13} className="text-[#db994b]" /> ¿Tienes un código de descuento?
+                        </label>
+                        
+                        {appliedCoupon && isCouponApplied ? (
+                          <div className="flex items-center justify-between bg-[#db994b]/10 border border-[#db994b]/30 rounded-xl px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <Check size={16} className="text-emerald-600 shrink-0" />
+                              <div>
+                                <span className="font-mono font-bold text-xs text-[#b87528]">{appliedCoupon.toUpperCase()}</span>
+                                <span className="text-[11px] text-stone-600 block">¡{firstOrderPromo?.percent || 10}% de descuento aplicado a tu pedido!</span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAppliedCoupon('');
+                                setCouponInput('');
+                                localStorage.removeItem('origencanino_coupon_code');
+                                setCouponSuccess('');
+                                setCouponError('');
+                              }}
+                              className="text-xs text-red-500 hover:text-red-700 font-bold underline p-1 cursor-pointer"
+                            >
+                              Quitar
+                            </button>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={couponInput}
+                                onChange={(e) => {
+                                  setCouponInput(e.target.value.toUpperCase());
+                                  setCouponError('');
+                                }}
+                                placeholder="Ej: BIENVENIDO10"
+                                className="flex-1 border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono font-bold tracking-wider focus:ring-2 focus:ring-[#db994b] outline-none bg-white uppercase"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const clean = couponInput.trim().toUpperCase();
+                                  if (!clean) {
+                                    setCouponError('Ingresa un código');
+                                    return;
+                                  }
+                                  if (clean === targetCoupon) {
+                                    if (emailCheckEligible === false) {
+                                      setCouponError('Este correo ya registra compras previas.');
+                                      return;
+                                    }
+                                    setAppliedCoupon(clean);
+                                    localStorage.setItem('origencanino_coupon_code', clean);
+                                    setCouponSuccess('¡Cupón aplicado con éxito!');
+                                    setCouponError('');
+                                  } else {
+                                    setCouponError('Código de cupón inválido o expirado.');
+                                  }
+                                }}
+                                className="bg-[#db994b] hover:bg-[#c58235] text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+                              >
+                                Aplicar
+                              </button>
+                            </div>
+                            {couponError && <p className="text-[11px] text-red-500 font-bold mt-1.5">{couponError}</p>}
+                            {couponSuccess && !appliedCoupon && <p className="text-[11px] text-emerald-600 font-bold mt-1.5">{couponSuccess}</p>}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div className="flex justify-between text-sm text-gray-600">
                       <span>Subtotal ({items.reduce((acc, i) => acc + i.quantity, 0)} unidades)</span>

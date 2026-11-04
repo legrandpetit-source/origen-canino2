@@ -1418,33 +1418,39 @@ def create_order(order: OrderCreate):
             if order.nfc_building_code:
                 cursor.execute("UPDATE nfc_buildings SET visits_count = visits_count + 1 WHERE slug = %s", (order.nfc_building_code,))
 
-            conn.commit()
-            
-            # Send Telegram notification
-            msg = f"🐶 ¡Nuevo Pedido en Origen Canino! (#{order_id})\n\n"
-            if order.is_subscription:
-                msg = f"🔄 ¡NUEVA SUSCRIPCIÓN MENSUAL! (#{order_id})\n\n"
-                
-            msg += f"👤 Cliente: {order.customer_name}\n"
-            msg += f"📞 Teléfono: {order.customer_phone}\n"
-            msg += f"📍 Dirección: {order.customer_address}, {order.customer_city}\n"
-            msg += f"💳 Método: {'Mercado Pago Online' if order.payment_method == 'mercadopago' else 'Transferencia Bancaria'}\n"
-            
-            if order.payment_method == 'transferencia' and order.transfer_bank:
-                msg += f"🏦 Banco: {order.transfer_bank} | N° Operación: {order.transfer_receipt_number or 'Sin registrar'}\n"
+            # Manejo de estados y alertas de Telegram según método de pago:
+            # 1. MERCADO PAGO: No notificar como venta hasta que el webhook confirme el pago real aprobado
+            if order.payment_method == 'mercadopago':
+                cursor.execute("UPDATE orders SET payment_status = 'Iniciado (Esperando Pago)' WHERE id = %s", (order_id,))
+                conn.commit()
+                # NOTA: NO enviamos notificación a Telegram aquí. Se enviará únicamente cuando Mercado Pago confirme el pago aprobado.
+            else:
+                # 2. TRANSFERENCIA BANCARIA: Notificar como solicitud pendiente de validar comprobante
+                cursor.execute("UPDATE orders SET payment_status = 'Pendiente de Transferencia' WHERE id = %s", (order_id,))
+                conn.commit()
 
-            if order.nfc_building_code:
-                msg += f"🏢 Tag NFC Comunidad: {order.nfc_building_code} (Descuento: -${discount:,})\n"
-            elif discount > 0:
-                msg += f"🎉 Descuento 1ra Compra Aplicado: -${discount:,}\n"
+                msg = f"📋 ¡Nueva Solicitud de Pedido por Transferencia! (#{order_id})\n\n"
+                if order.is_subscription:
+                    msg = f"🔄 ¡SOLICITUD DE SUSCRIPCIÓN (Transferencia)! (#{order_id})\n\n"
+                    
+                msg += "⚠️ ESTADO: PENDIENTE DE PAGO (Validar transferencia antes de despachar)\n\n"
+                msg += f"👤 Cliente: {order.customer_name}\n"
+                msg += f"📞 Teléfono: {order.customer_phone}\n"
+                msg += f"📍 Dirección: {order.customer_address}, {order.customer_city}\n"
+                msg += f"🏦 Banco: {order.transfer_bank or 'Sin registrar'} | N° Operación: {order.transfer_receipt_number or 'Pendiente'}\n"
 
-            msg += f"💰 Total a Pagar: ${total:,}\n\n"
-            
-            if order.is_subscription:
-                msg += "⚠️ Importante: Es una suscripción manual. Recuerda contactar al cliente 1 semana antes del próximo mes.\n\n"
+                if order.nfc_building_code:
+                    msg += f"🏢 Tag NFC Comunidad: {order.nfc_building_code} (Descuento: -${discount:,})\n"
+                elif discount > 0:
+                    msg += f"🎉 Descuento 1ra Compra: -${discount:,}\n"
+
+                msg += f"💰 Total a Transferir: ${total:,}\n\n"
                 
-            msg += "Revisa el panel de admin para más detalles."
-            notify_telegram(msg)
+                if order.is_subscription:
+                    msg += "⚠️ Importante: Es suscripción por transferencia. Coordinar con el cliente cada mes.\n\n"
+                    
+                msg += "👉 Revisa tu cuenta bancaria para confirmar la recepción del dinero."
+                notify_telegram(msg)
             
             return {"success": True, "order_id": order_id, "total": total, "message": "Orden creada correctamente"}
     except Exception as e:
@@ -1570,6 +1576,8 @@ async def mercadopago_webhook(request: Request):
                 
                 if status == "approved" and ext_ref:
                     order_id = int(ext_ref)
+                    full_order = None
+                    order_items = []
                     with get_connection() as conn:
                         cursor = conn.cursor()
                         cursor.execute("""
@@ -1577,9 +1585,43 @@ async def mercadopago_webhook(request: Request):
                             SET payment_status = 'Pagado', mercadopago_payment_id = %s
                             WHERE id = %s
                         """, (str(data_id), order_id))
-                        conn.commit()
                         
-                    notify_telegram(f"🎉 ¡PAGO APROBADO EN MERCADO PAGO!\n\n🐶 Pedido #{order_id}\n💰 Monto: ${p_data.get('transaction_amount', 0):,}\nID Pago MP: {data_id}")
+                        # Obtener datos completos de la orden y productos para la notificación
+                        cursor.execute("SELECT * FROM orders WHERE id = %s", (order_id,))
+                        full_order = cursor.fetchone()
+                        
+                        cursor.execute("""
+                            SELECT product_name, quantity, price_at_purchase 
+                            FROM order_items 
+                            WHERE order_id = %s
+                        """, (order_id,))
+                        order_items = cursor.fetchall()
+                        conn.commit()
+
+                    # Armar notificación de venta real confirmada a Telegram
+                    paid_amount = p_data.get('transaction_amount', full_order.get('total', 0) if full_order else 0)
+                    msg = f"🎉 ¡VENTA CONFIRMADA Y PAGADA EN MERCADO PAGO! (#{order_id})\n\n"
+                    if full_order:
+                        if full_order.get('is_subscription'):
+                            msg = f"🔄 ¡SUSCRIPCIÓN PAGADA EN MERCADO PAGO! (#{order_id})\n\n"
+                        msg += f"👤 Cliente: {full_order.get('customer_name')}\n"
+                        msg += f"📞 Teléfono: {full_order.get('customer_phone')}\n"
+                        msg += f"📍 Dirección: {full_order.get('customer_address')}, {full_order.get('customer_city')}\n"
+                        msg += f"💳 Método: Mercado Pago Online (Aprobado)\n"
+                        msg += f"🆔 Transacción MP: {data_id}\n\n"
+
+                        if order_items:
+                            msg += "🛒 Productos Comprados:\n"
+                            for it in order_items:
+                                msg += f"  • {it.get('quantity')}x {it.get('product_name')} (${it.get('price_at_purchase'):,})\n"
+                            msg += "\n"
+
+                        msg += f"💰 Total Pagado: ${int(paid_amount):,}\n\n"
+                        msg += "✅ El pago está 100% acreditado. Puedes preparar el pedido."
+                    else:
+                        msg += f"💰 Monto: ${int(paid_amount):,}\nID Pago MP: {data_id}"
+
+                    notify_telegram(msg)
             except Exception as e:
                 print("[MP Webhook Error]:", e)
                 
