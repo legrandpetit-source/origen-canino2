@@ -1314,6 +1314,78 @@ def delete_product(product_id: int, current_user: str = Depends(get_current_admi
         raise HTTPException(status_code=500, detail="Error eliminando el producto.")
 
 # --- Endpoints Blog ---
+@app.post("/api/admin/blog/upload-image")
+async def upload_blog_image(file: UploadFile = File(...), current_user: str = Depends(get_current_admin)):
+    try:
+        if not file.content_type or not file.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="El archivo debe ser una imagen válida.")
+
+        MAX_UPLOAD_SIZE = 12 * 1024 * 1024
+        content = await file.read(MAX_UPLOAD_SIZE + 1)
+        if not content:
+            raise HTTPException(status_code=400, detail="El archivo está vacío.")
+        if len(content) > MAX_UPLOAD_SIZE:
+            raise HTTPException(status_code=413, detail="La imagen excede el límite permitido de 12 MB.")
+
+        orig_size_bytes = len(content)
+        Image.MAX_IMAGE_PIXELS = 35_000_000
+        image = Image.open(io.BytesIO(content))
+
+        # 1. Corregir orientación EXIF (típica en fotos de móviles)
+        try:
+            image = ImageOps.exif_transpose(image)
+        except Exception:
+            pass
+
+        # 2. Normalizar modos de color para WebP
+        if image.mode in ("P", "LA"):
+            image = image.convert("RGBA")
+        elif image.mode == "CMYK":
+            image = image.convert("RGB")
+        elif image.mode not in ("RGB", "RGBA", "L"):
+            image = image.convert("RGB")
+
+        # 3. Redimensionar para cabecera editorial de Blog (máx 1400px ancho)
+        max_w = 1400
+        w, h = image.size
+        if w > max_w:
+            new_h = int(h * (max_w / w))
+            image = image.resize((max_w, new_h), Image.Resampling.LANCZOS)
+
+        # 4. Generar nombre único .webp y guardar comprimido
+        filename = f"blog_{uuid.uuid4().hex[:12]}.webp"
+        upload_dir = os.path.join("uploads", "blog")
+        os.makedirs(upload_dir, exist_ok=True)
+        filepath = os.path.join(upload_dir, filename)
+
+        image.save(
+            filepath,
+            "WEBP",
+            quality=84,
+            method=6,
+            optimize=True
+        )
+
+        final_size_bytes = os.path.getsize(filepath)
+        final_w, final_h = image.size
+
+        return {
+            "success": True,
+            "url": f"/uploads/blog/{filename}",
+            "filename": filename,
+            "original_size": orig_size_bytes,
+            "final_size": final_size_bytes,
+            "saved_bytes": max(0, orig_size_bytes - final_size_bytes),
+            "width": final_w,
+            "height": final_h,
+            "format": "webp"
+        }
+    except UnidentifiedImageError:
+        raise HTTPException(status_code=400, detail="Formato de imagen corrupto o no reconocido.")
+    except Exception as e:
+        print(f"Error subiendo imagen de blog: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al procesar la imagen del blog: {str(e)}")
+
 @app.get("/api/blog", response_model=List[BlogPostResponse])
 def get_blog_posts():
     with get_connection() as conn:

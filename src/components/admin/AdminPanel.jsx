@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Package, BookOpen, Edit2, Plus, Trash2, X, Save, ShoppingCart, 
   MessageSquareHeart, Check, XCircle, LogOut, Key, ChefHat, BarChart, 
-  Building2, CreditCard, Calculator, Send, Gift, UploadCloud, 
+  Building2, CreditCard, Calculator, Send, Gift, UploadCloud, Upload,
   Image as ImageIcon, Loader2, Sparkles, CheckCircle2, ExternalLink, Menu 
 } from 'lucide-react';
 import AdminLogin from './AdminLogin';
@@ -103,6 +103,9 @@ const AdminPanel = () => {
   const [recipeProduct, setRecipeProduct] = useState(null);
   const [editingPost, setEditingPost] = useState(null);
   const [isAddingPost, setIsAddingPost] = useState(false);
+  const [uploadingBlogImage, setUploadingBlogImage] = useState(false);
+  const [blogUploadInfo, setBlogUploadInfo] = useState(null);
+  const blogFileInputRef = useRef(null);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -1161,10 +1164,96 @@ const AdminPanel = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">URL Imagen de Cabecera</label>
-                <input type="url" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-primary-green outline-none" required
+                <label className="block text-sm font-bold text-gray-700 mb-1">Fotografía de Cabecera (Editorial)</label>
+                
+                {/* Previsualización en vivo */}
+                {editingPost.image && (
+                  <div className="relative mb-3 rounded-2xl overflow-hidden border border-stone-200 bg-stone-100 aspect-[16/9] max-h-56 flex items-center justify-center">
+                    <img
+                      src={editingPost.image}
+                      alt="Vista previa artículo"
+                      className="w-full h-full object-cover object-center"
+                    />
+                    <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-xs text-white text-[11px] font-mono px-2.5 py-1 rounded-lg">
+                      {editingPost.image.startsWith('/uploads') ? '✓ Alojada localmente en WebP' : 'Enlace externo'}
+                    </div>
+                  </div>
+                )}
+
+                <input 
+                  ref={blogFileInputRef}
+                  type="file" 
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setUploadingBlogImage(true);
+                    setBlogUploadInfo(null);
+                    try {
+                      let blobToSend = file;
+                      try {
+                        blobToSend = await compressImageToWebP(file, 1400, 0.85);
+                      } catch (cErr) {
+                        console.warn("Compresión cliente opcional falló, usando archivo original:", cErr);
+                      }
+                      const formData = new FormData();
+                      formData.append('file', blobToSend, file.name.replace(/\.[^.]+$/, '.webp'));
+
+                      const res = await fetchWithAuth('/api/admin/blog/upload-image', {
+                        method: 'POST',
+                        body: formData
+                      });
+
+                      if (res.ok) {
+                        const data = await res.json();
+                        setEditingPost(prev => ({ ...prev, image: data.url }));
+                        setBlogUploadInfo(data);
+                      } else {
+                        const errData = await res.json().catch(() => ({}));
+                        alert(errData.detail || "Error al subir la imagen del blog");
+                      }
+                    } catch (err) {
+                      console.error(err);
+                      alert("Error de conexión al subir la imagen");
+                    } finally {
+                      setUploadingBlogImage(false);
+                      if (blogFileInputRef.current) blogFileInputRef.current.value = '';
+                    }
+                  }}
+                />
+
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <button
+                    type="button"
+                    disabled={uploadingBlogImage}
+                    onClick={() => blogFileInputRef.current?.click()}
+                    className="px-4 py-2.5 bg-[#677333] hover:bg-[#56602b] text-white rounded-xl font-bold text-xs flex items-center gap-2 transition shadow-sm disabled:opacity-50 cursor-pointer"
+                  >
+                    {uploadingBlogImage ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        Comprimiendo y guardando en WebP...
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={14} />
+                        Subir Fotografía (Convierte a WebP local)
+                      </>
+                    )}
+                  </button>
+                  <span className="text-xs text-stone-400">o ingresa una URL:</span>
+                </div>
+
+                {blogUploadInfo && (
+                  <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2 mb-2 flex items-center gap-1.5 font-medium">
+                    ✓ Imagen optimizada y convertida a WebP exitosamente ({Math.round(blogUploadInfo.final_size / 1024)} KB).
+                  </p>
+                )}
+
+                <input type="text" className="w-full border rounded-lg p-2 text-xs text-stone-600 focus:ring-2 focus:ring-primary-green outline-none" required
                   value={editingPost.image} onChange={e => setEditingPost({...editingPost, image: e.target.value})} 
-                  placeholder="https://images.unsplash.com/..."/>
+                  placeholder="https://... o ruta /uploads/blog/..."/>
               </div>
 
               <div className="pt-4 flex justify-end gap-3">

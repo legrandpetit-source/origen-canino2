@@ -39,10 +39,12 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  // Comunidad NFC (Edificio/Condominio)
+  // Comunidad NFC (Edificio/Condominio) - Solo activo si se ingresa directamente desde NFC
   const [nfcCommunity, setNfcCommunityState] = useState(() => {
     try {
-      const saved = localStorage.getItem('origencanino_nfc_community');
+      // Limpiar residuo histórico persistente de localStorage
+      localStorage.removeItem('origencanino_nfc_community');
+      const saved = sessionStorage.getItem('origencanino_nfc_community');
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
@@ -53,17 +55,18 @@ export const CartProvider = ({ children }) => {
     setNfcCommunityState(community);
     if (community) {
       try {
-        localStorage.setItem('origencanino_nfc_community', JSON.stringify(community));
+        sessionStorage.setItem('origencanino_nfc_community', JSON.stringify(community));
       } catch (e) {
-        console.error("Error guardando comunidad NFC en localStorage:", e);
+        console.error("Error guardando comunidad NFC en sessionStorage:", e);
       }
     } else {
-      localStorage.removeItem('origencanino_nfc_community');
+      sessionStorage.removeItem('origencanino_nfc_community');
     }
   };
 
   const clearNfcCommunity = () => {
     setNfcCommunityState(null);
+    sessionStorage.removeItem('origencanino_nfc_community');
     localStorage.removeItem('origencanino_nfc_community');
   };
 

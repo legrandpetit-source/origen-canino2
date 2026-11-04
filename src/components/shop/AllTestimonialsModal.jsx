@@ -58,29 +58,31 @@ const AllTestimonialsModal = ({ isOpen, onClose, openSubmitModal }) => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {testimonials.map((t) => (
-                <div key={t.id} className="bg-white p-6 rounded-3xl shadow-md border border-gray-100 hover:shadow-lg transition-shadow">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-14 h-14 bg-secondary-brown rounded-full flex items-center justify-center overflow-hidden shadow-sm shrink-0">
-                      {t.image_path ? (
-                        <img src={t.image_path} alt={t.dog_name} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-white font-bold text-xl uppercase">
-                          {t.owner_name.charAt(0)}{t.dog_name.charAt(0)}
-                        </span>
-                      )}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-secondary-brown text-lg">{t.owner_name} & {t.dog_name}</h4>
-                      <div className="flex gap-1">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} size={16} className={i < t.rating ? "text-yellow-400 fill-current" : "text-gray-300"} />
-                        ))}
+                <div key={t.id} className="bg-white p-6 rounded-3xl shadow-sm border border-stone-200/80 hover:shadow-md transition-shadow flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-3.5 mb-3.5">
+                      <div className="w-14 h-14 bg-stone-100 rounded-2xl overflow-hidden shadow-xs border-2 border-white ring-2 ring-[#677333]/25 shrink-0">
+                        {t.image_path ? (
+                          <img src={t.image_path} alt={t.dog_name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-[#677333] flex items-center justify-center text-white font-bold text-lg uppercase">
+                            {t.dog_name ? t.dog_name.charAt(0) : 'P'}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="font-header font-bold text-base text-[#3C2716]">"{t.dog_name}" <span className="text-xs font-normal text-stone-500 font-body">de {t.owner_name}</span></h4>
+                        <div className="flex gap-0.5 mt-0.5 text-[#db994b]">
+                          {[...Array(5)].map((_, i) => (
+                            <Star key={i} size={13} className={i < t.rating ? "fill-current" : "text-stone-200"} />
+                          ))}
+                        </div>
                       </div>
                     </div>
+                    <p className="text-stone-700 font-body italic leading-relaxed text-sm">
+                      "{t.content}"
+                    </p>
                   </div>
-                  <p className="text-secondary-brown-light italic leading-relaxed text-sm md:text-base">
-                    "{t.content}"
-                  </p>
                 </div>
               ))}
             </div>
