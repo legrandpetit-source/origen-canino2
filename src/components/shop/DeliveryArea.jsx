@@ -25,7 +25,7 @@ const DeliveryArea = () => {
           {/* Lado Mapa */}
           <div className="md:col-span-5 bg-[#F6F2EA] relative flex items-center justify-center p-4 min-h-[220px] md:min-h-full">
             <img 
-              src="/delivery_map.jpg" 
+              src="/delivery_map.webp" 
               alt="Mapa de Zonas de Despacho" 
               className="w-full max-h-[300px] object-contain rounded-2xl drop-shadow-sm"
             />
