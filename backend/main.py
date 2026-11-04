@@ -1,6 +1,9 @@
 import os
 import re
 import json
+import time
+from collections import defaultdict
+from threading import Lock
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, Form, UploadFile, File, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -45,6 +48,35 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- Middleware de Seguridad HTTP (Hardening Defensivo) ---
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    return response
+
+# --- Motor de Mitigación de Ataques y Rate Limiting en Memoria ---
+class RateLimiter:
+    def __init__(self):
+        self._lock = Lock()
+        self._records = defaultdict(list)
+
+    def is_rate_limited(self, key: str, max_requests: int, window_seconds: int) -> bool:
+        now = time.time()
+        with self._lock:
+            cutoff = now - window_seconds
+            self._records[key] = [t for t in self._records[key] if t > cutoff]
+            if len(self._records[key]) >= max_requests:
+                return True
+            self._records[key].append(now)
+            return False
+
+rate_limiter = RateLimiter()
 
 # --- Modelos Pydantic ---
 class ProductResponse(BaseModel):
@@ -430,6 +462,12 @@ class ContactMessage(BaseModel):
 def login(request: LoginRequest, req: Request):
     ip = get_client_ip(req)
     clean_email = request.email.strip().lower()
+
+    # Rate limiting defensivo contra fuerza bruta: máx 5 intentos por minuto por IP
+    if rate_limiter.is_rate_limited(f"login_{ip}", max_requests=5, window_seconds=60):
+        log_security_event(clean_email, "Bloqueo por exceso de intentos de login", status="critical", ip_address=ip, details="IP bloqueada temporalmente por 1 minuto")
+        raise HTTPException(status_code=429, detail="Demasiados intentos de acceso. Por seguridad, espera 1 minuto.")
+
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
@@ -462,6 +500,16 @@ def login(request: LoginRequest, req: Request):
 @app.post("/api/admin/verify-2fa")
 def verify_2fa(request: Verify2FARequest, req: Request):
     ip = get_client_ip(req)
+
+    # Protección de fuerza bruta: Máx 5 intentos para este session_id
+    if rate_limiter.is_rate_limited(f"2fa_{request.session_id}", max_requests=5, window_seconds=300):
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM admin_2fa_codes WHERE session_id = %s", (request.session_id,))
+            conn.commit()
+        log_security_event("Sistema", "Sesión 2FA destruida por fuerza bruta", status="critical", ip_address=ip, details=f"Sesión {request.session_id} invalidada")
+        raise HTTPException(status_code=429, detail="Demasiados intentos fallidos. Tu código 2FA ha sido revocado por seguridad. Inicia sesión nuevamente.")
+
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -1009,11 +1057,20 @@ def update_product(product_id: int, p: ProductUpdate, current_user: str = Depend
 @app.post("/api/admin/products/upload-image")
 async def upload_product_image(file: UploadFile = File(...), current_user: str = Depends(get_current_admin)):
     try:
-        content = await file.read()
+        # Validación de tipo de archivo
+        if not file.content_type or not file.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="El archivo debe ser una imagen válida.")
+
+        # Límite estricto de tamaño a 10 MB para prevenir DoS por memoria
+        MAX_UPLOAD_SIZE = 10 * 1024 * 1024
+        content = await file.read(MAX_UPLOAD_SIZE + 1)
         if not content:
             raise HTTPException(status_code=400, detail="El archivo está vacío.")
+        if len(content) > MAX_UPLOAD_SIZE:
+            raise HTTPException(status_code=413, detail="La imagen excede el límite permitido de 10 MB.")
 
         orig_size_bytes = len(content)
+        Image.MAX_IMAGE_PIXELS = 30_000_000  # Protección contra descompresiones masivas (Decompression Bombs)
         image = Image.open(io.BytesIO(content))
         
         # 1. Corregir orientación EXIF (típica en fotos de móviles)
@@ -1344,7 +1401,19 @@ def submit_contact(msg: ContactMessage):
 MIN_PURCHASE_AMOUNT = 30000
 
 @app.post("/api/orders")
-def create_order(order: OrderCreate):
+def create_order(order: OrderCreate, req: Request):
+    ip = get_client_ip(req)
+    # Límite anti-spam: máximo 10 pedidos cada 5 minutos por IP
+    if rate_limiter.is_rate_limited(f"orders_{ip}", max_requests=10, window_seconds=300):
+        raise HTTPException(status_code=429, detail="Has alcanzado el límite de creación de pedidos. Por favor espera unos minutos.")
+
+    # Sanitización de longitudes de campo
+    order.customer_name = order.customer_name.strip()[:150]
+    order.customer_email = order.customer_email.strip().lower()[:150]
+    order.customer_phone = order.customer_phone.strip()[:50]
+    order.customer_address = order.customer_address.strip()[:250]
+    order.customer_city = order.customer_city.strip()[:100]
+
     subtotal = sum(item.price * item.quantity for item in order.items)
     if subtotal < MIN_PURCHASE_AMOUNT:
         raise HTTPException(
