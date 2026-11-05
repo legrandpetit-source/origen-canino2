@@ -50,6 +50,10 @@ const ProductCard = ({ product, addItem }) => {
           <img 
             src={product.image || '/logo.webp'} 
             alt={product.name} 
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = '/logo.webp';
+            }}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
 

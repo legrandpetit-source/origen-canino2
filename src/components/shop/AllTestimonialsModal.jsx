@@ -63,7 +63,15 @@ const AllTestimonialsModal = ({ isOpen, onClose, openSubmitModal }) => {
                     <div className="flex items-center gap-3.5 mb-3.5">
                       <div className="w-14 h-14 bg-stone-100 rounded-2xl overflow-hidden shadow-xs border-2 border-white ring-2 ring-[#677333]/25 shrink-0">
                         {t.image_path ? (
-                          <img src={t.image_path} alt={t.dog_name} className="w-full h-full object-cover" />
+                          <img 
+                            src={t.image_path} 
+                            alt={t.dog_name} 
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = '/logo.webp';
+                            }}
+                            className="w-full h-full object-cover" 
+                          />
                         ) : (
                           <div className="w-full h-full bg-[#677333] flex items-center justify-center text-white font-bold text-lg uppercase">
                             {t.dog_name ? t.dog_name.charAt(0) : 'P'}

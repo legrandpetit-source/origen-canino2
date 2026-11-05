@@ -45,6 +45,10 @@ const Blog = () => {
                     <img 
                       src={article.image} 
                       alt={article.title} 
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = '/logo.webp';
+                      }}
                       className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                       loading="lazy"
                     />

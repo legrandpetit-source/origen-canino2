@@ -33,8 +33,50 @@ groq_api_key = os.getenv("GROQ_API_KEY")
 app = FastAPI(title="Origen Canino API")
 
 # Mount uploads directory
-# Asegurarnos de que el directorio de subidas exista
+# Asegurarnos de que el directorio de subidas exista y sincronizar assets predeterminados
 os.makedirs("uploads", exist_ok=True)
+for _sub in ["products", "testimonials", "blog"]:
+    os.makedirs(os.path.join("uploads", _sub), exist_ok=True)
+
+# Auto-seed static assets into uploads if missing (prevents broken images on container rebuild)
+try:
+    import shutil
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    source_roots = [
+        os.path.join(base_dir, "..", "public", "images"),
+        os.path.join(base_dir, "..", "dist", "images")
+    ]
+    for src_root in source_roots:
+        if os.path.isdir(src_root):
+            for sub in ["products", "testimonials", "blog"]:
+                sub_src = os.path.join(src_root, sub)
+                sub_dst = os.path.join("uploads", sub)
+                if os.path.isdir(sub_src):
+                    for fname in os.listdir(sub_src):
+                        f_src = os.path.join(sub_src, fname)
+                        f_dst = os.path.join(sub_dst, fname)
+                        if os.path.isfile(f_src) and not os.path.exists(f_dst):
+                            shutil.copy2(f_src, f_dst)
+    
+    # Symlink/copy legacy hash names for backward compatibility
+    legacy_hashes = {
+        "products": {
+            "6b31b5acd884489c9354b0fa4890af1f.webp": "dieta-barf.webp",
+            "6f7f2e611ac84b01bb555523b8f002f1.webp": "dieta-cocinada-cerdo.webp",
+            "809cf60f6cd94af396c8e1926d6cc16b.webp": "patitas-pollo.webp",
+            "400c8212744044d3a75efd0d77beaabb.webp": "caldo-huesos.webp",
+            "80bff89182d34fadad34c9990dc5b821.webp": "dieta-barf-molida.webp",
+        }
+    }
+    for sub, mapping in legacy_hashes.items():
+        for hash_name, target_file in mapping.items():
+            h_path = os.path.join("uploads", sub, hash_name)
+            t_path = os.path.join("uploads", sub, target_file)
+            if os.path.exists(t_path) and not os.path.exists(h_path):
+                shutil.copy2(t_path, h_path)
+except Exception as _e:
+    print(f"Warning: could not auto-seed uploads: {_e}")
+
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Inicializar base de datos al arrancar
