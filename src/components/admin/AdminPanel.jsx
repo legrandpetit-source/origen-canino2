@@ -247,6 +247,32 @@ const AdminPanel = () => {
     }
   };
 
+  const handleBulkDeleteOrders = async (orderIds) => {
+    if (!orderIds || orderIds.length === 0) return false;
+    const count = orderIds.length;
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar permanentemente ${count} pedido(s) seleccionado(s)? Esta acción no se puede deshacer.`)) {
+      return false;
+    }
+    try {
+      const res = await fetchWithAuth('/api/admin/orders/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_ids: orderIds })
+      });
+      if (res.ok) {
+        fetchData();
+        return true;
+      } else {
+        alert('Error al eliminar los pedidos seleccionados');
+        return false;
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error de conexión al eliminar pedidos');
+      return false;
+    }
+  };
+
   // --- Testimonial Logic ---
   const handleUpdateTestimonialStatus = async (id, status) => {
     try {
@@ -527,6 +553,7 @@ const AdminPanel = () => {
                   orders={orders} 
                   handleUpdateOrderStatus={handleUpdateOrderStatus} 
                   handleDeleteOrder={handleDeleteOrder} 
+                  handleBulkDeleteOrders={handleBulkDeleteOrders}
                 />
               )}
 

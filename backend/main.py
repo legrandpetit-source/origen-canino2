@@ -250,6 +250,9 @@ class OrderStatusUpdate(BaseModel):
     payment_status: Optional[str] = None
     delivery_status: Optional[str] = None
 
+class BulkDeleteOrdersRequest(BaseModel):
+    order_ids: List[int]
+
 class BuildingCreateUpdate(BaseModel):
     name: str
     slug: str
@@ -2238,6 +2241,20 @@ def delete_order(order_id: int, current_user: str = Depends(get_current_admin)):
             return {"success": True, "message": "Orden eliminada exitosamente"}
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error eliminando la orden.")
+
+@app.post("/api/admin/orders/bulk-delete")
+def bulk_delete_orders(req: BulkDeleteOrdersRequest, current_user: str = Depends(get_current_admin)):
+    if not req.order_ids:
+        return {"success": True, "deleted_count": 0}
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM order_items WHERE order_id = ANY(%s)", (req.order_ids,))
+            cursor.execute("DELETE FROM orders WHERE id = ANY(%s)", (req.order_ids,))
+            conn.commit()
+            return {"success": True, "deleted_count": len(req.order_ids)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error eliminando los pedidos seleccionados.")
 
 # --- Testimonials Endpoints ---
 @app.get("/api/testimonials")
