@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, ArrowLeft, CreditCard, Landmark, Sparkles, Building2, ShieldCheck, Copy, Check, UserCheck, Dog, RefreshCw, Info, Gift, Tag, Mail, Lock } from 'lucide-react';
+import { X, CheckCircle, ArrowLeft, CreditCard, Landmark, Sparkles, Building2, ShieldCheck, Copy, Check, UserCheck, Dog, RefreshCw, Info, Gift, Tag, Mail, Lock, User, Phone, MapPin, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useCustomer } from '../../context/CustomerContext';
 
@@ -9,7 +9,9 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
     items, total, clearCart, dogData, nfcCommunity, nfcDiscount, 
     firstOrderPromo, isFirstPurchaseEligible, markAsPurchased 
   } = useCart();
-  const { customer, dogs, openAuthModal, login } = useCustomer();
+  const { customer, dogs, openAuthModal, login, register } = useCustomer();
+  
+  const [checkoutStep, setCheckoutStep] = useState('checkout'); // 'checkout' | 'register'
   
   const [formData, setFormData] = useState({
     customer_name: '',
@@ -25,6 +27,23 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
     transfer_bank: '',
     transfer_receipt_number: '',
   });
+
+  // Estado para el formulario dedicado de Registro de nuevo cliente
+  const [regForm, setRegForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    phone: '',
+    address: '',
+    city: 'Santiago',
+    region: 'Región Metropolitana',
+    dog_name: '',
+    dog_weight: '',
+    dog_age: 'adult_normal'
+  });
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [regLoading, setRegLoading] = useState(false);
+  const [regError, setRegError] = useState('');
 
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
   const [emailChecked, setEmailChecked] = useState(false);
@@ -226,6 +245,74 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
     }
   };
 
+  const handleOpenRegisterStep = (email = '') => {
+    setRegForm({
+      name: formData.customer_name || '',
+      email: (email || formData.customer_email || '').trim().toLowerCase(),
+      password: '',
+      phone: formData.customer_phone || '',
+      address: formData.customer_address || '',
+      city: formData.customer_city || 'Santiago',
+      region: formData.customer_region || 'Región Metropolitana',
+      dog_name: formData.dog_name || dogData?.name || '',
+      dog_weight: formData.dog_weight || (dogData?.weight ? String(dogData.weight) : ''),
+      dog_age: formData.dog_age || dogData?.age || 'adult_normal'
+    });
+    setRegError('');
+    setCheckoutStep('register');
+  };
+
+  const handleRegisterSubmit = async (e) => {
+    e.preventDefault();
+    setRegError('');
+    if (!regForm.password || regForm.password.length < 6) {
+      setRegError('La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+    if (!regForm.name.trim() || !regForm.email.trim()) {
+      setRegError('Tu nombre y correo electrónico son obligatorios.');
+      return;
+    }
+
+    setRegLoading(true);
+    try {
+      await register({
+        name: regForm.name.trim(),
+        email: regForm.email.trim().toLowerCase(),
+        password: regForm.password,
+        phone: regForm.phone.trim(),
+        address: regForm.address.trim(),
+        city: regForm.city.trim(),
+        region: regForm.region || 'Región Metropolitana',
+        dog_name: regForm.dog_name ? regForm.dog_name.trim() : null,
+        dog_weight: regForm.dog_weight ? parseFloat(regForm.dog_weight) : null,
+        dog_age: regForm.dog_age || 'adult_normal'
+      });
+
+      // Sincronizar automáticamente datos con formData de Checkout
+      setFormData(prev => ({
+        ...prev,
+        customer_name: regForm.name.trim(),
+        customer_email: regForm.email.trim().toLowerCase(),
+        customer_phone: regForm.phone.trim(),
+        customer_address: regForm.address.trim(),
+        customer_city: regForm.city.trim(),
+        customer_region: regForm.region || 'Región Metropolitana',
+        dog_name: regForm.dog_name ? regForm.dog_name.trim() : prev.dog_name,
+        dog_weight: regForm.dog_weight ? String(regForm.dog_weight) : prev.dog_weight,
+        dog_age: regForm.dog_age || prev.dog_age
+      }));
+
+      setIsExistingCustomer(true);
+      setEmailChecked(true);
+      setCheckoutStep('checkout');
+    } catch (err) {
+      setRegError(err.message || 'Error al crear la cuenta de cliente.');
+    } finally {
+      setRegLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (items.length === 0) return;
@@ -234,9 +321,9 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
       return;
     }
 
-    // Si es un cliente nuevo y no ha puesto contraseña
-    if (!customer && !isExistingCustomer && (!formData.customer_password || formData.customer_password.length < 6)) {
-      alert("Como es tu primera compra, por favor crea tu contraseña de cliente (mínimo 6 caracteres) para registrarte.");
+    // Si es un cliente nuevo que aún no crea su cuenta, abrir el formulario de registro con transición suave
+    if (!customer && !isExistingCustomer) {
+      handleOpenRegisterStep(formData.customer_email);
       return;
     }
     
@@ -245,7 +332,7 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
       const orderData = {
         customer_name: formData.customer_name,
         customer_email: formData.customer_email,
-        customer_password: formData.customer_password || null,
+        customer_password: null,
         customer_phone: formData.customer_phone,
         customer_address: formData.customer_address,
         customer_city: formData.customer_city,
@@ -388,20 +475,274 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                 </button>
               </div>
             ) : (
-              <>
-                <div className="flex justify-between items-center p-4 border-b bg-bg-cream sticky top-0 z-10">
-                  <div className="flex items-center gap-3">
-                    {onBack && (
-                      <button type="button" onClick={onBack} className="p-2 hover:bg-gray-200 rounded-full transition text-gray-600 flex items-center justify-center" title="Volver al carrito">
-                        <ArrowLeft size={24} />
+              <AnimatePresence mode="wait">
+                {checkoutStep === 'register' ? (
+                  <motion.div
+                    key="step-register"
+                    initial={{ opacity: 0, x: 30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -30 }}
+                    transition={{ duration: 0.22, ease: "easeInOut" }}
+                    className="flex flex-col flex-1"
+                  >
+                    {/* Header para Registro */}
+                    <div className="flex justify-between items-center p-4 border-b bg-bg-cream sticky top-0 z-10">
+                      <div className="flex items-center gap-3">
+                        <button 
+                          type="button" 
+                          onClick={() => setCheckoutStep('checkout')} 
+                          className="p-2 hover:bg-gray-200 rounded-full transition text-gray-600 flex items-center justify-center cursor-pointer"
+                          title="Volver a la compra"
+                        >
+                          <ArrowLeft size={22} />
+                        </button>
+                        <div>
+                          <h2 className="text-xl font-header text-primary-green-dark">Crear Cuenta de Cliente</h2>
+                          <p className="text-[11px] text-gray-500">Paso previo para darte de alta y coordinar tu despacho</p>
+                        </div>
+                      </div>
+                      <button type="button" onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition cursor-pointer">
+                        <X size={22} />
                       </button>
-                    )}
-                    <h2 className="text-2xl font-header text-primary-green-dark">Finalizar Compra</h2>
-                  </div>
-                  <button type="button" onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition">
-                    <X size={24} />
-                  </button>
-                </div>
+                    </div>
+
+                    {/* Formulario Dedicado de Registro */}
+                    <form onSubmit={handleRegisterSubmit} className="p-6 space-y-5 flex-1">
+                      {/* Mensaje de Bienvenida Amistoso */}
+                      <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-2xl p-4 flex items-start gap-3 shadow-2xs">
+                        <div className="p-2 bg-amber-100 text-amber-800 rounded-xl shrink-0 mt-0.5">
+                          <Sparkles size={20} className="text-amber-600" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-amber-900">¡Te damos la bienvenida a Origen Canino!</h4>
+                          <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+                            Crea tu usuario una sola vez. Con tu cuenta podrás revisar tus despachos congelados, registrar a tus mascotas y repetir tus pedidos en 1 clic.
+                          </p>
+                        </div>
+                      </div>
+
+                      {regError && (
+                        <div className="p-3 bg-red-50 text-red-700 text-xs rounded-xl border border-red-200 font-semibold">
+                          {regError}
+                        </div>
+                      )}
+
+                      {/* 1. Datos Personales */}
+                      <div>
+                        <h3 className="font-bold text-sm text-secondary-brown mb-2.5 flex items-center gap-2">
+                          <span className="w-5 h-5 bg-primary-green text-white text-[11px] rounded-full flex items-center justify-center font-bold">1</span>
+                          Tus Datos de Contacto
+                        </h3>
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
+                                <User size={13} className="text-primary-green" /> Tu Nombre Completo *
+                              </label>
+                              <input
+                                required
+                                type="text"
+                                value={regForm.name}
+                                onChange={(e) => setRegForm({ ...regForm, name: e.target.value })}
+                                placeholder="Ej. Juan Pérez"
+                                className="w-full border p-2.5 rounded-xl text-xs focus:ring-2 focus:ring-primary-green outline-none bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
+                                <Phone size={13} className="text-primary-green" /> WhatsApp / Teléfono *
+                              </label>
+                              <input
+                                required
+                                type="tel"
+                                value={regForm.phone}
+                                onChange={(e) => setRegForm({ ...regForm, phone: e.target.value })}
+                                placeholder="+56 9 1234 5678"
+                                className="w-full border p-2.5 rounded-xl text-xs focus:ring-2 focus:ring-primary-green outline-none bg-white"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
+                                <Mail size={13} className="text-primary-green" /> Correo Electrónico *
+                              </label>
+                              <input
+                                required
+                                type="email"
+                                value={regForm.email}
+                                onChange={(e) => setRegForm({ ...regForm, email: e.target.value })}
+                                placeholder="tu@email.com"
+                                className="w-full border p-2.5 rounded-xl text-xs focus:ring-2 focus:ring-primary-green outline-none bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
+                                <Lock size={13} className="text-primary-green" /> Crea tu Contraseña *
+                              </label>
+                              <div className="relative">
+                                <input
+                                  required
+                                  minLength={6}
+                                  type={showRegPassword ? "text" : "password"}
+                                  value={regForm.password}
+                                  onChange={(e) => setRegForm({ ...regForm, password: e.target.value })}
+                                  placeholder="Mínimo 6 caracteres"
+                                  className="w-full border p-2.5 pr-8 rounded-xl text-xs focus:ring-2 focus:ring-primary-green outline-none bg-white"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowRegPassword(!showRegPassword)}
+                                  className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600"
+                                >
+                                  {showRegPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 2. Dirección de Despacho */}
+                      <div>
+                        <h3 className="font-bold text-sm text-secondary-brown mb-2.5 flex items-center gap-2">
+                          <span className="w-5 h-5 bg-primary-green text-white text-[11px] rounded-full flex items-center justify-center font-bold">2</span>
+                          Dirección de Despacho
+                        </h3>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
+                              <MapPin size={13} className="text-primary-green" /> Calle, Número, Depto/Torre *
+                            </label>
+                            <input
+                              required
+                              type="text"
+                              value={regForm.address}
+                              onChange={(e) => setRegForm({ ...regForm, address: e.target.value })}
+                              placeholder="Av. Las Condes 1234, Depto 502"
+                              className="w-full border p-2.5 rounded-xl text-xs focus:ring-2 focus:ring-primary-green outline-none bg-white"
+                            />
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-bold text-gray-700 mb-1">Comuna / Ciudad *</label>
+                              <input
+                                required
+                                type="text"
+                                value={regForm.city}
+                                onChange={(e) => setRegForm({ ...regForm, city: e.target.value })}
+                                placeholder="Las Condes, Santiago"
+                                className="w-full border p-2.5 rounded-xl text-xs focus:ring-2 focus:ring-primary-green outline-none bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-gray-700 mb-1">Región</label>
+                              <select
+                                value={regForm.region}
+                                onChange={(e) => setRegForm({ ...regForm, region: e.target.value })}
+                                className="w-full border p-2.5 rounded-xl text-xs focus:ring-2 focus:ring-primary-green outline-none bg-white"
+                              >
+                                <option value="Región Metropolitana">Región Metropolitana</option>
+                                <option value="Región de Valparaíso">Región de Valparaíso</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 3. Ficha de tu Perrito */}
+                      <div>
+                        <h3 className="font-bold text-sm text-secondary-brown mb-2.5 flex items-center gap-2">
+                          <span className="w-5 h-5 bg-primary-green text-white text-[11px] rounded-full flex items-center justify-center font-bold">3</span>
+                          Ficha de tu Mascota (Para cálculo nutricional y porción)
+                        </h3>
+                        <div className="p-3.5 bg-amber-50/70 border border-amber-200/60 rounded-2xl space-y-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                            <div>
+                              <label className="block text-[11px] text-gray-700 font-bold mb-1">Nombre Perrito *</label>
+                              <input
+                                required
+                                type="text"
+                                value={regForm.dog_name}
+                                onChange={(e) => setRegForm({ ...regForm, dog_name: e.target.value })}
+                                placeholder="Ej. Max"
+                                className="w-full border border-amber-200 bg-white rounded-lg p-2 text-xs outline-none focus:ring-1 focus:ring-primary-green"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] text-gray-700 font-bold mb-1">Peso en Kg *</label>
+                              <input
+                                required
+                                type="number"
+                                step="0.1"
+                                value={regForm.dog_weight}
+                                onChange={(e) => setRegForm({ ...regForm, dog_weight: e.target.value })}
+                                placeholder="Ej. 18.5"
+                                className="w-full border border-amber-200 bg-white rounded-lg p-2 text-xs outline-none focus:ring-1 focus:ring-primary-green"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] text-gray-700 font-bold mb-1">Etapa / Actividad</label>
+                              <select
+                                value={regForm.dog_age}
+                                onChange={(e) => setRegForm({ ...regForm, dog_age: e.target.value })}
+                                className="w-full border border-amber-200 bg-white rounded-lg p-2 text-xs outline-none focus:ring-1 focus:ring-primary-green"
+                              >
+                                <option value="puppy_small">Cachorro (2 a 6 meses)</option>
+                                <option value="puppy_large">Cachorro (6 a 12 meses)</option>
+                                <option value="adult_low">Adulto (Baja Actividad / Senior)</option>
+                                <option value="adult_normal">Adulto (Actividad Normal)</option>
+                                <option value="adult_high">Adulto (Alta Actividad / Deporte)</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Botón de Envío de Registro */}
+                      <button
+                        type="submit"
+                        disabled={regLoading}
+                        className="w-full bg-primary-green hover:bg-primary-green-dark text-white font-bold py-3.5 rounded-xl transition shadow-md flex items-center justify-center gap-2 text-base cursor-pointer mt-4"
+                      >
+                        {regLoading ? "Creando tu cuenta..." : "Crear mi Cuenta y Continuar al Pago"}
+                        <ArrowRight size={18} />
+                      </button>
+
+                      <div className="text-center pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setCheckoutStep('checkout')}
+                          className="text-xs text-gray-500 hover:text-gray-800 underline cursor-pointer"
+                        >
+                          Volver al resumen de compra
+                        </button>
+                      </div>
+                    </form>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="step-checkout"
+                    initial={{ opacity: 0, x: -30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 30 }}
+                    transition={{ duration: 0.22, ease: "easeInOut" }}
+                    className="flex flex-col flex-1"
+                  >
+                    <div className="flex justify-between items-center p-4 border-b bg-bg-cream sticky top-0 z-10">
+                      <div className="flex items-center gap-3">
+                        {onBack && (
+                          <button type="button" onClick={onBack} className="p-2 hover:bg-gray-200 rounded-full transition text-gray-600 flex items-center justify-center" title="Volver al carrito">
+                            <ArrowLeft size={24} />
+                          </button>
+                        )}
+                        <h2 className="text-2xl font-header text-primary-green-dark">Finalizar Compra</h2>
+                      </div>
+                      <button type="button" onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition">
+                        <X size={24} />
+                      </button>
+                    </div>
                 
                 <form onSubmit={handleSubmit} className="p-6 space-y-6 flex-1">
                   {/* Banner de Bienvenida si ya está logueado */}
@@ -518,14 +859,28 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
 
                       {/* CASO B: Cliente NUEVO detectado (correo no existe en la base de datos) */}
                       {emailChecked && !isExistingCustomer && !customer && formData.customer_email && (
-                        <div className="bg-amber-50/90 border border-amber-300 rounded-2xl p-3.5 shadow-2xs">
-                          <p className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                            <Sparkles size={16} className="text-amber-700" />
-                            ¡Bienvenido a Origen Canino! Este correo no tiene cuenta previa.
-                          </p>
-                          <p className="text-[11px] text-amber-800 mt-1">
-                            Ingresa tus datos a continuación y crea una contraseña para dar de alta tu usuario, coordinar tu despacho congelado y guardar a tu mascota.
-                          </p>
+                        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-2xl p-4 shadow-2xs">
+                          <div className="flex items-start gap-3">
+                            <div className="p-2 bg-amber-100 text-amber-800 rounded-xl shrink-0 mt-0.5">
+                              <Sparkles size={18} className="text-amber-600" />
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="text-xs font-bold text-amber-900">
+                                ¡Bienvenido a Origen Canino! Este correo no tiene cuenta previa.
+                              </h4>
+                              <p className="text-[11px] text-amber-800 mt-1 leading-relaxed">
+                                Para coordinar tu despacho congelado y guardar la ficha nutricional de tu perrito, crearemos tu cuenta de cliente en unos segundos.
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenRegisterStep(formData.customer_email)}
+                                className="mt-2.5 inline-flex items-center gap-1.5 bg-primary-green hover:bg-primary-green-dark text-white text-xs font-bold px-3.5 py-2 rounded-xl transition shadow-xs cursor-pointer"
+                              >
+                                <span>Crear mi Cuenta de Cliente</span>
+                                <ArrowRight size={14} />
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       )}
 
@@ -538,28 +893,6 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                           <label className="block text-sm text-gray-600 mb-1">Teléfono (WhatsApp) *</label>
                           <input required type="text" name="customer_phone" value={formData.customer_phone} onChange={handleChange} className="w-full border p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-primary-green outline-none bg-white" placeholder="+56 9 1234 5678" />
                         </div>
-
-                        {/* Campo Contraseña obligatorio para usuario nuevo */}
-                        {!customer && !isExistingCustomer && (
-                          <div className="md:col-span-2">
-                            <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1">
-                              <Lock size={14} className="text-primary-green" /> Crea tu Contraseña de Cliente *
-                            </label>
-                            <input 
-                              required 
-                              type="password" 
-                              minLength={6}
-                              name="customer_password" 
-                              value={formData.customer_password} 
-                              onChange={handleChange} 
-                              className="w-full border p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-primary-green outline-none bg-white" 
-                              placeholder="Mínimo 6 caracteres (para ingresar a Mi Cuenta y repetir pedidos)" 
-                            />
-                            <p className="text-[10px] text-gray-500 mt-1">
-                              Con esta clave podrás acceder a tu portal en <span className="font-semibold text-primary-green">Mi Cuenta</span> para ver el estado de tu despacho congelado y repetir pedidos en 1 clic.
-                            </p>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -938,9 +1271,11 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                     <span>Pago 100% seguro con respaldo de Origen Canino</span>
                   </div>
                 </form>
-              </>
+              </motion.div>
             )}
-          </motion.div>
+          </AnimatePresence>
+        )}
+      </motion.div>
         </>
       )}
     </AnimatePresence>
