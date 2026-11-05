@@ -35,7 +35,7 @@ app = FastAPI(title="Origen Canino API")
 # Mount uploads directory
 # Asegurarnos de que el directorio de subidas exista y sincronizar assets predeterminados
 os.makedirs("uploads", exist_ok=True)
-for _sub in ["products", "testimonials", "blog"]:
+for _sub in ["products", "testimonials", "blog", "dogs"]:
     os.makedirs(os.path.join("uploads", _sub), exist_ok=True)
 
 # Auto-seed static assets into uploads if missing (prevents broken images on container rebuild)
@@ -245,6 +245,37 @@ class OrderCreate(BaseModel):
     transfer_receipt_number: Optional[str] = None
     nfc_building_code: Optional[str] = None
     discount_amount: Optional[int] = 0
+    coupon_code: Optional[str] = None
+
+class CouponCreate(BaseModel):
+    code: str
+    description: Optional[str] = ""
+    discount_type: str = "percentage"  # "percentage" or "fixed"
+    discount_value: float
+    min_order_amount: Optional[int] = 0
+    max_discount_amount: Optional[int] = None
+    usage_limit: Optional[int] = None
+    usage_per_customer: Optional[int] = 1
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    is_active: Optional[bool] = True
+
+class CouponUpdate(BaseModel):
+    description: Optional[str] = None
+    discount_type: Optional[str] = None
+    discount_value: Optional[float] = None
+    min_order_amount: Optional[int] = None
+    max_discount_amount: Optional[int] = None
+    usage_limit: Optional[int] = None
+    usage_per_customer: Optional[int] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class ValidateCouponRequest(BaseModel):
+    code: str
+    email: Optional[str] = ""
+    subtotal: int
 
 class OrderStatusUpdate(BaseModel):
     payment_status: Optional[str] = None
@@ -343,6 +374,7 @@ class CustomerDogCreateUpdate(BaseModel):
     age_stage: Optional[str] = "adulto"
     favorite_diet: Optional[str] = None
     notes: Optional[str] = None
+    photo_url: Optional[str] = None
 
 # --- Auth Config ---
 SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key-origen")
@@ -975,7 +1007,7 @@ def customer_login(req: CustomerLoginRequest):
             raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos")
             
         customer_id = customer["id"]
-        cursor.execute("SELECT id, name, weight, age_stage, favorite_diet, notes FROM customer_dogs WHERE customer_id = %s ORDER BY id ASC", (customer_id,))
+        cursor.execute("SELECT id, name, weight, age_stage, favorite_diet, notes, photo_url FROM customer_dogs WHERE customer_id = %s ORDER BY id ASC", (customer_id,))
         dogs = cursor.fetchall()
         for d in dogs:
             if "weight" in d and d["weight"] is not None:
@@ -1005,7 +1037,7 @@ def get_customer_profile(customer_id: int = Depends(get_current_customer)):
         if not customer:
             raise HTTPException(status_code=404, detail="Cliente no encontrado")
             
-        cursor.execute("SELECT id, name, weight, age_stage, favorite_diet, notes FROM customer_dogs WHERE customer_id = %s ORDER BY id ASC", (customer_id,))
+        cursor.execute("SELECT id, name, weight, age_stage, favorite_diet, notes, photo_url FROM customer_dogs WHERE customer_id = %s ORDER BY id ASC", (customer_id,))
         dogs = cursor.fetchall()
         for d in dogs:
             if "weight" in d and d["weight"] is not None:
@@ -1038,10 +1070,10 @@ def add_customer_dog(dog: CustomerDogCreateUpdate, customer_id: int = Depends(ge
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO customer_dogs (customer_id, name, weight, age_stage, favorite_diet, notes)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            RETURNING id, name, weight, age_stage, favorite_diet, notes
-        """, (customer_id, dog.name.strip(), dog.weight, dog.age_stage or "adulto", dog.favorite_diet, dog.notes))
+            INSERT INTO customer_dogs (customer_id, name, weight, age_stage, favorite_diet, notes, photo_url)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, name, weight, age_stage, favorite_diet, notes, photo_url
+        """, (customer_id, dog.name.strip(), dog.weight, dog.age_stage or "adulto", dog.favorite_diet, dog.notes, dog.photo_url))
         new_dog = cursor.fetchone()
         if "weight" in new_dog and new_dog["weight"] is not None:
             new_dog["weight"] = float(new_dog["weight"])
@@ -1054,10 +1086,10 @@ def update_customer_dog(dog_id: int, dog: CustomerDogCreateUpdate, customer_id: 
         cursor = conn.cursor()
         cursor.execute("""
             UPDATE customer_dogs 
-            SET name = %s, weight = %s, age_stage = %s, favorite_diet = %s, notes = %s
+            SET name = %s, weight = %s, age_stage = %s, favorite_diet = %s, notes = %s, photo_url = COALESCE(%s, photo_url)
             WHERE id = %s AND customer_id = %s
-            RETURNING id, name, weight, age_stage, favorite_diet, notes
-        """, (dog.name.strip(), dog.weight, dog.age_stage or "adulto", dog.favorite_diet, dog.notes, dog_id, customer_id))
+            RETURNING id, name, weight, age_stage, favorite_diet, notes, photo_url
+        """, (dog.name.strip(), dog.weight, dog.age_stage or "adulto", dog.favorite_diet, dog.notes, dog.photo_url, dog_id, customer_id))
         updated_dog = cursor.fetchone()
         if not updated_dog:
             raise HTTPException(status_code=404, detail="Perrito no encontrado")
@@ -1066,10 +1098,102 @@ def update_customer_dog(dog_id: int, dog: CustomerDogCreateUpdate, customer_id: 
         conn.commit()
         return {"success": True, "dog": updated_dog}
 
+@app.post("/api/customer/dogs/{dog_id}/upload-photo")
+async def upload_dog_photo(dog_id: int, file: UploadFile = File(...), customer_id: int = Depends(get_current_customer)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, photo_url FROM customer_dogs WHERE id = %s AND customer_id = %s", (dog_id, customer_id))
+            dog = cursor.fetchone()
+            if not dog:
+                raise HTTPException(status_code=404, detail="Perrito no encontrado")
+            old_photo_url = dog.get("photo_url")
+
+        if not file.content_type or not file.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="El archivo debe ser una imagen válida.")
+
+        MAX_UPLOAD_SIZE = 8 * 1024 * 1024
+        content = await file.read(MAX_UPLOAD_SIZE + 1)
+        if not content:
+            raise HTTPException(status_code=400, detail="El archivo está vacío.")
+        if len(content) > MAX_UPLOAD_SIZE:
+            raise HTTPException(status_code=413, detail="La foto no debe superar los 8 MB.")
+
+        Image.MAX_IMAGE_PIXELS = 25_000_000
+        image = Image.open(io.BytesIO(content))
+
+        try:
+            image = ImageOps.exif_transpose(image)
+        except Exception:
+            pass
+
+        if image.mode in ("P", "LA"):
+            image = image.convert("RGBA")
+        elif image.mode != "RGB":
+            image = image.convert("RGB")
+
+        # Redimensionar proporcionalmente para foto/avatar de mascota (máx 800x800)
+        max_dim = 800
+        image.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+
+        filename = f"dog_{dog_id}_{uuid.uuid4().hex[:8]}.webp"
+        upload_dir = os.path.join("uploads", "dogs")
+        os.makedirs(upload_dir, exist_ok=True)
+        filepath = os.path.join(upload_dir, filename)
+
+        # Compresión WebP ultraliviana
+        image.save(
+            filepath,
+            "WEBP",
+            quality=82,
+            method=6,
+            optimize=True
+        )
+
+        new_photo_url = f"/uploads/dogs/{filename}"
+
+        # Eliminar foto anterior si existía para que siempre sea UNA sola foto por perrito
+        if old_photo_url and old_photo_url.startswith("/uploads/dogs/"):
+            old_fn = old_photo_url.replace("/uploads/dogs/", "").strip()
+            old_fp = os.path.join(upload_dir, old_fn)
+            if os.path.exists(old_fp):
+                try:
+                    os.remove(old_fp)
+                except Exception as _e:
+                    print("Warning removing old dog photo:", _e)
+
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE customer_dogs SET photo_url = %s WHERE id = %s AND customer_id = %s", (new_photo_url, dog_id, customer_id))
+            conn.commit()
+
+        return {
+            "success": True,
+            "photo_url": new_photo_url,
+            "message": "Foto optimizada en formato WebP guardada con éxito."
+        }
+    except HTTPException:
+        raise
+    except UnidentifiedImageError:
+        raise HTTPException(status_code=400, detail="El archivo subido no es una imagen válida.")
+    except Exception as e:
+        print("Error uploading dog photo:", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.delete("/api/customer/dogs/{dog_id}")
 def delete_customer_dog(dog_id: int, customer_id: int = Depends(get_current_customer)):
     with get_connection() as conn:
         cursor = conn.cursor()
+        cursor.execute("SELECT photo_url FROM customer_dogs WHERE id = %s AND customer_id = %s", (dog_id, customer_id))
+        d_row = cursor.fetchone()
+        if d_row and d_row.get("photo_url") and d_row["photo_url"].startswith("/uploads/dogs/"):
+            old_fn = d_row["photo_url"].replace("/uploads/dogs/", "").strip()
+            old_fp = os.path.join("uploads", "dogs", old_fn)
+            if os.path.exists(old_fp):
+                try:
+                    os.remove(old_fp)
+                except Exception:
+                    pass
         cursor.execute("DELETE FROM customer_dogs WHERE id = %s AND customer_id = %s", (dog_id, customer_id))
         conn.commit()
         return {"success": True, "message": "Perrito eliminado"}
@@ -1654,25 +1778,42 @@ def create_order(order: OrderCreate, req: Request):
                         VALUES (%s, %s, %s, %s)
                     """, (linked_customer_id, order.dog_name, order.dog_weight, order.dog_age or 'adulto'))
 
+            coupon_applied = order.coupon_code.strip().upper() if order.coupon_code else None
+
             cursor.execute("""
                 INSERT INTO orders (
                     customer_name, customer_email, customer_phone, customer_address, 
                     customer_city, customer_region, subtotal, shipping_cost, total, 
                     is_subscription, dog_name, dog_weight, dog_age, payment_method, 
                     transfer_bank, transfer_receipt_number, nfc_building_code, 
-                    discount_amount, payment_status, customer_id
+                    discount_amount, coupon_code, payment_status, customer_id
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
                 RETURNING id
             """, (
                 order.customer_name, order.customer_email, order.customer_phone, order.customer_address, 
                 order.customer_city, order.customer_region, subtotal, shipping_cost, total, 
                 int(order.is_subscription), order.dog_name, order.dog_weight, order.dog_age,
                 order.payment_method or 'transferencia', order.transfer_bank, order.transfer_receipt_number,
-                order.nfc_building_code, discount, initial_payment_status, linked_customer_id
+                order.nfc_building_code, discount, coupon_applied, initial_payment_status, linked_customer_id
             ))
             
             order_id = cursor.fetchone()['id']
+
+            # Registrar uso de cupón en la tabla coupon_usages e incrementar times_used si aplica
+            if coupon_applied:
+                try:
+                    cursor.execute("SELECT id FROM coupons WHERE UPPER(code) = %s", (coupon_applied,))
+                    c_row = cursor.fetchone()
+                    if c_row:
+                        c_id = c_row['id']
+                        cursor.execute("UPDATE coupons SET times_used = times_used + 1, updated_at = CURRENT_TIMESTAMP WHERE id = %s", (c_id,))
+                        cursor.execute("""
+                            INSERT INTO coupon_usages (coupon_id, coupon_code, customer_email, order_id, discount_applied)
+                            VALUES (%s, %s, %s, %s, %s)
+                        """, (c_id, coupon_applied, clean_email, order_id, discount))
+                except Exception as _c_err:
+                    print("Error tracking coupon usage:", _c_err)
             
             # Si el cliente existe y trajo datos de perrito, auto-guardar si no lo tiene
             if linked_customer_id and order.dog_name and order.dog_weight:
@@ -2180,6 +2321,248 @@ def update_admin_first_order_promo(payload: PromoSettingsUpdate, current_user: s
             """, (val_json,))
             conn.commit()
             return {"success": True, "settings": payload.dict()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- Dynamic Coupons Engine Endpoints ---
+
+@app.post("/api/promotions/validate")
+def validate_coupon_endpoint(req: ValidateCouponRequest):
+    code = (req.code or "").strip().upper()
+    if not code:
+        return {"valid": False, "message": "Por favor ingresa un código de cupón."}
+    
+    clean_email = (req.email or "").strip().lower()
+    subtotal = req.subtotal or 0
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # 1. Comprobar si coincide con el cupón de 1ra Compra (BIENVENIDO10 o configurado)
+        cursor.execute("SELECT value FROM system_settings WHERE key = 'first_order_promo'")
+        row = cursor.fetchone()
+        first_promo = {**DEFAULT_PROMO_SETTINGS, **(json.loads(row['value']) if row and row.get('value') else {})}
+        target_welcome = (first_promo.get('code') or 'BIENVENIDO10').strip().upper()
+        
+        if first_promo.get('enabled') and code == target_welcome:
+            if clean_email:
+                cursor.execute("""
+                    SELECT COUNT(*) as cnt FROM orders 
+                    WHERE LOWER(customer_email) = %s AND payment_status != 'Cancelado'
+                """, (clean_email,))
+                cnt_row = cursor.fetchone()
+                order_cnt = cnt_row['cnt'] if cnt_row else 0
+                if order_cnt > 0:
+                    return {
+                        "valid": False,
+                        "code": code,
+                        "message": "Este cupón es exclusivo para la primera compra y tu correo ya registra pedidos anteriores."
+                    }
+            
+            percent = float(first_promo.get('percent', 10))
+            discount = int(round(subtotal * (percent / 100)))
+            return {
+                "valid": True,
+                "code": code,
+                "discount_type": "percentage",
+                "discount_value": percent,
+                "discount_amount": discount,
+                "description": first_promo.get('description') or "Descuento de primera compra",
+                "message": f"¡Cupón {code} aplicado! -${discount:,} CLP ({int(percent)}% OFF)".replace(",", ".")
+            }
+
+        # 2. Comprobar en la tabla de cupones dinámicos
+        cursor.execute("SELECT * FROM coupons WHERE UPPER(code) = %s", (code,))
+        c_row = cursor.fetchone()
+        if not c_row:
+            return {"valid": False, "code": code, "message": f"El cupón '{code}' no existe o no es válido."}
+        
+        coupon = dict(c_row)
+        if not coupon.get("is_active"):
+            return {"valid": False, "code": code, "message": "Este cupón se encuentra inactivo actualmente."}
+
+        # Validar fechas de vigencia
+        now = datetime.now(timezone.utc)
+        if coupon.get("start_date"):
+            s_date = coupon["start_date"]
+            if hasattr(s_date, "tzinfo") and s_date.tzinfo is None:
+                s_date = s_date.replace(tzinfo=timezone.utc)
+            if now < s_date:
+                return {"valid": False, "code": code, "message": "Esta promoción aún no ha comenzado."}
+                
+        if coupon.get("end_date"):
+            e_date = coupon["end_date"]
+            if hasattr(e_date, "tzinfo") and e_date.tzinfo is None:
+                e_date = e_date.replace(tzinfo=timezone.utc)
+            if now > e_date:
+                return {"valid": False, "code": code, "message": "Este cupón ha expirado."}
+
+        # Validar compra mínima
+        min_order = coupon.get("min_order_amount") or 0
+        if subtotal < min_order:
+            return {
+                "valid": False,
+                "code": code,
+                "message": f"Este cupón requiere una compra mínima de ${min_order:,} CLP.".replace(",", ".")
+            }
+
+        # Validar límite de usos totales en la tienda
+        usage_limit = coupon.get("usage_limit")
+        times_used = coupon.get("times_used") or 0
+        if usage_limit is not None and times_used >= usage_limit:
+            return {"valid": False, "code": code, "message": "Este cupón ha alcanzado el límite máximo de usos disponibles."}
+
+        # Validar límite de usos por cliente
+        usage_per_cust = coupon.get("usage_per_customer") or 1
+        if clean_email:
+            cursor.execute("""
+                SELECT COUNT(*) as cnt FROM coupon_usages 
+                WHERE coupon_id = %s AND LOWER(customer_email) = %s
+            """, (coupon["id"], clean_email))
+            u_row = cursor.fetchone()
+            user_used = u_row['cnt'] if u_row else 0
+            if user_used >= usage_per_cust:
+                return {
+                    "valid": False,
+                    "code": code,
+                    "message": f"Ya has utilizado este cupón el máximo de veces permitido ({usage_per_cust})."
+                }
+
+        # Calcular descuento
+        disc_type = coupon.get("discount_type") or "percentage"
+        disc_val = float(coupon.get("discount_value") or 0)
+
+        if disc_type == "percentage":
+            calculated = int(round(subtotal * (disc_val / 100)))
+            max_disc = coupon.get("max_discount_amount")
+            if max_disc and calculated > max_disc:
+                calculated = max_disc
+        else: # "fixed"
+            calculated = min(int(disc_val), subtotal)
+
+        return {
+            "valid": True,
+            "code": code,
+            "coupon_id": coupon["id"],
+            "discount_type": disc_type,
+            "discount_value": disc_val,
+            "discount_amount": calculated,
+            "description": coupon.get("description") or "",
+            "message": f"¡Cupón {code} aplicado! -${calculated:,} CLP".replace(",", ".")
+        }
+
+@app.get("/api/admin/promotions")
+def get_admin_promotions(current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM coupons ORDER BY created_at DESC")
+            rows = cursor.fetchall()
+            
+            coupons_list = []
+            for r in rows:
+                c = dict(r)
+                if "discount_value" in c and c["discount_value"] is not None:
+                    c["discount_value"] = float(c["discount_value"])
+                if isinstance(c.get("start_date"), datetime):
+                    c["start_date"] = c["start_date"].isoformat()
+                if isinstance(c.get("end_date"), datetime):
+                    c["end_date"] = c["end_date"].isoformat()
+                if isinstance(c.get("created_at"), datetime):
+                    c["created_at"] = c["created_at"].isoformat()
+                if isinstance(c.get("updated_at"), datetime):
+                    c["updated_at"] = c["updated_at"].isoformat()
+                coupons_list.append(c)
+            return {"success": True, "coupons": coupons_list}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/admin/promotions")
+def create_admin_promotion(payload: CouponCreate, current_user: str = Depends(get_current_admin)):
+    code = payload.code.strip().upper()
+    if not code:
+        raise HTTPException(status_code=400, detail="El código de cupón es obligatorio.")
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM coupons WHERE UPPER(code) = %s", (code,))
+            if cursor.fetchone():
+                raise HTTPException(status_code=400, detail=f"Ya existe un cupón con el código '{code}'.")
+
+            cursor.execute("""
+                INSERT INTO coupons (
+                    code, description, discount_type, discount_value, 
+                    min_order_amount, max_discount_amount, usage_limit, 
+                    usage_per_customer, start_date, end_date, is_active
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                ) RETURNING *
+            """, (
+                code, (payload.description or "").strip(), payload.discount_type, payload.discount_value,
+                payload.min_order_amount or 0, payload.max_discount_amount, payload.usage_limit,
+                payload.usage_per_customer or 1, payload.start_date, payload.end_date, payload.is_active
+            ))
+            new_row = cursor.fetchone()
+            conn.commit()
+            new_c = dict(new_row)
+            if "discount_value" in new_c and new_c["discount_value"] is not None:
+                new_c["discount_value"] = float(new_c["discount_value"])
+            return {"success": True, "coupon": new_c}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/admin/promotions/{coupon_id}")
+def update_admin_promotion(coupon_id: int, payload: CouponUpdate, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM coupons WHERE id = %s", (coupon_id,))
+            existing = cursor.fetchone()
+            if not existing:
+                raise HTTPException(status_code=404, detail="Cupón no encontrado.")
+
+            fields_dict = payload.dict(exclude_unset=True)
+            if not fields_dict:
+                return {"success": True, "coupon": dict(existing)}
+
+            updates = []
+            params = []
+            for k, v in fields_dict.items():
+                updates.append(f"{k} = %s")
+                params.append(v)
+
+            updates.append("updated_at = CURRENT_TIMESTAMP")
+            params.append(coupon_id)
+
+            sql = f"UPDATE coupons SET {', '.join(updates)} WHERE id = %s RETURNING *"
+            cursor.execute(sql, tuple(params))
+            updated_row = cursor.fetchone()
+            conn.commit()
+
+            c = dict(updated_row)
+            if "discount_value" in c and c["discount_value"] is not None:
+                c["discount_value"] = float(c["discount_value"])
+            return {"success": True, "coupon": c}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/admin/promotions/{coupon_id}")
+def delete_admin_promotion(coupon_id: int, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM coupons WHERE id = %s RETURNING id", (coupon_id,))
+            deleted = cursor.fetchone()
+            if not deleted:
+                raise HTTPException(status_code=404, detail="Cupón no encontrado.")
+            conn.commit()
+            return {"success": True, "message": "Cupón eliminado correctamente."}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

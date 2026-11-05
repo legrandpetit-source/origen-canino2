@@ -69,6 +69,8 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
   const [copiedBankInfo, setCopiedBankInfo] = useState(false);
   const [couponInput, setCouponInput] = useState(() => localStorage.getItem('origencanino_coupon_code') || '');
   const [appliedCoupon, setAppliedCoupon] = useState(() => localStorage.getItem('origencanino_coupon_code') || '');
+  const [appliedCouponData, setAppliedCouponData] = useState(null);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [couponError, setCouponError] = useState('');
   const [couponSuccess, setCouponSuccess] = useState('');
 
@@ -146,31 +148,89 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
     }
   }, [formData.customer_email]);
 
-  // Descuentos: Suscripción (10%), Comunidad NFC o Primera Compra (vía cupón o detección de 1ra compra)
+  // Descuentos: Suscripción (10%), Comunidad NFC o Promoción / Cupón
   const subscriptionDiscount = isSubscription ? Math.round(total * 0.1) : 0;
   const appliedNfcDiscount = (!isSubscription && nfcDiscount > 0) ? nfcDiscount : 0;
   
   const isEligibleForFirstOrder = emailCheckEligible !== null ? emailCheckEligible : isFirstPurchaseEligible;
 
-  // Cupón válido si coincide con el código de bienvenida configurado (por defecto BIENVENIDO10)
-  const targetCoupon = (firstOrderPromo?.code || 'BIENVENIDO10').trim().toUpperCase();
-  const isCouponApplied = appliedCoupon.trim().toUpperCase() === targetCoupon;
+  // Cálculo del descuento promocional (cupón dinámico O bienvenida automática)
+  let appliedPromoDiscount = 0;
+  let promoDiscountLabel = 'Descuento Promocional';
 
-  // Se aplica si el usuario ingresó el cupón válido O si es detectado automáticamente como cliente nuevo
-  const canApplyWelcomeDiscount = !isSubscription && appliedNfcDiscount === 0 && (
-    (isCouponApplied && isEligibleForFirstOrder) ||
-    (isEligibleForFirstOrder && firstOrderPromo?.enabled && !appliedCoupon)
-  );
+  if (!isSubscription && appliedNfcDiscount === 0) {
+    if (appliedCoupon && appliedCouponData && appliedCouponData.valid) {
+      appliedPromoDiscount = appliedCouponData.discount_amount || 0;
+      promoDiscountLabel = appliedCouponData.discount_type === 'percentage'
+        ? `Cupón ${appliedCoupon} (${appliedCouponData.discount_value}% OFF)`
+        : `Cupón ${appliedCoupon} (-$${appliedCouponData.discount_amount.toLocaleString('es-CL')})`;
+    } else if (isEligibleForFirstOrder && firstOrderPromo?.enabled && !appliedCoupon) {
+      appliedPromoDiscount = Math.round(total * (Number(firstOrderPromo.percent || 10) / 100));
+      promoDiscountLabel = `Descuento 1ra Compra (${firstOrderPromo.percent}% OFF)`;
+    }
+  }
 
-  const appliedFirstOrderDiscount = canApplyWelcomeDiscount && firstOrderPromo?.enabled
-    ? Math.round(total * (Number(firstOrderPromo.percent || 10) / 100))
-    : 0;
-
-  const totalDiscount = subscriptionDiscount + appliedNfcDiscount + appliedFirstOrderDiscount;
+  const totalDiscount = subscriptionDiscount + appliedNfcDiscount + appliedPromoDiscount;
 
   const subtotalAfterDiscount = Math.max(0, total - totalDiscount);
   const shippingCost = isSubscription ? 0 : (subtotalAfterDiscount < 100000 ? 5000 : 0);
   const finalTotal = subtotalAfterDiscount + shippingCost;
+
+  // Validación de cupón contra el endpoint /api/promotions/validate
+  const validateAndApplyCoupon = async (codeToTest) => {
+    const clean = (codeToTest || couponInput).trim().toUpperCase();
+    if (!clean) {
+      setCouponError('Por favor ingresa un código.');
+      return;
+    }
+    setValidatingCoupon(true);
+    setCouponError('');
+    setCouponSuccess('');
+    try {
+      const res = await fetch('/api/promotions/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: clean,
+          email: formData.customer_email.trim(),
+          subtotal: total
+        })
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setAppliedCoupon(clean);
+        setAppliedCouponData(data);
+        localStorage.setItem('origencanino_coupon_code', clean);
+        setCouponSuccess(data.message || `¡Cupón ${clean} aplicado con éxito!`);
+        setCouponError('');
+      } else {
+        setAppliedCoupon('');
+        setAppliedCouponData(null);
+        localStorage.removeItem('origencanino_coupon_code');
+        setCouponError(data.message || 'Código de cupón inválido o expirado.');
+      }
+    } catch (err) {
+      setCouponError('Error al contactar el servidor para validar el cupón.');
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon('');
+    setAppliedCouponData(null);
+    setCouponInput('');
+    localStorage.removeItem('origencanino_coupon_code');
+    setCouponSuccess('');
+    setCouponError('');
+  };
+
+  // Re-validar cupón automáticamente si cambia el subtotal
+  useEffect(() => {
+    if (isOpen && appliedCoupon && total > 0) {
+      validateAndApplyCoupon(appliedCoupon);
+    }
+  }, [total, isOpen]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -372,6 +432,7 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
         transfer_receipt_number: paymentMethod === 'transferencia' ? formData.transfer_receipt_number : null,
         nfc_building_code: nfcCommunity ? nfcCommunity.slug : null,
         discount_amount: totalDiscount,
+        coupon_code: appliedCoupon || null,
         items: items.map(item => ({
           id: item.id,
           name: item.name,
@@ -1162,24 +1223,20 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                           <Tag size={13} className="text-[#db994b]" /> ¿Tienes un código de descuento?
                         </label>
                         
-                        {appliedCoupon && isCouponApplied ? (
-                          <div className="flex items-center justify-between bg-[#db994b]/10 border border-[#db994b]/30 rounded-xl px-3 py-2">
+                        {appliedCoupon && appliedPromoDiscount > 0 ? (
+                          <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
                             <div className="flex items-center gap-2">
                               <Check size={16} className="text-emerald-600 shrink-0" />
                               <div>
-                                <span className="font-mono font-bold text-xs text-[#b87528]">{appliedCoupon.toUpperCase()}</span>
-                                <span className="text-[11px] text-stone-600 block">¡{firstOrderPromo?.percent || 10}% de descuento aplicado a tu pedido!</span>
+                                <span className="font-mono font-bold text-xs text-emerald-800">{appliedCoupon.toUpperCase()}</span>
+                                <span className="text-[11px] text-emerald-700 block">
+                                  {appliedCouponData?.description || '¡Descuento aplicado a tu pedido!'} (-${appliedPromoDiscount.toLocaleString('es-CL')})
+                                </span>
                               </div>
                             </div>
                             <button
                               type="button"
-                              onClick={() => {
-                                setAppliedCoupon('');
-                                setCouponInput('');
-                                localStorage.removeItem('origencanino_coupon_code');
-                                setCouponSuccess('');
-                                setCouponError('');
-                              }}
+                              onClick={handleRemoveCoupon}
                               className="text-xs text-red-500 hover:text-red-700 font-bold underline p-1 cursor-pointer"
                             >
                               Quitar
@@ -1195,33 +1252,22 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                                   setCouponInput(e.target.value.toUpperCase());
                                   setCouponError('');
                                 }}
-                                placeholder="Ej: BIENVENIDO10"
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    validateAndApplyCoupon();
+                                  }
+                                }}
+                                placeholder="Ej: BIENVENIDO10, CANELO15"
                                 className="flex-1 border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono font-bold tracking-wider focus:ring-2 focus:ring-[#db994b] outline-none bg-white uppercase"
                               />
                               <button
                                 type="button"
-                                onClick={() => {
-                                  const clean = couponInput.trim().toUpperCase();
-                                  if (!clean) {
-                                    setCouponError('Ingresa un código');
-                                    return;
-                                  }
-                                  if (clean === targetCoupon) {
-                                    if (emailCheckEligible === false) {
-                                      setCouponError('Este correo ya registra compras previas.');
-                                      return;
-                                    }
-                                    setAppliedCoupon(clean);
-                                    localStorage.setItem('origencanino_coupon_code', clean);
-                                    setCouponSuccess('¡Cupón aplicado con éxito!');
-                                    setCouponError('');
-                                  } else {
-                                    setCouponError('Código de cupón inválido o expirado.');
-                                  }
-                                }}
-                                className="bg-[#db994b] hover:bg-[#c58235] text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+                                disabled={validatingCoupon}
+                                onClick={() => validateAndApplyCoupon()}
+                                className="bg-[#db994b] hover:bg-[#c58235] text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50"
                               >
-                                Aplicar
+                                {validatingCoupon ? '...' : 'Aplicar'}
                               </button>
                             </div>
                             {couponError && <p className="text-[11px] text-red-500 font-bold mt-1.5">{couponError}</p>}
@@ -1252,12 +1298,12 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                       </div>
                     )}
 
-                    {appliedFirstOrderDiscount > 0 && (
+                    {appliedPromoDiscount > 0 && (
                       <div className="flex justify-between text-sm text-[#677333] font-bold bg-[#677333]/10 p-2 rounded-xl">
                         <span className="flex items-center gap-1.5">
-                          <Gift size={16} /> Descuento 1ra Compra ({firstOrderPromo?.percent}% OFF)
+                          <Gift size={16} /> {promoDiscountLabel}
                         </span>
-                        <span>-${appliedFirstOrderDiscount.toLocaleString('es-CL')}</span>
+                        <span>-${appliedPromoDiscount.toLocaleString('es-CL')}</span>
                       </div>
                     )}
 

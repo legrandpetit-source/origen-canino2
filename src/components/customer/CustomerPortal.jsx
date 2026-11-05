@@ -22,14 +22,15 @@ import {
   Mail,
   Building2,
   ShoppingCart,
-  Heart
+  Heart,
+  Camera
 } from 'lucide-react';
 import { useCustomer } from '../../context/CustomerContext';
 import { useCart } from '../../context/CartContext';
 import { useNavigate } from 'react-router-dom';
 
 const CustomerPortal = () => {
-  const { customer, dogs, logout, updateProfile, addDog, updateDog, deleteDog, fetchOrders } = useCustomer();
+  const { customer, dogs, logout, updateProfile, addDog, updateDog, deleteDog, uploadDogPhoto, fetchOrders } = useCustomer();
   const { addItem, setIsCartOpen, setDogData } = useCart();
   const navigate = useNavigate();
 
@@ -50,11 +51,13 @@ const CustomerPortal = () => {
   // Dog modal
   const [isDogModalOpen, setIsDogModalOpen] = useState(false);
   const [editingDog, setEditingDog] = useState(null);
+  const [uploadingPhotoForDogId, setUploadingPhotoForDogId] = useState(null);
   const [dogForm, setDogForm] = useState({
     name: '',
     weight: '',
     age_stage: 'adulto',
-    notes: ''
+    notes: '',
+    photo_url: ''
   });
   const [savingDog, setSavingDog] = useState(false);
 
@@ -64,6 +67,29 @@ const CustomerPortal = () => {
   const notify = (type, text) => {
     setFeedback({ type, text });
     setTimeout(() => setFeedback(null), 4000);
+  };
+
+  // Direct photo upload with WebP conversion in backend
+  const handleDirectPhotoUpload = async (dogId, file) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      notify('error', 'Por favor selecciona un archivo de imagen válido.');
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      notify('error', 'La foto no debe superar los 8 MB.');
+      return;
+    }
+
+    setUploadingPhotoForDogId(dogId);
+    try {
+      await uploadDogPhoto(dogId, file);
+      notify('success', '¡Foto guardada y optimizada en WebP!');
+    } catch (err) {
+      notify('error', err.message || 'Error al subir foto de la mascota');
+    } finally {
+      setUploadingPhotoForDogId(null);
+    }
   };
 
   useEffect(() => {
@@ -163,7 +189,8 @@ const CustomerPortal = () => {
         name: dog.name,
         weight: dog.weight,
         age_stage: dog.age_stage || 'adulto',
-        notes: dog.notes || ''
+        notes: dog.notes || '',
+        photo_url: dog.photo_url || ''
       });
     } else {
       setEditingDog(null);
@@ -171,7 +198,8 @@ const CustomerPortal = () => {
         name: '',
         weight: '',
         age_stage: 'adulto',
-        notes: ''
+        notes: '',
+        photo_url: ''
       });
     }
     setIsDogModalOpen(true);
@@ -433,9 +461,49 @@ const CustomerPortal = () => {
                         {/* Cabecera de la Mascota */}
                         <div className="flex justify-between items-start mb-4">
                           <div className="flex items-center gap-3.5">
-                            <div className="w-13 h-13 rounded-2xl bg-[#faf7f2] border border-[#EBE4DA] text-primary-green flex items-center justify-center p-2.5 shadow-2xs">
-                              <PawPrint size={26} />
+                            {/* Avatar con foto o ícono + upload directo WebP */}
+                            <div className="relative group/avatar w-14 h-14 rounded-2xl overflow-hidden bg-[#faf7f2] border-2 border-primary-green/25 shadow-2xs shrink-0 flex items-center justify-center">
+                              {dog.photo_url ? (
+                                <img 
+                                  src={dog.photo_url} 
+                                  alt={dog.name} 
+                                  className="w-full h-full object-cover" 
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-primary-green p-2.5">
+                                  <PawPrint size={26} />
+                                </div>
+                              )}
+
+                              {/* Botón flotante para subir/cambiar foto */}
+                              <label 
+                                className={`absolute inset-0 bg-black/55 text-white flex flex-col items-center justify-center gap-0.5 cursor-pointer transition ${
+                                  uploadingPhotoForDogId === dog.id ? 'opacity-100' : 'opacity-0 group-hover/avatar:opacity-100'
+                                }`}
+                                title="Subir o cambiar foto de tu perrito (se optimiza a WebP)"
+                              >
+                                {uploadingPhotoForDogId === dog.id ? (
+                                  <RefreshCw size={16} className="animate-spin text-white" />
+                                ) : (
+                                  <>
+                                    <Camera size={16} />
+                                    <span className="text-[9px] font-bold">Foto</span>
+                                  </>
+                                )}
+                                <input 
+                                  type="file" 
+                                  accept="image/*" 
+                                  disabled={uploadingPhotoForDogId === dog.id}
+                                  className="hidden" 
+                                  onChange={(e) => {
+                                    if (e.target.files && e.target.files[0]) {
+                                      handleDirectPhotoUpload(dog.id, e.target.files[0]);
+                                    }
+                                  }} 
+                                />
+                              </label>
                             </div>
+
                             <div>
                               <h3 className="font-header text-2xl text-secondary-brown font-bold tracking-tight">
                                 {dog.name}
@@ -482,6 +550,13 @@ const CustomerPortal = () => {
                           <ShieldCheck size={14} className="text-primary-green" />
                           <span>Formato recomendado: paquetes de 1 Kg al vacío</span>
                         </div>
+
+                        {dog.notes && (
+                          <div className="mt-2 px-3 py-1.5 bg-amber-50/80 border border-amber-200/70 rounded-xl text-[11px] text-amber-900 flex items-center gap-1.5">
+                            <AlertCircle size={13} className="text-amber-700 shrink-0" />
+                            <span className="truncate"><strong>Salud / Alergias:</strong> {dog.notes}</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Botón de Compra Personalizada */}
@@ -760,6 +835,17 @@ const CustomerPortal = () => {
                       <option value="adult_low">Adulto / Senior</option>
                     </select>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 mb-1">Notas de Salud / Alergias (Opcional)</label>
+                  <input
+                    type="text"
+                    value={dogForm.notes}
+                    onChange={(e) => setDogForm({ ...dogForm, notes: e.target.value })}
+                    placeholder="Ej. Sensible al pollo, alérgico a granos"
+                    className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white"
+                  />
                 </div>
 
                 <div className="flex justify-end gap-3 pt-3 border-t border-[#EBE4DA]">

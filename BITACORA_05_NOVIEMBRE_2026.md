@@ -61,3 +61,4 @@
 - **Build de Producción:** Vite 5.4.14 compilado exitosamente. Bundle activo: `assets/index-CpFJFUdI.js` y `assets/index-AtLl18V_.css`.
 - **Servidor:** Hetzner VPS `167.233.122.18` operando con Nginx SSL y Docker containers saludables.
 - **Base de Datos:** PostgreSQL 17 Alpine en container `origen-canino-db`.
+

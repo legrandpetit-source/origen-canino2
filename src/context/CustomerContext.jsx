@@ -164,6 +164,23 @@ export const CustomerProvider = ({ children }) => {
     return true;
   };
 
+  const uploadDogPhoto = async (dogId, file) => {
+    const currentToken = token || localStorage.getItem('customer_token');
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`/api/customer/dogs/${dogId}/upload-photo`, {
+      method: 'POST',
+      headers: {
+        ...(currentToken ? { 'Authorization': `Bearer ${currentToken}` } : {})
+      },
+      body: formData
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Error al subir foto');
+    setDogs(prev => prev.map(d => d.id === dogId ? { ...d, photo_url: data.photo_url } : d));
+    return data.photo_url;
+  };
+
   const fetchOrders = async () => {
     const res = await fetchWithCustomerAuth('/api/customer/orders');
     if (!res.ok) throw new Error('Error al cargar pedidos');
@@ -194,6 +211,7 @@ export const CustomerProvider = ({ children }) => {
       addDog,
       updateDog,
       deleteDog,
+      uploadDogPhoto,
       fetchOrders,
       fetchWithCustomerAuth
     }}>
