@@ -183,9 +183,29 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
     setTimeout(() => setCopiedBankInfo(false), 2500);
   };
 
+  const handleEmailChange = (val) => {
+    setFormData(prev => ({ ...prev, customer_email: val }));
+    
+    // Al escribir, editar o borrar, reseteamos de inmediato la validación previa
+    setEmailChecked(false);
+    setIsExistingCustomer(false);
+    setExistingCustomerName('');
+    setLoginError('');
+
+    const clean = val.trim().toLowerCase();
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (emailRegex.test(clean)) {
+      checkEmail(clean);
+    }
+  };
+
   const checkEmail = async (emailToTest) => {
     const clean = (emailToTest || '').trim().toLowerCase();
-    if (!clean || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(clean)) {
+      setEmailChecked(false);
+      setIsExistingCustomer(false);
+      setExistingCustomerName('');
       return;
     }
     
@@ -204,25 +224,32 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
         body: JSON.stringify({ email: clean })
       });
       const data = await res.json();
-      setEmailChecked(true);
-      if (data && data.exists) {
-        setIsExistingCustomer(true);
-        setExistingCustomerName(data.customer_name);
-        setFormData(prev => ({
-          ...prev,
-          customer_name: prev.customer_name || data.customer_name || '',
-          customer_phone: prev.customer_phone || data.phone || '',
-          customer_address: prev.customer_address || data.address || '',
-          customer_city: prev.customer_city || data.city || '',
-          customer_region: data.region || prev.customer_region || 'Región Metropolitana',
-          dog_name: prev.dog_name || data.dog_name || '',
-          dog_weight: prev.dog_weight || data.dog_weight || '',
-          dog_age: prev.dog_age || data.dog_age || 'adult_normal',
-        }));
-      } else {
-        setIsExistingCustomer(false);
-        setExistingCustomerName('');
-      }
+      
+      setFormData(current => {
+        // Verificar que el input no haya cambiado mientras se esperaba la respuesta
+        if (current.customer_email.trim().toLowerCase() === clean) {
+          setEmailChecked(true);
+          if (data && data.exists) {
+            setIsExistingCustomer(true);
+            setExistingCustomerName(data.customer_name);
+            return {
+              ...current,
+              customer_name: current.customer_name || data.customer_name || '',
+              customer_phone: current.customer_phone || data.phone || '',
+              customer_address: current.customer_address || data.address || '',
+              customer_city: current.customer_city || data.city || '',
+              customer_region: data.region || current.customer_region || 'Región Metropolitana',
+              dog_name: current.dog_name || data.dog_name || '',
+              dog_weight: current.dog_weight || data.dog_weight || '',
+              dog_age: current.dog_age || data.dog_age || 'adult_normal',
+            };
+          } else {
+            setIsExistingCustomer(false);
+            setExistingCustomerName('');
+          }
+        }
+        return current;
+      });
     } catch (e) {
       console.error("Error consultando correo de cliente:", e);
     } finally {
@@ -814,20 +841,24 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                           type="email" 
                           name="customer_email" 
                           value={formData.customer_email} 
-                          onChange={(e) => {
-                            handleChange(e);
-                            if (e.target.value.includes('@') && e.target.value.includes('.')) {
-                              checkEmail(e.target.value);
+                          onChange={(e) => handleEmailChange(e.target.value)}
+                          onBlur={(e) => {
+                            const clean = e.target.value.trim().toLowerCase();
+                            const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+                            if (emailRegex.test(clean)) {
+                              checkEmail(clean);
+                            } else {
+                              setEmailChecked(false);
+                              setIsExistingCustomer(false);
                             }
                           }}
-                          onBlur={(e) => checkEmail(e.target.value)}
                           className="w-full border p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-primary-green outline-none bg-white" 
                           placeholder="tu@email.com" 
                         />
                       </div>
 
                       {/* CASO A: Reconocido como cliente existente (sin sesión activa) */}
-                      {emailChecked && isExistingCustomer && !customer && (
+                      {emailChecked && isExistingCustomer && !customer && /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(formData.customer_email?.trim() || '') && (
                         <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-4 shadow-2xs">
                           <p className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
                             <UserCheck size={16} className="text-emerald-700" />
@@ -858,7 +889,7 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                       )}
 
                       {/* CASO B: Cliente NUEVO detectado (correo no existe en la base de datos) */}
-                      {emailChecked && !isExistingCustomer && !customer && formData.customer_email && (
+                      {emailChecked && !isExistingCustomer && !customer && /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(formData.customer_email?.trim() || '') && (
                         <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-2xl p-4 shadow-2xs">
                           <div className="flex items-start gap-3">
                             <div className="p-2 bg-amber-100 text-amber-800 rounded-xl shrink-0 mt-0.5">
