@@ -19,7 +19,7 @@ from PIL import Image, UnidentifiedImageError, ImageOps
 import io
 import uuid
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import bcrypt
 import jwt
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
