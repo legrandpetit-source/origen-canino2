@@ -14,6 +14,9 @@ const ProductCard = ({ product, addItem }) => {
     if (nameLower.includes('salmón') || nameLower.includes('hipoaler')) {
       return { text: 'HIPOALERGÉNICO', bg: 'bg-accent-red text-white' };
     }
+    if (nameLower.includes('caluga') || nameLower.includes('colágeno') || nameLower.includes('colageno')) {
+      return { text: 'COLÁGENO ARTICULAR', bg: 'bg-[#677333] text-white' };
+    }
     if (typeLower === 'snack') {
       return { text: 'SNACK 100% NATURAL', bg: 'bg-[#855026] text-white' };
     }
