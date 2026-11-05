@@ -234,6 +234,7 @@ class OrderCreate(BaseModel):
     customer_address: str
     customer_city: str
     customer_region: str
+    customer_password: Optional[str] = None
     items: List[OrderItem]
     is_subscription: bool = False
     dog_name: Optional[str] = None
@@ -322,6 +323,9 @@ class CustomerRegisterRequest(BaseModel):
 class CustomerLoginRequest(BaseModel):
     email: str
     password: str
+
+class CheckEmailRequest(BaseModel):
+    email: str
 
 class CustomerProfileUpdate(BaseModel):
     name: str
@@ -881,6 +885,31 @@ def test_admin_telegram_settings(payload: dict = None, current_user: str = Depen
 # ==========================================
 # --- PORTAL DE CLIENTES & MASCOTAS ---
 # ==========================================
+
+@app.post("/api/customer/check-email")
+def check_customer_email(req: CheckEmailRequest):
+    clean_email = req.email.strip().lower()
+    if not clean_email or "@" not in clean_email:
+        return {"exists": False}
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, phone, address, city, region FROM customers WHERE LOWER(email) = %s", (clean_email,))
+        c = cursor.fetchone()
+        if c:
+            cursor.execute("SELECT name, weight, age_stage FROM customer_dogs WHERE customer_id = %s ORDER BY id ASC LIMIT 1", (c["id"],))
+            dog = cursor.fetchone()
+            return {
+                "exists": True,
+                "customer_name": c["name"],
+                "phone": c["phone"] or "",
+                "address": c["address"] or "",
+                "city": c["city"] or "",
+                "region": c["region"] or "Región Metropolitana",
+                "dog_name": dog["name"] if dog else "",
+                "dog_weight": float(dog["weight"]) if dog and dog["weight"] else "",
+                "dog_age": dog["age_stage"] if dog else "adult_normal"
+            }
+        return {"exists": False}
 
 @app.post("/api/customer/register")
 def customer_register(req: CustomerRegisterRequest):
@@ -1601,7 +1630,8 @@ def create_order(order: OrderCreate, req: Request):
             else:
                 # Garantizar que NINGÚN cliente se salte la base de datos customers
                 import secrets
-                temp_hash = get_password_hash(secrets.token_hex(8))
+                raw_pwd = order.customer_password if (order.customer_password and len(order.customer_password) >= 6) else secrets.token_hex(8)
+                temp_hash = get_password_hash(raw_pwd)
                 cursor.execute("""
                     INSERT INTO customers (name, email, password_hash, phone, address, city, region)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)

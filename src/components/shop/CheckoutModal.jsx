@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, ArrowLeft, CreditCard, Landmark, Sparkles, Building2, ShieldCheck, Copy, Check, UserCheck, Dog, RefreshCw, Info, Gift, Tag } from 'lucide-react';
+import { X, CheckCircle, ArrowLeft, CreditCard, Landmark, Sparkles, Building2, ShieldCheck, Copy, Check, UserCheck, Dog, RefreshCw, Info, Gift, Tag, Mail, Lock } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useCustomer } from '../../context/CustomerContext';
 
@@ -9,11 +9,12 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
     items, total, clearCart, dogData, nfcCommunity, nfcDiscount, 
     firstOrderPromo, isFirstPurchaseEligible, markAsPurchased 
   } = useCart();
-  const { customer, dogs, openAuthModal } = useCustomer();
+  const { customer, dogs, openAuthModal, login } = useCustomer();
   
   const [formData, setFormData] = useState({
     customer_name: '',
     customer_email: '',
+    customer_password: '',
     customer_phone: '',
     customer_address: '',
     customer_city: '',
@@ -24,6 +25,14 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
     transfer_bank: '',
     transfer_receipt_number: '',
   });
+
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+  const [emailChecked, setEmailChecked] = useState(false);
+  const [isExistingCustomer, setIsExistingCustomer] = useState(false);
+  const [existingCustomerName, setExistingCustomerName] = useState('');
+  const [loginPasswordInput, setLoginPasswordInput] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   
   const [paymentMethod, setPaymentMethod] = useState('mercadopago'); // 'mercadopago' | 'transferencia'
   const [bankSettings, setBankSettings] = useState({
@@ -155,6 +164,68 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
     setTimeout(() => setCopiedBankInfo(false), 2500);
   };
 
+  const checkEmail = async (emailToTest) => {
+    const clean = (emailToTest || '').trim().toLowerCase();
+    if (!clean || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
+      return;
+    }
+    
+    // Si ya está logueado como cliente con ese mismo correo
+    if (customer && customer.email?.toLowerCase() === clean) {
+      setIsExistingCustomer(true);
+      setEmailChecked(true);
+      return;
+    }
+
+    setIsCheckingEmail(true);
+    try {
+      const res = await fetch('/api/customer/check-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: clean })
+      });
+      const data = await res.json();
+      setEmailChecked(true);
+      if (data && data.exists) {
+        setIsExistingCustomer(true);
+        setExistingCustomerName(data.customer_name);
+        setFormData(prev => ({
+          ...prev,
+          customer_name: prev.customer_name || data.customer_name || '',
+          customer_phone: prev.customer_phone || data.phone || '',
+          customer_address: prev.customer_address || data.address || '',
+          customer_city: prev.customer_city || data.city || '',
+          customer_region: data.region || prev.customer_region || 'Región Metropolitana',
+          dog_name: prev.dog_name || data.dog_name || '',
+          dog_weight: prev.dog_weight || data.dog_weight || '',
+          dog_age: prev.dog_age || data.dog_age || 'adult_normal',
+        }));
+      } else {
+        setIsExistingCustomer(false);
+        setExistingCustomerName('');
+      }
+    } catch (e) {
+      console.error("Error consultando correo de cliente:", e);
+    } finally {
+      setIsCheckingEmail(false);
+    }
+  };
+
+  const handleQuickLogin = async () => {
+    if (!loginPasswordInput) return;
+    setIsLoggingIn(true);
+    setLoginError('');
+    try {
+      await login(formData.customer_email, loginPasswordInput);
+      setLoginPasswordInput('');
+      setIsExistingCustomer(true);
+    } catch (err) {
+      setLoginError(err.message || 'Contraseña incorrecta');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (items.length === 0) return;
@@ -163,8 +234,9 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
       return;
     }
 
-    if (!customer) {
-      openAuthModal('register');
+    // Si es un cliente nuevo y no ha puesto contraseña
+    if (!customer && !isExistingCustomer && (!formData.customer_password || formData.customer_password.length < 6)) {
+      alert("Como es tu primera compra, por favor crea tu contraseña de cliente (mínimo 6 caracteres) para registrarte.");
       return;
     }
     
@@ -173,6 +245,7 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
       const orderData = {
         customer_name: formData.customer_name,
         customer_email: formData.customer_email,
+        customer_password: formData.customer_password || null,
         customer_phone: formData.customer_phone,
         customer_address: formData.customer_address,
         customer_city: formData.customer_city,
@@ -331,8 +404,8 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                 </div>
                 
                 <form onSubmit={handleSubmit} className="p-6 space-y-6 flex-1">
-                  {/* Banner de Autocompletado / Inicio de Sesión de Clientes */}
-                  {customer ? (
+                  {/* Banner de Bienvenida si ya está logueado */}
+                  {customer && (
                     <div className="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-3.5 flex items-center justify-between shadow-xs">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
@@ -343,41 +416,13 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                             <UserCheck size={14} className="text-emerald-600" /> ¡Hola, {customer.name}!
                           </p>
                           <p className="text-[11px] text-gray-600">
-                            Hemos autocompletado tus datos de contacto y entrega guardados.
+                            Reconocimos tu cuenta. Tus datos de contacto, despacho y mascota están precargados.
                           </p>
                         </div>
                       </div>
-                      <span className="text-[10px] font-bold text-primary-green bg-white px-2 py-0.5 rounded-full border border-emerald-200 shadow-xs hidden sm:inline-block">
+                      <span className="text-[10px] font-bold text-primary-green bg-white px-2.5 py-1 rounded-full border border-emerald-200 shadow-xs hidden sm:inline-block">
                         Cliente Registrado
                       </span>
-                    </div>
-                  ) : (
-                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-secondary-orange/50 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-secondary-orange/20 text-secondary-orange flex items-center justify-center shrink-0">
-                          <UserCheck size={20} />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-secondary-brown">¡Registro obligatorio para despachos!</p>
-                          <p className="text-[11px] text-gray-600">Para coordinar tu despacho congelado a -18°C y registrar a tu peludo, debes ingresar tus datos.</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <button
-                          type="button"
-                          onClick={() => openAuthModal('register')}
-                          className="flex-1 sm:flex-none whitespace-nowrap px-3.5 py-2 bg-secondary-orange hover:bg-[#d65d21] text-white text-xs font-bold rounded-xl transition shadow-xs text-center"
-                        >
-                          Soy Nuevo / Crear Cuenta
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openAuthModal('login')}
-                          className="flex-1 sm:flex-none whitespace-nowrap px-3 py-2 bg-white hover:bg-stone-50 text-secondary-brown border border-stone-300 text-xs font-bold rounded-xl transition shadow-xs text-center"
-                        >
-                          Iniciar Sesión
-                        </button>
-                      </div>
                     </div>
                   )}
 
@@ -403,24 +448,118 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                     </div>
                   )}
 
-                  {/* Datos de Contacto */}
+                  {/* 1. Datos de Contacto y Reconocimiento de Usuario */}
                   <div>
                     <h3 className="font-bold text-lg mb-3 text-secondary-brown flex items-center gap-2">
                       <span className="w-6 h-6 bg-primary-green text-white text-xs rounded-full flex items-center justify-center">1</span>
                       Datos de Contacto
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                    <div className="space-y-4">
+                      {/* Correo Electrónico (Identificador Principal) */}
                       <div>
-                        <label className="block text-sm text-gray-600 mb-1">Nombre Completo *</label>
-                        <input required type="text" name="customer_name" value={formData.customer_name} onChange={handleChange} className="w-full border p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-primary-green outline-none" placeholder="Ej. Juan Pérez" />
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-sm font-bold text-gray-700 flex items-center gap-1.5">
+                            <Mail size={15} className="text-primary-green" /> Correo Electrónico *
+                          </label>
+                          {isCheckingEmail && (
+                            <span className="text-[11px] text-primary-green font-semibold animate-pulse flex items-center gap-1">
+                              <RefreshCw size={11} className="animate-spin" /> Verificando...
+                            </span>
+                          )}
+                        </div>
+                        <input 
+                          required 
+                          type="email" 
+                          name="customer_email" 
+                          value={formData.customer_email} 
+                          onChange={(e) => {
+                            handleChange(e);
+                            if (e.target.value.includes('@') && e.target.value.includes('.')) {
+                              checkEmail(e.target.value);
+                            }
+                          }}
+                          onBlur={(e) => checkEmail(e.target.value)}
+                          className="w-full border p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-primary-green outline-none bg-white" 
+                          placeholder="tu@email.com" 
+                        />
                       </div>
-                      <div>
-                        <label className="block text-sm text-gray-600 mb-1">Teléfono (WhatsApp) *</label>
-                        <input required type="text" name="customer_phone" value={formData.customer_phone} onChange={handleChange} className="w-full border p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-primary-green outline-none" placeholder="+56 9 1234 5678" />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-sm text-gray-600 mb-1">Correo Electrónico *</label>
-                        <input required type="email" name="customer_email" value={formData.customer_email} onChange={handleChange} className="w-full border p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-primary-green outline-none" placeholder="juan@ejemplo.com" />
+
+                      {/* CASO A: Reconocido como cliente existente (sin sesión activa) */}
+                      {emailChecked && isExistingCustomer && !customer && (
+                        <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-4 shadow-2xs">
+                          <p className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                            <UserCheck size={16} className="text-emerald-700" />
+                            ¡Reconocimos tu correo, {existingCustomerName || 'amigo'}! Ya tienes una cuenta registrada.
+                          </p>
+                          <p className="text-[11px] text-emerald-800 mt-1">
+                            Ingresa tu contraseña para autocompletar tus datos de despacho y la ficha de tu perrito:
+                          </p>
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mt-2.5">
+                            <input 
+                              type="password"
+                              placeholder="Tu contraseña"
+                              value={loginPasswordInput}
+                              onChange={(e) => setLoginPasswordInput(e.target.value)}
+                              className="border border-emerald-300 rounded-xl px-3 py-2 text-xs bg-white focus:outline-emerald-600 flex-1"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleQuickLogin}
+                              disabled={isLoggingIn}
+                              className="bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-emerald-700 transition shadow-xs cursor-pointer whitespace-nowrap"
+                            >
+                              {isLoggingIn ? 'Iniciando...' : 'Iniciar Sesión'}
+                            </button>
+                          </div>
+                          {loginError && <p className="text-[11px] text-red-600 mt-1 font-semibold">{loginError}</p>}
+                        </div>
+                      )}
+
+                      {/* CASO B: Cliente NUEVO detectado (correo no existe en la base de datos) */}
+                      {emailChecked && !isExistingCustomer && !customer && formData.customer_email && (
+                        <div className="bg-amber-50/90 border border-amber-300 rounded-2xl p-3.5 shadow-2xs">
+                          <p className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                            <Sparkles size={16} className="text-amber-700" />
+                            ¡Bienvenido a Origen Canino! Este correo no tiene cuenta previa.
+                          </p>
+                          <p className="text-[11px] text-amber-800 mt-1">
+                            Ingresa tus datos a continuación y crea una contraseña para dar de alta tu usuario, coordinar tu despacho congelado y guardar a tu mascota.
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm text-gray-600 mb-1">Nombre Completo *</label>
+                          <input required type="text" name="customer_name" value={formData.customer_name} onChange={handleChange} className="w-full border p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-primary-green outline-none bg-white" placeholder="Ej. Juan Pérez" />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-gray-600 mb-1">Teléfono (WhatsApp) *</label>
+                          <input required type="text" name="customer_phone" value={formData.customer_phone} onChange={handleChange} className="w-full border p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-primary-green outline-none bg-white" placeholder="+56 9 1234 5678" />
+                        </div>
+
+                        {/* Campo Contraseña obligatorio para usuario nuevo */}
+                        {!customer && !isExistingCustomer && (
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-1">
+                              <Lock size={14} className="text-primary-green" /> Crea tu Contraseña de Cliente *
+                            </label>
+                            <input 
+                              required 
+                              type="password" 
+                              minLength={6}
+                              name="customer_password" 
+                              value={formData.customer_password} 
+                              onChange={handleChange} 
+                              className="w-full border p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-primary-green outline-none bg-white" 
+                              placeholder="Mínimo 6 caracteres (para ingresar a Mi Cuenta y repetir pedidos)" 
+                            />
+                            <p className="text-[10px] text-gray-500 mt-1">
+                              Con esta clave podrás acceder a tu portal en <span className="font-semibold text-primary-green">Mi Cuenta</span> para ver el estado de tu despacho congelado y repetir pedidos en 1 clic.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -783,10 +922,6 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                   >
                     {isSubmitting ? (
                       'Procesando pedido...'
-                    ) : !customer ? (
-                      <>
-                        <UserCheck size={20} /> Crear Cuenta o Iniciar Sesión para Pagar
-                      </>
                     ) : paymentMethod === 'mercadopago' ? (
                       <>
                         <CreditCard size={20} /> Pagar con Mercado Pago (${finalTotal.toLocaleString('es-CL')})

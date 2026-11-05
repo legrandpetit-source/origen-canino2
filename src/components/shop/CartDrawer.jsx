@@ -60,17 +60,6 @@ const CartDrawer = () => {
 
   const handleCheckout = () => {
     if (items.length === 0 || !isMinMet) return;
-    
-    if (!customer) {
-      // Si el cliente no ha iniciado sesión ni tiene cuenta, abrir el formulario de registro obligatorio
-      setIsCartOpen(false);
-      openAuthModal('register', () => {
-        // Al registrarse o loguearse con éxito, abrir inmediatamente el Checkout
-        setIsCheckoutOpen(true);
-      });
-      return;
-    }
-
     setIsCheckoutOpen(true);
     setIsCartOpen(false);
   };
