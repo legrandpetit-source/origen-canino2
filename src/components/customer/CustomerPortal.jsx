@@ -15,7 +15,14 @@ import {
   Calendar, 
   ChevronRight,
   ShieldCheck,
-  Scale
+  Scale,
+  Sparkles,
+  Truck,
+  Phone,
+  Mail,
+  Building2,
+  ShoppingCart,
+  Heart
 } from 'lucide-react';
 import { useCustomer } from '../../context/CustomerContext';
 import { useCart } from '../../context/CartContext';
@@ -26,7 +33,7 @@ const CustomerPortal = () => {
   const { addItem, setIsCartOpen, setDogData } = useCart();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders', 'dogs', 'profile'
+  const [activeTab, setActiveTab] = useState('dogs'); // 'orders', 'dogs', 'profile'
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
 
@@ -86,20 +93,22 @@ const CustomerPortal = () => {
 
   if (!customer) {
     return (
-      <div className="container mx-auto px-4 py-16 text-center max-w-md">
-        <div className="p-4 bg-primary-green/10 text-primary-green rounded-3xl w-20 h-20 mx-auto flex items-center justify-center mb-6 shadow-xs">
-          <PawPrint size={40} />
+      <div className="bg-bg-cream min-h-screen py-16 flex items-center justify-center">
+        <div className="bg-white p-8 md:p-10 rounded-3xl border border-[#EBE4DA] shadow-lg text-center max-w-md mx-4">
+          <div className="w-20 h-20 bg-primary-green/10 text-primary-green rounded-3xl mx-auto flex items-center justify-center mb-6 shadow-xs border border-primary-green/20">
+            <PawPrint size={40} />
+          </div>
+          <h2 className="font-header text-3xl text-secondary-brown mb-2 font-bold">Portal de Clientes</h2>
+          <p className="text-stone-600 mb-8 text-sm leading-relaxed">
+            Inicia sesión con tu correo y contraseña para revisar tus perritos, tus direcciones de entrega y repetir tus pedidos con un solo clic.
+          </p>
+          <button
+            onClick={() => navigate('/')}
+            className="w-full bg-primary-green text-white font-bold py-3.5 px-6 rounded-2xl hover:bg-primary-green-dark transition shadow-md cursor-pointer"
+          >
+            Volver a la Tienda
+          </button>
         </div>
-        <h2 className="font-header text-3xl text-secondary-brown mb-3">Portal de Clientes Origen Canino</h2>
-        <p className="text-stone-600 mb-8 text-sm leading-relaxed">
-          Inicia sesión para revisar tus perritos, tus direcciones y repetir tus pedidos con un solo clic.
-        </p>
-        <button
-          onClick={() => navigate('/')}
-          className="bg-primary-green text-white font-bold px-6 py-3 rounded-xl hover:bg-primary-green-dark transition shadow-md cursor-pointer"
-        >
-          Volver a la Tienda
-        </button>
       </div>
     );
   }
@@ -111,7 +120,6 @@ const CustomerPortal = () => {
       return;
     }
 
-    // Si la orden tenía datos del perrito, cargarlos en CartContext
     if (order.dog_name && order.dog_weight) {
       setDogData({
         name: order.dog_name,
@@ -120,7 +128,6 @@ const CustomerPortal = () => {
       });
     }
 
-    // Agregar items al carrito
     order.items.forEach(item => {
       addItem({
         id: item.product_id,
@@ -140,7 +147,7 @@ const CustomerPortal = () => {
     setSavingProfile(true);
     try {
       await updateProfile(profileForm);
-      notify('success', 'Tus datos de despacho fueron actualizados exitosamente.');
+      notify('success', '¡Tus datos de despacho fueron actualizados exitosamente!');
     } catch (err) {
       notify('error', err.message || 'Error al actualizar perfil');
     } finally {
@@ -208,138 +215,439 @@ const CustomerPortal = () => {
   };
 
   return (
-    <div className="bg-bg-cream/60 min-h-screen py-8 md:py-12">
-      <div className="container mx-auto px-4 max-w-5xl space-y-6">
+    <div className="bg-bg-cream min-h-screen py-8 md:py-12">
+      <div className="container mx-auto px-4 max-w-5xl space-y-8">
         
-        {/* Customer Header Banner */}
-        <div className="bg-white p-6 md:p-8 rounded-3xl border border-stone-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div className="flex items-center gap-4">
-            {/* Logo de Origen Canino en lugar de la P genérica */}
-            <div className="w-16 h-16 rounded-2xl bg-white p-1 border-2 border-primary-green/20 shadow-xs flex items-center justify-center overflow-hidden shrink-0">
-              <img 
-                src="/logo.webp" 
-                alt="Origen Canino" 
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                }}
-              />
-              <PawPrint size={28} className="text-primary-green hidden only:block" />
+        {/* HERO CARD PRINCIPAL DEL CLIENTE */}
+        <div className="bg-white rounded-3xl p-6 md:p-8 border border-[#EBE4DA] shadow-xs relative overflow-hidden">
+          {/* Fondo sutil orgánico */}
+          <div className="absolute top-0 right-0 w-80 h-80 bg-primary-green/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+          <div className="absolute bottom-0 left-0 w-60 h-60 bg-secondary-orange/5 rounded-full blur-2xl pointer-events-none -ml-16 -mb-16" />
+
+          <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div className="flex items-center gap-4">
+              {/* Avatar Oficial con Logo Origen Canino */}
+              <div className="w-18 h-18 md:w-20 md:h-20 rounded-3xl bg-[#FAF7F2] p-2 border-2 border-primary-green/25 shadow-xs flex items-center justify-center shrink-0">
+                <img 
+                  src="/logo.webp" 
+                  alt="Origen Canino" 
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+                <PawPrint size={32} className="text-primary-green hidden only:block" />
+              </div>
+
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="font-header text-2xl md:text-3xl text-secondary-brown font-extrabold tracking-tight">
+                    ¡Hola, {customer.name}!
+                  </h1>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#db994b]/15 text-[#9e6320] text-xs font-bold rounded-full border border-[#db994b]/30">
+                    <Sparkles size={13} className="text-[#db994b]" />
+                    Cliente Nutrición Real
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-y-1 gap-x-3 text-xs md:text-sm text-stone-500 mt-1.5">
+                  <span className="flex items-center gap-1 text-stone-700 font-medium">
+                    <Mail size={13} className="text-primary-green" />
+                    {customer.email}
+                  </span>
+                  {customer.phone && (
+                    <span className="flex items-center gap-1 text-stone-600">
+                      • <Phone size={13} className="text-primary-green" />
+                      {customer.phone}
+                    </span>
+                  )}
+                  {customer.city && (
+                    <span className="flex items-center gap-1 text-stone-600">
+                      • <MapPin size={13} className="text-primary-green" />
+                      {customer.city} ({customer.region || 'Región Metropolitana'})
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
 
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="font-header text-2xl md:text-3xl text-secondary-brown">
-                  ¡Hola, {customer.name}!
-                </h2>
-                <span className="px-2.5 py-0.5 bg-primary-green/15 text-primary-green-dark text-xs font-bold rounded-full border border-primary-green/20">
-                  🐾 Cliente Origen Canino
-                </span>
-              </div>
-              <p className="text-xs md:text-sm text-stone-500 flex flex-wrap items-center gap-2 md:gap-3 mt-1">
-                <span className="font-medium text-stone-700">{customer.email}</span>
-                {customer.phone && <span>• {customer.phone}</span>}
-                {customer.city && <span>• 📍 {customer.city} ({customer.region || 'Región Metropolitana'})</span>}
-              </p>
+            {/* Acciones Rápidas */}
+            <div className="flex items-center gap-2.5 w-full md:w-auto justify-end">
+              <button
+                onClick={() => {
+                  navigate('/#tienda');
+                  setTimeout(() => {
+                    const el = document.getElementById('catalogo') || document.getElementById('tienda');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }, 150);
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-green hover:bg-primary-green-dark text-white rounded-2xl text-xs md:text-sm font-bold shadow-xs transition cursor-pointer"
+              >
+                <ShoppingCart size={15} />
+                <span>Ir a la Tienda</span>
+              </button>
+
+              <button
+                onClick={() => { logout(); navigate('/'); }}
+                className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 border border-stone-200 text-stone-600 hover:text-red-600 hover:border-red-200 hover:bg-red-50/50 rounded-2xl text-xs md:text-sm font-semibold transition cursor-pointer"
+                title="Cerrar Sesión"
+              >
+                <LogOut size={15} />
+                <span>Salir</span>
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            <button
-              onClick={() => { logout(); navigate('/'); }}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 border border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-50 transition w-full md:w-auto cursor-pointer"
-            >
-              <LogOut size={16} />
-              Cerrar Sesión
-            </button>
+          {/* Mini-Indicadores Informativos */}
+          <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-3 pt-6 mt-6 border-t border-[#EBE4DA]/80">
+            <div className="flex items-center gap-3 p-3 bg-[#FAF7F2] rounded-2xl border border-[#EBE4DA]">
+              <div className="w-10 h-10 rounded-xl bg-primary-green/10 text-primary-green flex items-center justify-center shrink-0">
+                <PawPrint size={20} />
+              </div>
+              <div>
+                <span className="text-[11px] uppercase tracking-wider font-bold text-stone-500 block">Tus Mascotas</span>
+                <span className="text-sm font-bold text-secondary-brown">{dogs.length} perrito(s) registrado(s)</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 bg-[#FAF7F2] rounded-2xl border border-[#EBE4DA]">
+              <div className="w-10 h-10 rounded-xl bg-[#db994b]/15 text-[#db994b] flex items-center justify-center shrink-0">
+                <Truck size={20} />
+              </div>
+              <div>
+                <span className="text-[11px] uppercase tracking-wider font-bold text-stone-500 block">Despacho en</span>
+                <span className="text-sm font-bold text-secondary-brown">{customer.city || 'Algarrobo'} ({customer.region ? customer.region.replace('Región de ', '').replace('Región ', '') : 'RM'})</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 bg-[#FAF7F2] rounded-2xl border border-[#EBE4DA]">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                <ShieldCheck size={20} />
+              </div>
+              <div>
+                <span className="text-[11px] uppercase tracking-wider font-bold text-stone-500 block">Seguridad Cadena de Frío</span>
+                <span className="text-sm font-bold text-secondary-brown">-18°C Ultra-congelado</span>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Global Feedback */}
         {feedback && (
           <div className={`p-4 rounded-2xl flex items-center gap-3 text-sm font-semibold transition-all shadow-sm ${
-            feedback.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
+            feedback.type === 'success' 
+              ? 'bg-emerald-50 text-emerald-900 border border-emerald-200' 
+              : 'bg-red-50 text-red-900 border border-red-200'
           }`}>
-            {feedback.type === 'success' ? <CheckCircle size={20} className="text-green-600 shrink-0" /> : <AlertCircle size={20} className="text-red-600 shrink-0" />}
+            {feedback.type === 'success' ? <CheckCircle size={20} className="text-emerald-600 shrink-0" /> : <AlertCircle size={20} className="text-red-600 shrink-0" />}
             <span>{feedback.text}</span>
           </div>
         )}
 
-        {/* Navigation Tabs */}
-        <div className="flex bg-white p-1.5 rounded-2xl border border-stone-200 shadow-xs gap-2">
-          <button
-            onClick={() => setActiveTab('orders')}
-            className={`flex-1 py-3 px-4 font-bold text-xs md:text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer ${
-              activeTab === 'orders' 
-                ? 'bg-primary-green text-white shadow-sm' 
-                : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
-            }`}
-          >
-            <ShoppingBag size={17} />
-            Mis Pedidos ({orders.length})
-          </button>
-
+        {/* SEGMENTED CONTROL TABS */}
+        <div className="bg-[#EDE8DF] p-1.5 rounded-2xl border border-[#EBE4DA] flex gap-2 shadow-2xs">
           <button
             onClick={() => setActiveTab('dogs')}
             className={`flex-1 py-3 px-4 font-bold text-xs md:text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer ${
               activeTab === 'dogs' 
-                ? 'bg-primary-green text-white shadow-sm' 
-                : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
+                ? 'bg-primary-green text-white shadow-md' 
+                : 'text-secondary-brown hover:text-primary-green hover:bg-white/60'
             }`}
           >
             <PawPrint size={17} />
-            Mis Mascotas ({dogs.length})
+            <span>Mis Mascotas ({dogs.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('profile')}
             className={`flex-1 py-3 px-4 font-bold text-xs md:text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer ${
               activeTab === 'profile' 
-                ? 'bg-primary-green text-white shadow-sm' 
-                : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
+                ? 'bg-primary-green text-white shadow-md' 
+                : 'text-secondary-brown hover:text-primary-green hover:bg-white/60'
             }`}
           >
             <MapPin size={17} />
-            Datos de Despacho
+            <span>Datos de Despacho</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('orders')}
+            className={`flex-1 py-3 px-4 font-bold text-xs md:text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer ${
+              activeTab === 'orders' 
+                ? 'bg-primary-green text-white shadow-md' 
+                : 'text-secondary-brown hover:text-primary-green hover:bg-white/60'
+            }`}
+          >
+            <ShoppingBag size={17} />
+            <span>Historial de Pedidos ({orders.length})</span>
           </button>
         </div>
 
-        {/* --- TAB 1: ORDERS & REPEAT ORDER --- */}
+        {/* --- TAB 1: MIS MASCOTAS --- */}
+        {activeTab === 'dogs' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-3xl border border-[#EBE4DA]">
+              <div>
+                <h2 className="font-header text-2xl text-secondary-brown font-bold">Fichas Nutricionales de tus Perritos</h2>
+                <p className="text-xs md:text-sm text-stone-500 mt-0.5">
+                  Mantén el peso al día para que el sistema calcule automáticamente los gramos diarios y porciones de cada menú.
+                </p>
+              </div>
+              <button
+                onClick={() => handleOpenDogModal()}
+                className="bg-primary-green hover:bg-primary-green-dark text-white font-bold px-5 py-3 rounded-2xl shadow-sm text-xs md:text-sm flex items-center gap-2 transition cursor-pointer whitespace-nowrap"
+              >
+                <Plus size={18} />
+                <span>Registrar Nueva Mascota</span>
+              </button>
+            </div>
+
+            {dogs.length === 0 ? (
+              <div className="bg-white p-12 text-center rounded-3xl border border-[#EBE4DA] shadow-xs space-y-4">
+                <div className="p-4 bg-amber-50 text-amber-700 rounded-full w-16 h-16 mx-auto flex items-center justify-center border border-amber-200">
+                  <PawPrint size={32} />
+                </div>
+                <h3 className="font-header text-xl text-secondary-brown font-bold">Aún no registras a tu mascota</h3>
+                <p className="text-stone-500 text-sm max-w-sm mx-auto">
+                  Agrega a tu perrito con su peso corporal para calcular su porción diaria recomendada en cada pedido.
+                </p>
+                <button
+                  onClick={() => handleOpenDogModal()}
+                  className="bg-primary-green text-white font-bold px-6 py-3 rounded-2xl hover:bg-primary-green-dark transition shadow-sm text-sm cursor-pointer"
+                >
+                  Registrar mi primer perrito
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {dogs.map((dog) => {
+                  const dailyGrams = Math.round(dog.weight * 1000 * 0.025); // 2.5% de peso corporal
+                  const monthlyKilos = ((dailyGrams * 30) / 1000).toFixed(1);
+
+                  return (
+                    <div 
+                      key={dog.id} 
+                      className="bg-white rounded-3xl p-6 border border-[#EBE4DA] shadow-xs hover:shadow-md transition-all flex flex-col justify-between group"
+                    >
+                      <div>
+                        {/* Cabecera de la Mascota */}
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex items-center gap-3.5">
+                            <div className="w-13 h-13 rounded-2xl bg-[#faf7f2] border border-[#EBE4DA] text-primary-green flex items-center justify-center p-2.5 shadow-2xs">
+                              <PawPrint size={26} />
+                            </div>
+                            <div>
+                              <h3 className="font-header text-2xl text-secondary-brown font-bold tracking-tight">
+                                {dog.name}
+                              </h3>
+                              <span className="text-xs font-bold px-2.5 py-0.5 bg-primary-green/10 text-primary-green-dark rounded-full capitalize border border-primary-green/20">
+                                {dog.age_stage === 'adult_low' ? 'Adulto / Senior' : dog.age_stage || 'Adulto'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleOpenDogModal(dog)}
+                              className="p-2 text-stone-400 hover:text-primary-green rounded-xl hover:bg-[#faf7f2] transition cursor-pointer"
+                              title="Editar datos o peso"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteDog(dog)}
+                              className="p-2 text-stone-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition cursor-pointer"
+                              title="Eliminar ficha"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Bloque de Cálculo Nutricional Biológico */}
+                        <div className="bg-[#FAF7F2] rounded-2xl p-4 border border-[#EBE4DA] grid grid-cols-2 gap-3 text-center my-3">
+                          <div className="border-r border-[#EBE4DA] pr-2">
+                            <p className="text-[11px] text-stone-500 font-bold uppercase tracking-wider">Peso Registrado</p>
+                            <p className="text-2xl font-extrabold text-secondary-brown mt-0.5">{dog.weight} Kg</p>
+                            <p className="text-[10px] text-stone-400 mt-0.5">Peso en balanza</p>
+                          </div>
+                          <div className="pl-2">
+                            <p className="text-[11px] text-primary-green font-bold uppercase tracking-wider">Porción Diaria</p>
+                            <p className="text-2xl font-extrabold text-primary-green mt-0.5">~{dailyGrams} g</p>
+                            <p className="text-[10px] text-stone-400 mt-0.5">2.5% diario (~{monthlyKilos} kg/mes)</p>
+                          </div>
+                        </div>
+
+                        <div className="text-[11px] text-stone-500 flex items-center justify-center gap-1.5 py-1">
+                          <ShieldCheck size={14} className="text-primary-green" />
+                          <span>Formato recomendado: paquetes de 1 Kg al vacío</span>
+                        </div>
+                      </div>
+
+                      {/* Botón de Compra Personalizada */}
+                      <button
+                        onClick={() => {
+                          setDogData({ name: dog.name, weight: dog.weight, stage: dog.age_stage });
+                          navigate('/#tienda');
+                          setTimeout(() => {
+                            const el = document.getElementById('catalogo') || document.getElementById('tienda');
+                            if (el) el.scrollIntoView({ behavior: 'smooth' });
+                          }, 150);
+                        }}
+                        className="mt-4 w-full bg-secondary-orange hover:bg-[#c58235] text-white font-bold py-3.5 rounded-2xl transition shadow-xs text-xs md:text-sm flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <ShoppingCart size={16} />
+                        <span>Comprar Menú para {dog.name}</span>
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* --- TAB 2: DATOS DE DESPACHO (DIRECCIÓN Y REGIÓN) --- */}
+        {activeTab === 'profile' && (
+          <div className="max-w-2xl mx-auto bg-white p-6 md:p-8 rounded-3xl border border-[#EBE4DA] shadow-xs space-y-6">
+            <div className="flex items-center gap-3 pb-3 border-b border-[#EBE4DA]">
+              <div className="w-12 h-12 rounded-2xl bg-primary-green/10 text-primary-green flex items-center justify-center shrink-0">
+                <MapPin size={24} />
+              </div>
+              <div>
+                <h2 className="font-header text-2xl text-secondary-brown font-bold">Mis Datos de Despacho Habitual</h2>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  Estos datos se usarán por defecto para coordinar tus despachos congelados con cadena de frío (-18°C).
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-stone-700 mb-1 flex items-center gap-1.5">
+                  <User size={13} className="text-primary-green" /> Nombre Completo *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={profileForm.name}
+                  onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                  placeholder="Ej. Patricio Padilla"
+                  className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-stone-700 mb-1 flex items-center gap-1.5">
+                  <Phone size={13} className="text-primary-green" /> Teléfono / WhatsApp de Contacto *
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={profileForm.phone}
+                  onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                  placeholder="+56 9 5704 0679"
+                  className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-stone-700 mb-1 flex items-center gap-1.5">
+                  <MapPin size={13} className="text-primary-green" /> Dirección de Entrega (Calle, Número, Depto/Torre) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={profileForm.address}
+                  onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
+                  placeholder="Séptima Oriente Playa 312"
+                  className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 mb-1 flex items-center gap-1.5">
+                    <MapPin size={13} className="text-primary-green" /> Comuna / Ciudad *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={profileForm.city}
+                    onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })}
+                    placeholder="Ej. Algarrobo, Viña del Mar, Las Condes"
+                    className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 mb-1 flex items-center gap-1.5">
+                    <Building2 size={13} className="text-primary-green" /> Región de Despacho *
+                  </label>
+                  <select
+                    value={profileForm.region}
+                    onChange={(e) => setProfileForm({ ...profileForm, region: e.target.value })}
+                    className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white cursor-pointer font-medium"
+                  >
+                    <option value="Región Metropolitana">Región Metropolitana (Santiago)</option>
+                    <option value="Región de Valparaíso">Región de Valparaíso (Litoral y Costa)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-3">
+                <button
+                  type="submit"
+                  disabled={savingProfile}
+                  className="w-full bg-primary-green hover:bg-primary-green-dark text-white font-bold py-3.5 rounded-2xl transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 text-base"
+                >
+                  {savingProfile ? "Guardando datos..." : "Guardar Dirección de Despacho"}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* --- TAB 3: HISTORIAL DE PEDIDOS --- */}
         {activeTab === 'orders' && (
           <div className="space-y-4">
             {loadingOrders ? (
-              <div className="bg-white p-12 text-center rounded-3xl border border-stone-200 text-stone-500 shadow-sm">
+              <div className="bg-white p-12 text-center rounded-3xl border border-[#EBE4DA] text-stone-500 shadow-xs">
                 <RefreshCw size={28} className="animate-spin mx-auto mb-3 text-primary-green" />
                 <p>Cargando tus pedidos anteriores...</p>
               </div>
             ) : orders.length === 0 ? (
-              <div className="bg-white p-12 text-center rounded-3xl border border-stone-200 shadow-sm space-y-4">
-                <div className="p-4 bg-amber-50 text-amber-700 rounded-full w-16 h-16 mx-auto flex items-center justify-center">
+              <div className="bg-white p-12 text-center rounded-3xl border border-[#EBE4DA] shadow-xs space-y-4">
+                <div className="p-4 bg-amber-50 text-amber-700 rounded-full w-16 h-16 mx-auto flex items-center justify-center border border-amber-200">
                   <ShoppingBag size={32} />
                 </div>
-                <h3 className="font-header text-2xl text-secondary-brown">Aún no has realizado pedidos</h3>
+                <h3 className="font-header text-2xl text-secondary-brown font-bold">Aún no registras pedidos anteriores</h3>
                 <p className="text-stone-500 text-sm max-w-sm mx-auto">
                   Elige la dieta BARF o cocinada que mejor se adapte a tu perrito en nuestra tienda.
                 </p>
                 <button
                   onClick={() => navigate('/#tienda')}
-                  className="bg-primary-green text-white font-bold px-6 py-3 rounded-xl hover:bg-primary-green-dark transition shadow cursor-pointer"
+                  className="bg-primary-green text-white font-bold px-6 py-3 rounded-2xl hover:bg-primary-green-dark transition shadow-sm cursor-pointer"
                 >
-                  Ver Menú de Dietas
+                  Explorar Dietas & Menús
                 </button>
               </div>
             ) : (
               orders.map((o) => (
-                <div key={o.id} className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 hover:border-primary-green/40 transition">
+                <div 
+                  key={o.id} 
+                  className="bg-white p-6 rounded-3xl border border-[#EBE4DA] shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-6 hover:border-primary-green/40 transition"
+                >
                   <div className="space-y-2">
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                       <span className="font-header text-xl text-secondary-brown font-bold">
                         Pedido #{o.id}
                       </span>
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
                         o.payment_status?.toLowerCase().includes('pagado') 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-amber-100 text-amber-800'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                          : 'bg-amber-100 text-amber-800 border border-amber-300'
                       }`}>
                         {o.payment_status || 'Pendiente'}
                       </span>
@@ -350,19 +658,19 @@ const CustomerPortal = () => {
                       )}
                     </div>
 
-                    <div className="text-xs text-stone-500 flex items-center gap-4">
+                    <div className="text-xs text-stone-500 flex flex-wrap items-center gap-3">
                       <span className="flex items-center gap-1">
-                        <Calendar size={14} className="text-primary-green" />
+                        <Calendar size={13} className="text-primary-green" />
                         {new Date(o.created_at).toLocaleDateString('es-CL', {
                           day: '2-digit', month: 'short', year: 'numeric'
                         })}
                       </span>
                       <span>•</span>
-                      <span>Estado Entrega: <strong className="text-secondary-brown">{o.delivery_status || 'Preparación'}</strong></span>
+                      <span>Estado: <strong className="text-secondary-brown">{o.delivery_status || 'Preparación'}</strong></span>
                       {o.dog_name && <span>• Perro: <strong>{o.dog_name}</strong></span>}
                     </div>
 
-                    {/* Items resumen */}
+                    {/* Resumen de Productos */}
                     {o.items && o.items.length > 0 && (
                       <div className="pt-2 text-xs text-stone-600">
                         <ul className="list-disc list-inside space-y-0.5">
@@ -377,15 +685,15 @@ const CustomerPortal = () => {
                   </div>
 
                   <div className="flex flex-col items-start md:items-end gap-3 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0">
-                    <p className="font-sans text-2xl font-bold text-secondary-brown">
+                    <p className="font-sans text-2xl font-extrabold text-secondary-brown">
                       ${o.total?.toLocaleString('es-CL')}
                     </p>
                     
                     <button
                       onClick={() => handleRepeatOrder(o)}
-                      className="w-full md:w-auto bg-primary-green text-white font-bold px-5 py-2.5 rounded-xl hover:bg-primary-green-dark transition shadow flex items-center justify-center gap-2 text-sm cursor-pointer"
+                      className="w-full md:w-auto bg-primary-green text-white font-bold px-5 py-2.5 rounded-2xl hover:bg-primary-green-dark transition shadow-xs flex items-center justify-center gap-2 text-xs md:text-sm cursor-pointer"
                     >
-                      <RotateCcw size={16} />
+                      <RotateCcw size={15} />
                       Repetir este Pedido
                     </button>
                   </div>
@@ -395,196 +703,23 @@ const CustomerPortal = () => {
           </div>
         )}
 
-        {/* --- TAB 2: MY DOGS --- */}
-        {activeTab === 'dogs' && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <div>
-                <h3 className="font-header text-2xl text-secondary-brown">Mis Mascotas Registradas</h3>
-                <p className="text-xs md:text-sm text-stone-500">Mantén actualizado el peso de tus perritos para recibir la porción nutricional exacta.</p>
-              </div>
-              <button
-                onClick={() => handleOpenDogModal()}
-                className="bg-primary-green text-white font-bold px-4 py-2.5 rounded-xl hover:bg-primary-green-dark transition shadow text-xs md:text-sm flex items-center gap-2 cursor-pointer"
-              >
-                <Plus size={18} />
-                Agregar Mascota
-              </button>
-            </div>
-
-            {dogs.length === 0 ? (
-              <div className="bg-white p-12 text-center rounded-3xl border border-stone-200 shadow-sm space-y-4">
-                <div className="p-4 bg-amber-50 text-amber-700 rounded-full w-16 h-16 mx-auto flex items-center justify-center">
-                  <PawPrint size={32} />
-                </div>
-                <h4 className="font-header text-xl text-secondary-brown">No tienes mascotas registradas</h4>
-                <p className="text-stone-500 text-sm max-w-sm mx-auto">
-                  Agrega a tu perrito para que sus porciones queden pre-calculadas en cada compra.
-                </p>
-                <button
-                  onClick={() => handleOpenDogModal()}
-                  className="bg-primary-green text-white font-bold px-5 py-2.5 rounded-xl hover:bg-primary-green-dark transition shadow text-sm cursor-pointer"
-                >
-                  Registrar mi primer perrito
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {dogs.map((dog) => {
-                  const dailyGrams = Math.round(dog.weight * 1000 * 0.025); // 2.5% del peso corporal
-                  return (
-                    <div key={dog.id} className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-4 hover:border-primary-green/40 transition">
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-3">
-                          <div className="p-3 bg-amber-100/70 text-amber-800 rounded-2xl">
-                            <PawPrint size={24} />
-                          </div>
-                          <div>
-                            <h4 className="font-header text-2xl text-secondary-brown">{dog.name}</h4>
-                            <span className="text-xs font-semibold px-2 py-0.5 bg-stone-100 text-stone-700 rounded-full capitalize">
-                              {dog.age_stage || 'Adulto'}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => handleOpenDogModal(dog)}
-                            className="p-2 text-stone-400 hover:text-primary-green rounded-lg hover:bg-stone-50 transition cursor-pointer"
-                            title="Editar datos o peso"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteDog(dog)}
-                            className="p-2 text-stone-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition cursor-pointer"
-                            title="Eliminar mascota"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 p-3 bg-stone-50 rounded-2xl text-center border border-stone-100">
-                        <div>
-                          <p className="text-[11px] text-stone-400 font-bold uppercase">Peso Actual</p>
-                          <p className="text-xl font-bold text-secondary-brown">{dog.weight} Kg</p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] text-stone-400 font-bold uppercase">Porción Diaria Sugerida</p>
-                          <p className="text-xl font-bold text-primary-green">~{dailyGrams} g/día</p>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => {
-                          setDogData({ name: dog.name, weight: dog.weight, stage: dog.age_stage });
-                          navigate('/#tienda');
-                        }}
-                        className="w-full bg-primary-green/10 text-primary-green font-bold py-2.5 rounded-xl hover:bg-primary-green hover:text-white transition text-xs md:text-sm flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        Comprar Menú para {dog.name}
-                        <ChevronRight size={16} />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* --- TAB 3: PROFILE & DISPATCH (DATOS DE DESPACHO) --- */}
-        {activeTab === 'profile' && (
-          <div className="max-w-xl mx-auto bg-white p-6 md:p-8 rounded-3xl border border-stone-200 shadow-sm space-y-6">
-            <div>
-              <h3 className="font-header text-2xl text-secondary-brown">Mis Datos de Entrega Habitual</h3>
-              <p className="text-xs md:text-sm text-stone-500">Estos datos se usarán por defecto cada vez que compres en la tienda.</p>
-            </div>
-
-            <form onSubmit={handleSaveProfile} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-stone-700 mb-1">Nombre Completo *</label>
-                <input
-                  type="text"
-                  required
-                  value={profileForm.name}
-                  onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                  className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-stone-700 mb-1">Teléfono (WhatsApp de contacto) *</label>
-                <input
-                  type="tel"
-                  required
-                  value={profileForm.phone}
-                  onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                  className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-stone-700 mb-1">Dirección de Despacho (Calle, Número, Depto) *</label>
-                <input
-                  type="text"
-                  required
-                  value={profileForm.address}
-                  onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
-                  placeholder="Av. Las Condes 1234, Depto 502"
-                  className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-stone-700 mb-1">Comuna / Ciudad *</label>
-                  <input
-                    type="text"
-                    required
-                    value={profileForm.city}
-                    onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })}
-                    placeholder="Ej. Las Condes, Algarrobo, Viña del Mar"
-                    className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-stone-700 mb-1">Región de Despacho *</label>
-                  <select
-                    value={profileForm.region}
-                    onChange={(e) => setProfileForm({ ...profileForm, region: e.target.value })}
-                    className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white cursor-pointer"
-                  >
-                    <option value="Región Metropolitana">Región Metropolitana (Santiago)</option>
-                    <option value="Región de Valparaíso">Región de Valparaíso</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={savingProfile}
-                  className="w-full bg-primary-green text-white font-bold py-3.5 rounded-xl hover:bg-primary-green-dark transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                >
-                  {savingProfile ? "Guardando..." : "Guardar Datos de Despacho"}
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* --- MODAL: AGREGAR O EDITAR PERRO --- */}
+        {/* --- MODAL PARA REGISTRAR O EDITAR PERRO --- */}
         {isDogModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="bg-white rounded-3xl w-full max-w-md p-6 relative shadow-2xl border border-stone-200">
-              <h4 className="font-header text-2xl text-secondary-brown mb-2">
-                {editingDog ? `Editar a ${editingDog.name}` : 'Registrar Nueva Mascota'}
-              </h4>
-              <p className="text-xs text-stone-500 mb-4">
-                Ingresa los datos para adaptar la porción diaria recomendada.
-              </p>
+            <div className="bg-white rounded-3xl w-full max-w-md p-6 md:p-8 relative shadow-2xl border border-[#EBE4DA]">
+              <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[#EBE4DA]">
+                <div className="w-11 h-11 rounded-2xl bg-[#faf7f2] border border-[#EBE4DA] text-primary-green flex items-center justify-center">
+                  <PawPrint size={22} />
+                </div>
+                <div>
+                  <h4 className="font-header text-2xl text-secondary-brown font-bold">
+                    {editingDog ? `Editar a ${editingDog.name}` : 'Registrar Nueva Mascota'}
+                  </h4>
+                  <p className="text-xs text-stone-500">
+                    Para calcular porción y requerimiento calórico.
+                  </p>
+                </div>
+              </div>
 
               <form onSubmit={handleSaveDog} className="space-y-4">
                 <div>
@@ -594,14 +729,14 @@ const CustomerPortal = () => {
                     required
                     value={dogForm.name}
                     onChange={(e) => setDogForm({ ...dogForm, name: e.target.value })}
-                    placeholder="Ej. Rocky"
+                    placeholder="Ej. Canelo, Morocha"
                     className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-stone-700 mb-1">Peso (Kg) *</label>
+                    <label className="block text-xs font-bold text-stone-700 mb-1">Peso en Kg *</label>
                     <input
                       type="number"
                       step="0.1"
@@ -622,16 +757,16 @@ const CustomerPortal = () => {
                     >
                       <option value="adulto">Adulto</option>
                       <option value="cachorro">Cachorro</option>
-                      <option value="senior">Senior (+7 años)</option>
+                      <option value="adult_low">Adulto / Senior</option>
                     </select>
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-3 pt-3">
+                <div className="flex justify-end gap-3 pt-3 border-t border-[#EBE4DA]">
                   <button
                     type="button"
                     onClick={() => setIsDogModalOpen(false)}
-                    className="px-4 py-2 border border-stone-300 rounded-xl text-xs font-semibold text-stone-600 hover:bg-stone-50 transition cursor-pointer"
+                    className="px-4 py-2.5 border border-stone-300 rounded-xl text-xs font-semibold text-stone-600 hover:bg-stone-50 transition cursor-pointer"
                   >
                     Cancelar
                   </button>
