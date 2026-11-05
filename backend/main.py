@@ -1593,9 +1593,33 @@ def create_order(order: OrderCreate, req: Request):
             cursor = conn.cursor()
             
             # Buscar si el cliente ya está registrado por email
-            cursor.execute("SELECT id FROM customers WHERE LOWER(email) = %s", (order.customer_email.strip().lower(),))
+            clean_email = order.customer_email.strip().lower()
+            cursor.execute("SELECT id FROM customers WHERE LOWER(email) = %s", (clean_email,))
             c_row = cursor.fetchone()
-            linked_customer_id = c_row['id'] if c_row else None
+            if c_row:
+                linked_customer_id = c_row['id']
+            else:
+                # Garantizar que NINGÚN cliente se salte la base de datos customers
+                import secrets
+                temp_hash = get_password_hash(secrets.token_hex(8))
+                cursor.execute("""
+                    INSERT INTO customers (name, email, password_hash, phone, address, city, region)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                """, (
+                    order.customer_name, clean_email, temp_hash,
+                    order.customer_phone, order.customer_address,
+                    order.customer_city, order.customer_region or 'Región Metropolitana'
+                ))
+                new_c = cursor.fetchone()
+                linked_customer_id = new_c['id'] if new_c else None
+                
+                # Auto-guardar perrito en customer_dogs
+                if linked_customer_id and order.dog_name:
+                    cursor.execute("""
+                        INSERT INTO customer_dogs (customer_id, name, weight, age_stage)
+                        VALUES (%s, %s, %s, %s)
+                    """, (linked_customer_id, order.dog_name, order.dog_weight, order.dog_age or 'adulto'))
 
             cursor.execute("""
                 INSERT INTO orders (

@@ -162,6 +162,11 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
       alert("El monto mínimo de compra es de $30.000 CLP. Por favor agrega más productos a tu pedido.");
       return;
     }
+
+    if (!customer) {
+      openAuthModal('register');
+      return;
+    }
     
     setIsSubmitting(true);
     try {
@@ -347,23 +352,32 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                       </span>
                     </div>
                   ) : (
-                    <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-secondary-orange/50 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
-                          <Sparkles size={16} />
+                        <div className="w-9 h-9 rounded-xl bg-secondary-orange/20 text-secondary-orange flex items-center justify-center shrink-0">
+                          <UserCheck size={20} />
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-gray-800">¿Ya has comprado antes en Origen Canino?</p>
-                          <p className="text-[11px] text-gray-600">Inicia sesión para autocompletar tus datos y los de tu peludo en 1 clic.</p>
+                          <p className="text-xs font-bold text-secondary-brown">¡Registro obligatorio para despachos!</p>
+                          <p className="text-[11px] text-gray-600">Para coordinar tu despacho congelado a -18°C y registrar a tu peludo, debes ingresar tus datos.</p>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => openAuthModal('login')}
-                        className="whitespace-nowrap px-3.5 py-1.5 bg-primary-green hover:bg-primary-green-dark text-white text-xs font-bold rounded-xl transition shadow-xs w-full sm:w-auto text-center"
-                      >
-                        Iniciar Sesión
-                      </button>
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <button
+                          type="button"
+                          onClick={() => openAuthModal('register')}
+                          className="flex-1 sm:flex-none whitespace-nowrap px-3.5 py-2 bg-secondary-orange hover:bg-[#d65d21] text-white text-xs font-bold rounded-xl transition shadow-xs text-center"
+                        >
+                          Soy Nuevo / Crear Cuenta
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openAuthModal('login')}
+                          className="flex-1 sm:flex-none whitespace-nowrap px-3 py-2 bg-white hover:bg-stone-50 text-secondary-brown border border-stone-300 text-xs font-bold rounded-xl transition shadow-xs text-center"
+                        >
+                          Iniciar Sesión
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -765,10 +779,14 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                   <button 
                     type="submit" 
                     disabled={isSubmitting}
-                    className="w-full bg-secondary-orange text-white font-bold py-3.5 rounded-xl hover:bg-[#d65d21] transition shadow-lg flex justify-center items-center gap-2 disabled:opacity-50 text-base"
+                    className="w-full bg-secondary-orange text-white font-bold py-3.5 rounded-xl hover:bg-[#d65d21] transition shadow-lg flex justify-center items-center gap-2 disabled:opacity-50 text-base cursor-pointer"
                   >
                     {isSubmitting ? (
                       'Procesando pedido...'
+                    ) : !customer ? (
+                      <>
+                        <UserCheck size={20} /> Crear Cuenta o Iniciar Sesión para Pagar
+                      </>
                     ) : paymentMethod === 'mercadopago' ? (
                       <>
                         <CreditCard size={20} /> Pagar con Mercado Pago (${finalTotal.toLocaleString('es-CL')})

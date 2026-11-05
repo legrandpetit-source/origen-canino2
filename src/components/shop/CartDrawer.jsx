@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useCart } from '../../context/CartContext';
+import { useCustomer } from '../../context/CustomerContext';
 import { X, Plus, Minus, Trash2, Info, RefreshCw, CheckCircle2, Sparkles, Gift } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CheckoutModal from './CheckoutModal';
@@ -9,6 +10,7 @@ const CartDrawer = () => {
     items, isCartOpen, setIsCartOpen, updateQuantity, removeItem, total, addItem,
     firstOrderPromo, firstOrderDiscount, isFirstPurchaseEligible, nfcDiscount, nfcCommunity
   } = useCart();
+  const { customer, openAuthModal } = useCustomer();
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isSubscription, setIsSubscription] = useState(false);
 
@@ -58,6 +60,17 @@ const CartDrawer = () => {
 
   const handleCheckout = () => {
     if (items.length === 0 || !isMinMet) return;
+    
+    if (!customer) {
+      // Si el cliente no ha iniciado sesión ni tiene cuenta, abrir el formulario de registro obligatorio
+      setIsCartOpen(false);
+      openAuthModal('register', () => {
+        // Al registrarse o loguearse con éxito, abrir inmediatamente el Checkout
+        setIsCheckoutOpen(true);
+      });
+      return;
+    }
+
     setIsCheckoutOpen(true);
     setIsCartOpen(false);
   };
