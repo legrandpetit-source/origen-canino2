@@ -11,11 +11,12 @@ const plans = [
     breeds: 'Chihuahua, Poodle Toy, Dachshund, Schnauzer mini',
     weightRange: '1 a 10 kg',
     monthlyKilos: '3 a 6 kg/mes',
-    estimatedPrice: 'Desde $24.000',
+    estimatedPrice: 'Desde $30.000',
     bullets: [
-      'Porciones individuales selladas de 100g a 200g',
-      'Menú rotativo semanal (Vacuno & Pollo)',
-      'Monitoreo de adaptación por WhatsApp'
+      'Formatos de 1 Kg sellados al vacío',
+      'A elección: Dieta BARF Cruda o Cocinada al Vapor',
+      'Despacho programado quincenal o mensual',
+      'Alimento 100% natural ultracongelado a -18°C'
     ],
     buttonText: 'Elegir Plan Pequeño',
     isPopular: false
@@ -28,12 +29,12 @@ const plans = [
     breeds: 'Bulldog Francés, Border Collie, Beagle, Cocker',
     weightRange: '11 a 25 kg',
     monthlyKilos: '9 a 15 kg/mes',
-    estimatedPrice: 'Desde $72.000',
+    estimatedPrice: 'Desde $45.000',
     bullets: [
-      'Porciones optimizadas de 300g a 500g',
-      '3 recetas gourmet rotativas con superfoods',
+      'Formatos de 1 Kg sellados al vacío',
+      'A elección: Dieta BARF Cruda o Cocinada al Vapor',
       'Despacho programado quincenal o mensual',
-      'Snack dental crunchy de cortesía incluido'
+      'Alimento 100% natural ultracongelado a -18°C'
     ],
     buttonText: 'Elegir Plan Mediano',
     isPopular: true
@@ -46,11 +47,12 @@ const plans = [
     breeds: 'Golden Retriever, Pastor Alemán, Labrador, Bernés',
     weightRange: '26+ kg',
     monthlyKilos: '18+ kg/mes',
-    estimatedPrice: 'Desde $144.000',
+    estimatedPrice: 'Desde $90.000',
     bullets: [
-      'Packs familiares económicos al por mayor',
-      'Refuerzo articular extra con glucosamina natural',
-      'Frecuencia flexible para espacios de freezer reducidos'
+      'Formatos de 1 Kg sellados al vacío',
+      'A elección: Dieta BARF Cruda o Cocinada al Vapor',
+      'Despacho programado quincenal o mensual',
+      'Alimento 100% natural ultracongelado a -18°C'
     ],
     buttonText: 'Elegir Plan Grande',
     isPopular: false
@@ -78,7 +80,7 @@ const SuggestedPlans = () => {
             Planes Sugeridos – Guía de Compra Mensual
           </h2>
           <p className="text-xs sm:text-sm text-secondary-brown-light/80 font-sans max-w-xl mx-auto">
-            Porciones calculadas para cubrir la nutrición de 30 días con despacho programado.
+            Porciones calculadas para cubrir la nutrición de 30 días con despacho programado. Pedido mínimo: $30.000 CLP para asegurar la cadena de frío.
           </p>
         </div>
 
