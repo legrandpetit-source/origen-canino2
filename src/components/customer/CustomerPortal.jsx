@@ -87,16 +87,16 @@ const CustomerPortal = () => {
   if (!customer) {
     return (
       <div className="container mx-auto px-4 py-16 text-center max-w-md">
-        <div className="p-4 bg-primary-green/10 text-primary-green rounded-3xl w-20 h-20 mx-auto flex items-center justify-center mb-6">
+        <div className="p-4 bg-primary-green/10 text-primary-green rounded-3xl w-20 h-20 mx-auto flex items-center justify-center mb-6 shadow-xs">
           <PawPrint size={40} />
         </div>
         <h2 className="font-header text-3xl text-secondary-brown mb-3">Portal de Clientes Origen Canino</h2>
-        <p className="text-gray-600 mb-8 text-sm">
+        <p className="text-stone-600 mb-8 text-sm leading-relaxed">
           Inicia sesión para revisar tus perritos, tus direcciones y repetir tus pedidos con un solo clic.
         </p>
         <button
           onClick={() => navigate('/')}
-          className="bg-primary-green text-white font-bold px-6 py-3 rounded-xl hover:bg-primary-green-dark transition shadow-md"
+          className="bg-primary-green text-white font-bold px-6 py-3 rounded-xl hover:bg-primary-green-dark transition shadow-md cursor-pointer"
         >
           Volver a la Tienda
         </button>
@@ -140,7 +140,7 @@ const CustomerPortal = () => {
     setSavingProfile(true);
     try {
       await updateProfile(profileForm);
-      notify('success', 'Tus datos de despacho fueron actualizados.');
+      notify('success', 'Tus datos de despacho fueron actualizados exitosamente.');
     } catch (err) {
       notify('error', err.message || 'Error al actualizar perfil');
     } finally {
@@ -208,28 +208,38 @@ const CustomerPortal = () => {
   };
 
   return (
-    <div className="bg-bg-cream/40 min-h-screen py-10">
+    <div className="bg-bg-cream/60 min-h-screen py-8 md:py-12">
       <div className="container mx-auto px-4 max-w-5xl space-y-6">
         
         {/* Customer Header Banner */}
-        <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="bg-white p-6 md:p-8 rounded-3xl border border-stone-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-primary-green/10 text-primary-green flex items-center justify-center font-bold text-2xl font-header">
-              {customer.name.charAt(0).toUpperCase()}
+            {/* Logo de Origen Canino en lugar de la P genérica */}
+            <div className="w-16 h-16 rounded-2xl bg-white p-1 border-2 border-primary-green/20 shadow-xs flex items-center justify-center overflow-hidden shrink-0">
+              <img 
+                src="/logo.webp" 
+                alt="Origen Canino" 
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
+              <PawPrint size={28} className="text-primary-green hidden only:block" />
             </div>
+
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h2 className="font-header text-2xl md:text-3xl text-secondary-brown">
                   ¡Hola, {customer.name}!
                 </h2>
-                <span className="px-2.5 py-0.5 bg-green-100 text-green-800 text-xs font-bold rounded-full">
-                  Cliente Frecuente
+                <span className="px-2.5 py-0.5 bg-primary-green/15 text-primary-green-dark text-xs font-bold rounded-full border border-primary-green/20">
+                  🐾 Cliente Origen Canino
                 </span>
               </div>
-              <p className="text-sm text-gray-500 flex items-center gap-3 mt-1">
-                <span>{customer.email}</span>
+              <p className="text-xs md:text-sm text-stone-500 flex flex-wrap items-center gap-2 md:gap-3 mt-1">
+                <span className="font-medium text-stone-700">{customer.email}</span>
                 {customer.phone && <span>• {customer.phone}</span>}
-                {customer.city && <span>• {customer.city}</span>}
+                {customer.city && <span>• 📍 {customer.city} ({customer.region || 'Región Metropolitana'})</span>}
               </p>
             </div>
           </div>
@@ -237,7 +247,7 @@ const CustomerPortal = () => {
           <div className="flex items-center gap-3 w-full md:w-auto">
             <button
               onClick={() => { logout(); navigate('/'); }}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 border border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-50 transition w-full md:w-auto"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 border border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-50 transition w-full md:w-auto cursor-pointer"
             >
               <LogOut size={16} />
               Cerrar Sesión
@@ -256,40 +266,40 @@ const CustomerPortal = () => {
         )}
 
         {/* Navigation Tabs */}
-        <div className="flex bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm gap-2">
+        <div className="flex bg-white p-1.5 rounded-2xl border border-stone-200 shadow-xs gap-2">
           <button
             onClick={() => setActiveTab('orders')}
-            className={`flex-1 py-3 px-4 font-bold text-sm md:text-base rounded-xl transition flex items-center justify-center gap-2 ${
+            className={`flex-1 py-3 px-4 font-bold text-xs md:text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer ${
               activeTab === 'orders' 
                 ? 'bg-primary-green text-white shadow-sm' 
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
             }`}
           >
-            <ShoppingBag size={18} />
+            <ShoppingBag size={17} />
             Mis Pedidos ({orders.length})
           </button>
 
           <button
             onClick={() => setActiveTab('dogs')}
-            className={`flex-1 py-3 px-4 font-bold text-sm md:text-base rounded-xl transition flex items-center justify-center gap-2 ${
+            className={`flex-1 py-3 px-4 font-bold text-xs md:text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer ${
               activeTab === 'dogs' 
                 ? 'bg-primary-green text-white shadow-sm' 
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
             }`}
           >
-            <PawPrint size={18} />
+            <PawPrint size={17} />
             Mis Mascotas ({dogs.length})
           </button>
 
           <button
             onClick={() => setActiveTab('profile')}
-            className={`flex-1 py-3 px-4 font-bold text-sm md:text-base rounded-xl transition flex items-center justify-center gap-2 ${
+            className={`flex-1 py-3 px-4 font-bold text-xs md:text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer ${
               activeTab === 'profile' 
                 ? 'bg-primary-green text-white shadow-sm' 
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
             }`}
           >
-            <MapPin size={18} />
+            <MapPin size={17} />
             Datos de Despacho
           </button>
         </div>
@@ -298,29 +308,29 @@ const CustomerPortal = () => {
         {activeTab === 'orders' && (
           <div className="space-y-4">
             {loadingOrders ? (
-              <div className="bg-white p-12 text-center rounded-3xl border border-gray-100 text-gray-500">
+              <div className="bg-white p-12 text-center rounded-3xl border border-stone-200 text-stone-500 shadow-sm">
                 <RefreshCw size={28} className="animate-spin mx-auto mb-3 text-primary-green" />
                 <p>Cargando tus pedidos anteriores...</p>
               </div>
             ) : orders.length === 0 ? (
-              <div className="bg-white p-12 text-center rounded-3xl border border-gray-100 shadow-sm space-y-4">
+              <div className="bg-white p-12 text-center rounded-3xl border border-stone-200 shadow-sm space-y-4">
                 <div className="p-4 bg-amber-50 text-amber-700 rounded-full w-16 h-16 mx-auto flex items-center justify-center">
                   <ShoppingBag size={32} />
                 </div>
                 <h3 className="font-header text-2xl text-secondary-brown">Aún no has realizado pedidos</h3>
-                <p className="text-gray-500 text-sm max-w-sm mx-auto">
+                <p className="text-stone-500 text-sm max-w-sm mx-auto">
                   Elige la dieta BARF o cocinada que mejor se adapte a tu perrito en nuestra tienda.
                 </p>
                 <button
                   onClick={() => navigate('/#tienda')}
-                  className="bg-primary-green text-white font-bold px-6 py-3 rounded-xl hover:bg-primary-green-dark transition shadow"
+                  className="bg-primary-green text-white font-bold px-6 py-3 rounded-xl hover:bg-primary-green-dark transition shadow cursor-pointer"
                 >
                   Ver Menú de Dietas
                 </button>
               </div>
             ) : (
               orders.map((o) => (
-                <div key={o.id} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 hover:border-primary-green/30 transition">
+                <div key={o.id} className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 hover:border-primary-green/40 transition">
                   <div className="space-y-2">
                     <div className="flex items-center gap-3">
                       <span className="font-header text-xl text-secondary-brown font-bold">
@@ -340,18 +350,25 @@ const CustomerPortal = () => {
                       )}
                     </div>
 
-                    <div className="text-xs text-gray-500 flex items-center gap-4">
-                      <span className="flex items-center gap-1"><Calendar size={14} /> {o.created_at}</span>
-                      {o.dog_name && <span>• Para: <strong>{o.dog_name}</strong> ({o.dog_weight} kg)</span>}
+                    <div className="text-xs text-stone-500 flex items-center gap-4">
+                      <span className="flex items-center gap-1">
+                        <Calendar size={14} className="text-primary-green" />
+                        {new Date(o.created_at).toLocaleDateString('es-CL', {
+                          day: '2-digit', month: 'short', year: 'numeric'
+                        })}
+                      </span>
+                      <span>•</span>
+                      <span>Estado Entrega: <strong className="text-secondary-brown">{o.delivery_status || 'Preparación'}</strong></span>
+                      {o.dog_name && <span>• Perro: <strong>{o.dog_name}</strong></span>}
                     </div>
 
-                    {/* Items list */}
+                    {/* Items resumen */}
                     {o.items && o.items.length > 0 && (
-                      <div className="pt-2 text-sm text-gray-700">
+                      <div className="pt-2 text-xs text-stone-600">
                         <ul className="list-disc list-inside space-y-0.5">
-                          {o.items.map((item, idx) => (
+                          {o.items.map((it, idx) => (
                             <li key={idx}>
-                              <span className="font-semibold">{item.quantity}x</span> {item.product_name} {item.weight ? <span className="text-gray-500 text-xs font-normal">({item.weight})</span> : ''}
+                              <strong>{it.quantity}x</strong> {it.product_name} {it.weight ? `(${it.weight})` : ''}
                             </li>
                           ))}
                         </ul>
@@ -366,7 +383,7 @@ const CustomerPortal = () => {
                     
                     <button
                       onClick={() => handleRepeatOrder(o)}
-                      className="w-full md:w-auto bg-primary-green text-white font-bold px-5 py-2.5 rounded-xl hover:bg-primary-green-dark transition shadow flex items-center justify-center gap-2 text-sm"
+                      className="w-full md:w-auto bg-primary-green text-white font-bold px-5 py-2.5 rounded-xl hover:bg-primary-green-dark transition shadow flex items-center justify-center gap-2 text-sm cursor-pointer"
                     >
                       <RotateCcw size={16} />
                       Repetir este Pedido
@@ -381,14 +398,14 @@ const CustomerPortal = () => {
         {/* --- TAB 2: MY DOGS --- */}
         {activeTab === 'dogs' && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <div>
                 <h3 className="font-header text-2xl text-secondary-brown">Mis Mascotas Registradas</h3>
-                <p className="text-sm text-gray-500">Mantén actualizado el peso de tus perritos para recibir la porción nutricional exacta.</p>
+                <p className="text-xs md:text-sm text-stone-500">Mantén actualizado el peso de tus perritos para recibir la porción nutricional exacta.</p>
               </div>
               <button
                 onClick={() => handleOpenDogModal()}
-                className="bg-primary-green text-white font-bold px-4 py-2.5 rounded-xl hover:bg-primary-green-dark transition shadow text-sm flex items-center gap-2"
+                className="bg-primary-green text-white font-bold px-4 py-2.5 rounded-xl hover:bg-primary-green-dark transition shadow text-xs md:text-sm flex items-center gap-2 cursor-pointer"
               >
                 <Plus size={18} />
                 Agregar Mascota
@@ -396,17 +413,17 @@ const CustomerPortal = () => {
             </div>
 
             {dogs.length === 0 ? (
-              <div className="bg-white p-12 text-center rounded-3xl border border-gray-100 shadow-sm space-y-4">
+              <div className="bg-white p-12 text-center rounded-3xl border border-stone-200 shadow-sm space-y-4">
                 <div className="p-4 bg-amber-50 text-amber-700 rounded-full w-16 h-16 mx-auto flex items-center justify-center">
                   <PawPrint size={32} />
                 </div>
                 <h4 className="font-header text-xl text-secondary-brown">No tienes mascotas registradas</h4>
-                <p className="text-gray-500 text-sm max-w-sm mx-auto">
+                <p className="text-stone-500 text-sm max-w-sm mx-auto">
                   Agrega a tu perrito para que sus porciones queden pre-calculadas en cada compra.
                 </p>
                 <button
                   onClick={() => handleOpenDogModal()}
-                  className="bg-primary-green text-white font-bold px-5 py-2.5 rounded-xl hover:bg-primary-green-dark transition shadow text-sm"
+                  className="bg-primary-green text-white font-bold px-5 py-2.5 rounded-xl hover:bg-primary-green-dark transition shadow text-sm cursor-pointer"
                 >
                   Registrar mi primer perrito
                 </button>
@@ -416,7 +433,7 @@ const CustomerPortal = () => {
                 {dogs.map((dog) => {
                   const dailyGrams = Math.round(dog.weight * 1000 * 0.025); // 2.5% del peso corporal
                   return (
-                    <div key={dog.id} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4 hover:border-primary-green/30 transition">
+                    <div key={dog.id} className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-4 hover:border-primary-green/40 transition">
                       <div className="flex justify-between items-start">
                         <div className="flex items-center gap-3">
                           <div className="p-3 bg-amber-100/70 text-amber-800 rounded-2xl">
@@ -424,7 +441,7 @@ const CustomerPortal = () => {
                           </div>
                           <div>
                             <h4 className="font-header text-2xl text-secondary-brown">{dog.name}</h4>
-                            <span className="text-xs font-semibold px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full capitalize">
+                            <span className="text-xs font-semibold px-2 py-0.5 bg-stone-100 text-stone-700 rounded-full capitalize">
                               {dog.age_stage || 'Adulto'}
                             </span>
                           </div>
@@ -433,14 +450,14 @@ const CustomerPortal = () => {
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => handleOpenDogModal(dog)}
-                            className="p-2 text-gray-400 hover:text-primary-green rounded-lg hover:bg-gray-50 transition"
+                            className="p-2 text-stone-400 hover:text-primary-green rounded-lg hover:bg-stone-50 transition cursor-pointer"
                             title="Editar datos o peso"
                           >
                             <Edit2 size={16} />
                           </button>
                           <button
                             onClick={() => handleDeleteDog(dog)}
-                            className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition"
+                            className="p-2 text-stone-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition cursor-pointer"
                             title="Eliminar mascota"
                           >
                             <Trash2 size={16} />
@@ -448,13 +465,13 @@ const CustomerPortal = () => {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-2xl text-center">
+                      <div className="grid grid-cols-2 gap-3 p-3 bg-stone-50 rounded-2xl text-center border border-stone-100">
                         <div>
-                          <p className="text-xs text-gray-400 font-bold uppercase">Peso Actual</p>
+                          <p className="text-[11px] text-stone-400 font-bold uppercase">Peso Actual</p>
                           <p className="text-xl font-bold text-secondary-brown">{dog.weight} Kg</p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-400 font-bold uppercase">Porción Diaria Sugerida</p>
+                          <p className="text-[11px] text-stone-400 font-bold uppercase">Porción Diaria Sugerida</p>
                           <p className="text-xl font-bold text-primary-green">~{dailyGrams} g/día</p>
                         </div>
                       </div>
@@ -464,7 +481,7 @@ const CustomerPortal = () => {
                           setDogData({ name: dog.name, weight: dog.weight, stage: dog.age_stage });
                           navigate('/#tienda');
                         }}
-                        className="w-full bg-primary-green/10 text-primary-green font-bold py-2.5 rounded-xl hover:bg-primary-green hover:text-white transition text-sm flex items-center justify-center gap-2"
+                        className="w-full bg-primary-green/10 text-primary-green font-bold py-2.5 rounded-xl hover:bg-primary-green hover:text-white transition text-xs md:text-sm flex items-center justify-center gap-2 cursor-pointer"
                       >
                         Comprar Menú para {dog.name}
                         <ChevronRight size={16} />
@@ -477,67 +494,71 @@ const CustomerPortal = () => {
           </div>
         )}
 
-        {/* --- TAB 3: PROFILE & DISPATCH --- */}
+        {/* --- TAB 3: PROFILE & DISPATCH (DATOS DE DESPACHO) --- */}
         {activeTab === 'profile' && (
-          <div className="max-w-xl mx-auto bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+          <div className="max-w-xl mx-auto bg-white p-6 md:p-8 rounded-3xl border border-stone-200 shadow-sm space-y-6">
             <div>
               <h3 className="font-header text-2xl text-secondary-brown">Mis Datos de Entrega Habitual</h3>
-              <p className="text-sm text-gray-500">Estos datos se usarán por defecto cada vez que compres en la tienda.</p>
+              <p className="text-xs md:text-sm text-stone-500">Estos datos se usarán por defecto cada vez que compres en la tienda.</p>
             </div>
 
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Nombre Completo</label>
+                <label className="block text-xs font-bold text-stone-700 mb-1">Nombre Completo *</label>
                 <input
                   type="text"
                   required
                   value={profileForm.name}
                   onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                  className="w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm"
+                  className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Teléfono (WhatsApp de contacto)</label>
+                <label className="block text-xs font-bold text-stone-700 mb-1">Teléfono (WhatsApp de contacto) *</label>
                 <input
                   type="tel"
                   required
                   value={profileForm.phone}
                   onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                  className="w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm"
+                  className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Dirección de Despacho (Calle, Número, Depto)</label>
+                <label className="block text-xs font-bold text-stone-700 mb-1">Dirección de Despacho (Calle, Número, Depto) *</label>
                 <input
                   type="text"
                   required
                   value={profileForm.address}
                   onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
-                  className="w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm"
+                  placeholder="Av. Las Condes 1234, Depto 502"
+                  className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Comuna (Santiago)</label>
+                  <label className="block text-xs font-bold text-stone-700 mb-1">Comuna / Ciudad *</label>
                   <input
                     type="text"
                     required
                     value={profileForm.city}
                     onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })}
-                    className="w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm"
+                    placeholder="Ej. Las Condes, Algarrobo, Viña del Mar"
+                    className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Región</label>
-                  <input
-                    type="text"
-                    disabled
+                  <label className="block text-xs font-bold text-stone-700 mb-1">Región de Despacho *</label>
+                  <select
                     value={profileForm.region}
-                    className="w-full border border-gray-200 bg-gray-50 rounded-xl p-3 text-sm text-gray-500 cursor-not-allowed"
-                  />
+                    onChange={(e) => setProfileForm({ ...profileForm, region: e.target.value })}
+                    className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white cursor-pointer"
+                  >
+                    <option value="Región Metropolitana">Región Metropolitana (Santiago)</option>
+                    <option value="Región de Valparaíso">Región de Valparaíso</option>
+                  </select>
                 </div>
               </div>
 
@@ -545,7 +566,7 @@ const CustomerPortal = () => {
                 <button
                   type="submit"
                   disabled={savingProfile}
-                  className="w-full bg-primary-green text-white font-bold py-3.5 rounded-xl hover:bg-primary-green-dark transition shadow-md flex items-center justify-center gap-2"
+                  className="w-full bg-primary-green text-white font-bold py-3.5 rounded-xl hover:bg-primary-green-dark transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {savingProfile ? "Guardando..." : "Guardar Datos de Despacho"}
                 </button>
@@ -557,30 +578,30 @@ const CustomerPortal = () => {
         {/* --- MODAL: AGREGAR O EDITAR PERRO --- */}
         {isDogModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="bg-white rounded-3xl w-full max-w-md p-6 relative shadow-2xl border border-gray-100">
+            <div className="bg-white rounded-3xl w-full max-w-md p-6 relative shadow-2xl border border-stone-200">
               <h4 className="font-header text-2xl text-secondary-brown mb-2">
                 {editingDog ? `Editar a ${editingDog.name}` : 'Registrar Nueva Mascota'}
               </h4>
-              <p className="text-sm text-gray-500 mb-4">
+              <p className="text-xs text-stone-500 mb-4">
                 Ingresa los datos para adaptar la porción diaria recomendada.
               </p>
 
               <form onSubmit={handleSaveDog} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Nombre del Perrito</label>
+                  <label className="block text-xs font-bold text-stone-700 mb-1">Nombre del Perrito *</label>
                   <input
                     type="text"
                     required
                     value={dogForm.name}
                     onChange={(e) => setDogForm({ ...dogForm, name: e.target.value })}
                     placeholder="Ej. Rocky"
-                    className="w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm"
+                    className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Peso (Kg)</label>
+                    <label className="block text-xs font-bold text-stone-700 mb-1">Peso (Kg) *</label>
                     <input
                       type="number"
                       step="0.1"
@@ -588,16 +609,16 @@ const CustomerPortal = () => {
                       value={dogForm.weight}
                       onChange={(e) => setDogForm({ ...dogForm, weight: e.target.value })}
                       placeholder="Ej. 14.5"
-                      className="w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm"
+                      className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Etapa de Vida</label>
+                    <label className="block text-xs font-bold text-stone-700 mb-1">Etapa de Vida</label>
                     <select
                       value={dogForm.age_stage}
                       onChange={(e) => setDogForm({ ...dogForm, age_stage: e.target.value })}
-                      className="w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm"
+                      className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white cursor-pointer"
                     >
                       <option value="adulto">Adulto</option>
                       <option value="cachorro">Cachorro</option>
@@ -610,14 +631,14 @@ const CustomerPortal = () => {
                   <button
                     type="button"
                     onClick={() => setIsDogModalOpen(false)}
-                    className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition"
+                    className="px-4 py-2 border border-stone-300 rounded-xl text-xs font-semibold text-stone-600 hover:bg-stone-50 transition cursor-pointer"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
                     disabled={savingDog}
-                    className="px-5 py-2.5 bg-primary-green text-white rounded-xl text-sm font-bold hover:bg-primary-green-dark transition shadow"
+                    className="px-5 py-2.5 bg-primary-green text-white rounded-xl text-xs font-bold hover:bg-primary-green-dark transition shadow cursor-pointer disabled:opacity-50"
                   >
                     {savingDog ? "Guardando..." : "Guardar Mascota"}
                   </button>
@@ -633,4 +654,3 @@ const CustomerPortal = () => {
 };
 
 export default CustomerPortal;
-
