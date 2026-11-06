@@ -23,20 +23,37 @@ import {
   Building2,
   ShoppingCart,
   Heart,
-  Camera
+  Camera,
+  Gift,
+  QrCode,
+  Share2,
+  Copy,
+  Check,
+  Users,
+  Wallet,
+  ExternalLink,
+  Download,
+  ArrowUpRight
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useCustomer } from '../../context/CustomerContext';
 import { useCart } from '../../context/CartContext';
 import { useNavigate } from 'react-router-dom';
 
 const CustomerPortal = () => {
-  const { customer, dogs, logout, updateProfile, addDog, updateDog, deleteDog, uploadDogPhoto, fetchOrders } = useCustomer();
+  const { customer, dogs, logout, updateProfile, addDog, updateDog, deleteDog, uploadDogPhoto, fetchOrders, fetchReferralInfo } = useCustomer();
   const { addItem, setIsCartOpen, setDogData } = useCart();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState('dogs'); // 'orders', 'dogs', 'profile'
+  const [activeTab, setActiveTab] = useState('dogs'); // 'orders', 'dogs', 'profile', 'referrals'
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
+
+  // Referrals state
+  const [referralInfo, setReferralInfo] = useState(null);
+  const [loadingReferral, setLoadingReferral] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
 
   // Profile edit
   const [profileForm, setProfileForm] = useState({
@@ -116,6 +133,24 @@ const CustomerPortal = () => {
       setLoadingOrders(false);
     }
   };
+
+  const loadReferralData = async () => {
+    setLoadingReferral(true);
+    try {
+      const data = await fetchReferralInfo();
+      setReferralInfo(data);
+    } catch (err) {
+      console.error("Error cargando referidos:", err);
+    } finally {
+      setLoadingReferral(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'referrals' && customer) {
+      loadReferralData();
+    }
+  }, [activeTab, customer]);
 
   if (!customer) {
     return (
@@ -385,14 +420,26 @@ const CustomerPortal = () => {
 
           <button
             onClick={() => setActiveTab('orders')}
-            className={`flex-1 py-3 px-4 font-bold text-xs md:text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer ${
+            className={`flex-1 py-3 px-3 font-bold text-xs md:text-sm rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'orders' 
                 ? 'bg-primary-green text-white shadow-md' 
                 : 'text-secondary-brown hover:text-primary-green hover:bg-white/60'
             }`}
           >
             <ShoppingBag size={17} />
-            <span>Historial de Pedidos ({orders.length})</span>
+            <span>Historial ({orders.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('referrals')}
+            className={`flex-1 py-3 px-3 font-bold text-xs md:text-sm rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeTab === 'referrals' 
+                ? 'bg-primary-green text-white shadow-md' 
+                : 'text-secondary-brown hover:text-primary-green hover:bg-white/60'
+            }`}
+          >
+            <Gift size={17} />
+            <span>Invita y Gana 🐾</span>
           </button>
         </div>
 
@@ -760,6 +807,216 @@ const CustomerPortal = () => {
                 </div>
               ))
             )}
+          </div>
+        )}
+
+        {/* --- TAB 4: INVITA Y GANA (REFERIDOS Y QR) --- */}
+        {activeTab === 'referrals' && (
+          <div className="space-y-6">
+            {/* Header del Programa */}
+            <div className="bg-gradient-to-br from-[#faf7f2] via-white to-green-50/40 p-6 md:p-8 rounded-3xl border border-[#EBE4DA] shadow-xs relative overflow-hidden">
+              <div className="relative z-10 max-w-2xl">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary-green/10 text-primary-green rounded-full text-xs font-bold uppercase tracking-wider mb-2">
+                  <Sparkles size={13} /> Club de Embajadores Origen Canino
+                </span>
+                <h2 className="font-header text-2xl md:text-3xl text-secondary-brown font-extrabold">
+                  ¡Recomienda Nutrición Real y Gana Comida Gratis para tu Mascota! 🐾
+                </h2>
+                <p className="text-xs md:text-sm text-stone-600 mt-2 leading-relaxed">
+                  Tus amigos y vecinos reciben un <strong>{referralInfo?.discount_percent || 15}% de Descuento</strong> de regalo en su primera compra y tú acumulas <strong>${(referralInfo?.reward_amount || 5000).toLocaleString('es-CL')} CLP</strong> de saldo por cada amigo que compre.
+                </p>
+              </div>
+            </div>
+
+            {/* Métricas / Billetera Virtual */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-white p-5 rounded-2xl border border-emerald-200/80 shadow-xs flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                  <Wallet size={24} />
+                </div>
+                <div>
+                  <span className="text-[11px] uppercase tracking-wider font-bold text-stone-500 block">
+                    Saldo Disponible
+                  </span>
+                  <span className="text-2xl font-extrabold text-emerald-700">
+                    ${(referralInfo?.wallet_balance || 0).toLocaleString('es-CL')}
+                  </span>
+                  <span className="text-[10px] text-stone-400 block mt-0.5">
+                    Se descuenta en tu próximo pedido
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-[#EBE4DA] shadow-xs flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
+                  <Users size={24} />
+                </div>
+                <div>
+                  <span className="text-[11px] uppercase tracking-wider font-bold text-stone-500 block">
+                    Amigos que Compraron
+                  </span>
+                  <span className="text-2xl font-extrabold text-secondary-brown">
+                    {referralInfo?.total_friends || 0}
+                  </span>
+                  <span className="text-[10px] text-stone-400 block mt-0.5">
+                    Perritos alimentados sanamente
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-[#EBE4DA] shadow-xs flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center shrink-0">
+                  <Gift size={24} />
+                </div>
+                <div>
+                  <span className="text-[11px] uppercase tracking-wider font-bold text-stone-500 block">
+                    Total Ganado
+                  </span>
+                  <span className="text-2xl font-extrabold text-purple-700">
+                    ${(referralInfo?.total_earned || 0).toLocaleString('es-CL')}
+                  </span>
+                  <span className="text-[10px] text-stone-400 block mt-0.5">
+                    Acumulado histórico
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Tarjeta de Código QR y Compartir */}
+            <div className="bg-white rounded-3xl border border-[#EBE4DA] p-6 md:p-8 shadow-xs grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+              {/* QR Code Container */}
+              <div className="md:col-span-5 flex flex-col items-center text-center p-6 bg-[#faf7f2] rounded-2xl border border-[#EBE4DA]">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-primary-green mb-3">
+                  Tu Código QR Personal
+                </span>
+                
+                <div className="bg-white p-3.5 rounded-2xl border-2 border-primary-green/20 shadow-md">
+                  <QRCodeSVG 
+                    value={referralInfo?.referral_url || `https://origencanino.cl/?ref=${customer?.referral_code || 'ORIGEN'}`}
+                    size={175}
+                    level="H"
+                    includeMargin={false}
+                  />
+                </div>
+
+                <p className="text-xs text-stone-500 mt-3 max-w-xs leading-relaxed">
+                  Muestra este QR desde tu teléfono a otros dueños en el parque o condominio para que lo escaneen al instante.
+                </p>
+              </div>
+
+              {/* Acciones de Enlace y WhatsApp */}
+              <div className="md:col-span-7 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1">
+                    Tu Código de Descuento Exclusivo:
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="flex-1 p-3 bg-stone-50 border border-stone-200 rounded-xl font-mono text-base font-extrabold text-secondary-brown text-center tracking-widest">
+                      {referralInfo?.referral_code || customer?.referral_code || 'CARGANDO...'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const code = referralInfo?.referral_code || customer?.referral_code;
+                        if (code) {
+                          navigator.clipboard.writeText(code);
+                          setCopiedCode(true);
+                          setTimeout(() => setCopiedCode(false), 2000);
+                        }
+                      }}
+                      className="px-4 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shrink-0"
+                    >
+                      {copiedCode ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
+                      <span>{copiedCode ? '¡Copiado!' : 'Copiar Código'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1">
+                    Tu Enlace Directo Compartible:
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={referralInfo?.referral_url || `https://origencanino.cl/?ref=${customer?.referral_code || ''}`}
+                      className="flex-1 p-3 bg-stone-50 border border-stone-200 rounded-xl text-xs font-mono text-stone-600 outline-none truncate"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const url = referralInfo?.referral_url || `https://origencanino.cl/?ref=${customer?.referral_code || ''}`;
+                        navigator.clipboard.writeText(url);
+                        setCopiedUrl(true);
+                        setTimeout(() => setCopiedUrl(false), 2000);
+                      }}
+                      className="px-4 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shrink-0"
+                    >
+                      {copiedUrl ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
+                      <span>{copiedUrl ? '¡Copiado!' : 'Copiar Link'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Botón WhatsApp */}
+                <div className="pt-2">
+                  <a
+                    href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                      `¡Hola! Mi perrito come comida 100% natural en Origen Canino y su salud cambió radicalmente 🐾. Te dejo un 15% de descuento exclusivo para tu primera compra con este link: ${
+                        referralInfo?.referral_url || `https://origencanino.cl/?ref=${customer?.referral_code || ''}`
+                      }`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3.5 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl transition shadow-md flex items-center justify-center gap-2 text-sm cursor-pointer"
+                  >
+                    <Share2 size={18} />
+                    <span>Compartir por WhatsApp con 1 Toque 💬</span>
+                  </a>
+                </div>
+
+                <div className="bg-amber-50/80 border border-amber-200/70 p-3 rounded-xl text-[11px] text-amber-900 leading-relaxed">
+                  💡 <strong>¿Cómo funciona?</strong> Cuando tu amigo realice su primer pedido de mínimo $30.000 con tu código o QR, el sistema te acreditará automáticamente $5.000 CLP en tu billetera. ¡Sin límites de amigos!
+                </div>
+              </div>
+            </div>
+
+            {/* Listado de Amigos que Compraron */}
+            <div className="bg-white rounded-3xl border border-[#EBE4DA] p-6 shadow-xs space-y-4">
+              <h3 className="font-header text-xl text-secondary-brown font-bold flex items-center gap-2">
+                <Users className="text-primary-green" size={20} />
+                Historial de Amigos Referidos
+              </h3>
+
+              {referralInfo?.friends && referralInfo.friends.length > 0 ? (
+                <div className="divide-y divide-stone-100">
+                  {referralInfo.friends.map((f, idx) => (
+                    <div key={idx} className="py-3.5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs">
+                      <div>
+                        <strong className="text-secondary-brown text-sm block">{f.customer_name}</strong>
+                        <span className="text-stone-400">Fecha: {f.created_at} • Pedido #{f.id}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-stone-700">${(parseInt(f.total) || 0).toLocaleString('es-CL')}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                          f.payment_status?.toLowerCase().includes('pagado')
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {f.payment_status?.toLowerCase().includes('pagado') ? '+ $5.000 Acreditados' : 'Pendiente de Pago'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-stone-400 text-xs">
+                  <p className="font-medium text-stone-600">Aún no tienes amigos registrados con compras.</p>
+                  <p className="mt-1">¡Comparte tu código en tu próximo paseo al parque y empieza a sumar saldo!</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

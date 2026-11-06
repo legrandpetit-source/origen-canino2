@@ -187,6 +187,12 @@ export const CustomerProvider = ({ children }) => {
     return res.json();
   };
 
+  const fetchReferralInfo = async () => {
+    const res = await fetchWithCustomerAuth('/api/customer/referral');
+    if (!res.ok) throw new Error('Error al cargar información de referidos');
+    return res.json();
+  };
+
   const openAuthModal = (mode = 'login', onSuccess = null) => {
     setAuthModalMode(mode);
     setOnAuthSuccessCallback(() => onSuccess);
@@ -213,6 +219,7 @@ export const CustomerProvider = ({ children }) => {
       deleteDog,
       uploadDogPhoto,
       fetchOrders,
+      fetchReferralInfo,
       fetchWithCustomerAuth
     }}>
       {children}

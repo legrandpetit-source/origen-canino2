@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, ArrowLeft, CreditCard, Landmark, Sparkles, Building2, ShieldCheck, Copy, Check, UserCheck, Dog, RefreshCw, Info, Gift, Tag, Mail, Lock, User, Phone, MapPin, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { X, CheckCircle, ArrowLeft, CreditCard, Landmark, Sparkles, Building2, ShieldCheck, Copy, Check, UserCheck, Dog, RefreshCw, Info, Gift, Tag, Mail, Lock, User, Phone, MapPin, Eye, EyeOff, ArrowRight, Wallet } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useCustomer } from '../../context/CustomerContext';
 
@@ -52,6 +52,7 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
   const [loginPasswordInput, setLoginPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [useWalletBalance, setUseWalletBalance] = useState(true);
   
   const [paymentMethod, setPaymentMethod] = useState('mercadopago'); // 'mercadopago' | 'transferencia'
   const [bankSettings, setBankSettings] = useState({
@@ -161,9 +162,11 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
   if (!isSubscription && appliedNfcDiscount === 0) {
     if (appliedCoupon && appliedCouponData && appliedCouponData.valid) {
       appliedPromoDiscount = appliedCouponData.discount_amount || 0;
-      promoDiscountLabel = appliedCouponData.discount_type === 'percentage'
-        ? `Cupón ${appliedCoupon} (${appliedCouponData.discount_value}% OFF)`
-        : `Cupón ${appliedCoupon} (-$${appliedCouponData.discount_amount.toLocaleString('es-CL')})`;
+      promoDiscountLabel = appliedCouponData.is_referral
+        ? (appliedCouponData.description || `Código Amigo (${appliedCouponData.discount_value}% OFF)`)
+        : (appliedCouponData.discount_type === 'percentage'
+          ? `Cupón ${appliedCoupon} (${appliedCouponData.discount_value}% OFF)`
+          : `Cupón ${appliedCoupon} (-$${appliedCouponData.discount_amount.toLocaleString('es-CL')})`);
     } else if (isEligibleForFirstOrder && firstOrderPromo?.enabled && !appliedCoupon) {
       appliedPromoDiscount = Math.round(total * (Number(firstOrderPromo.percent || 10) / 100));
       promoDiscountLabel = `Descuento 1ra Compra (${firstOrderPromo.percent}% OFF)`;
@@ -174,7 +177,12 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
 
   const subtotalAfterDiscount = Math.max(0, total - totalDiscount);
   const shippingCost = isSubscription ? 0 : (subtotalAfterDiscount < 100000 ? 5000 : 0);
-  const finalTotal = subtotalAfterDiscount + shippingCost;
+  
+  // Descuento de Billetera Virtual (Referidos)
+  const availableWallet = Number(customer?.wallet_balance || 0);
+  const totalBeforeWallet = subtotalAfterDiscount + shippingCost;
+  const walletDeduction = (useWalletBalance && availableWallet > 0) ? Math.min(availableWallet, totalBeforeWallet) : 0;
+  const finalTotal = Math.max(0, totalBeforeWallet - walletDeduction);
 
   // Validación de cupón contra el endpoint /api/promotions/validate
   const validateAndApplyCoupon = async (codeToTest) => {
@@ -433,6 +441,8 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
         nfc_building_code: nfcCommunity ? nfcCommunity.slug : null,
         discount_amount: totalDiscount,
         coupon_code: appliedCoupon || null,
+        referral_code: appliedCouponData?.is_referral ? appliedCoupon : (sessionStorage.getItem('origencanino_referral_code') || null),
+        use_wallet_balance: useWalletBalance && walletDeduction > 0,
         items: items.map(item => ({
           id: item.id,
           name: item.name,
@@ -1316,6 +1326,29 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                       <p className="text-xs text-primary-green">
                         ¡Agrega ${(100000 - subtotalAfterDiscount).toLocaleString('es-CL')} más para despacho gratis en RM!
                       </p>
+                    )}
+
+                    {availableWallet > 0 && (
+                      <div className="bg-amber-50/80 border border-amber-200 p-2.5 rounded-xl space-y-1.5">
+                        <label className="flex items-center justify-between text-xs font-bold text-amber-900 cursor-pointer">
+                          <span className="flex items-center gap-1.5">
+                            <Wallet size={15} className="text-amber-700" />
+                            Pagar con Saldo Billetera (${availableWallet.toLocaleString('es-CL')} disp.)
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={useWalletBalance}
+                            onChange={(e) => setUseWalletBalance(e.target.checked)}
+                            className="w-4 h-4 text-primary-green rounded cursor-pointer"
+                          />
+                        </label>
+                        {useWalletBalance && walletDeduction > 0 && (
+                          <div className="flex justify-between text-xs text-amber-800 font-bold pt-1 border-t border-amber-200/60">
+                            <span>Descuento de Billetera Aplicado</span>
+                            <span>-${walletDeduction.toLocaleString('es-CL')}</span>
+                          </div>
+                        )}
+                      </div>
                     )}
 
                     <div className="border-t pt-2.5 mt-2 flex justify-between font-bold text-xl">

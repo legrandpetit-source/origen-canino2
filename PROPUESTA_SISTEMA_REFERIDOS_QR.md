@@ -174,3 +174,4 @@ Para que tengas control total de las ventas generadas por este canal:
 ## 9. Conclusión y Veredicto
 
 Esta iniciativa convierte el costo de marketing tradicional (que normalmente se le paga a Meta o Google Ads) en **premios para tus propios clientes**. Es la estrategia con mayor fidelización existente para marcas D2C (*Direct to Consumer*) de alimentos premium.
+

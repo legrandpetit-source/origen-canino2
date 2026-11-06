@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, Sparkles, X, Calculator, ArrowRight, HeartPulse, Bone } from 'lucide-react';
+import { Building2, Sparkles, X, Calculator, ArrowRight, HeartPulse, Bone, Gift } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import Especialidades from './Especialidades';
 import Blog from './Blog';
@@ -21,6 +21,8 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [nfcBannerOpen, setNfcBannerOpen] = useState(true);
+  const [referralBanner, setReferralBanner] = useState(null);
+  const [referralBannerOpen, setReferralBannerOpen] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('all'); // 'all', 'barf', 'cocinada', 'snack'
 
   useEffect(() => {
@@ -37,6 +39,22 @@ const Home = () => {
           }
         })
         .catch(err => console.error("Error validando NFC:", err));
+    }
+
+    // Detectar si el usuario ingresó por un enlace o QR de referido (?ref=codigo)
+    const refParam = params.get('ref');
+    if (refParam) {
+      fetch(`/api/referral/validate/${encodeURIComponent(refParam)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.valid) {
+            setReferralBanner(data);
+            setReferralBannerOpen(true);
+            sessionStorage.setItem('origencanino_referral_code', data.referral_code);
+            localStorage.setItem('origencanino_coupon_code', data.referral_code);
+          }
+        })
+        .catch(err => console.error("Error validando referido:", err));
     }
 
     // Escuchar eventos de filtro desde otras secciones (e.g. Especialidades)
@@ -114,6 +132,54 @@ const Home = () => {
                 </a>
                 <button 
                   onClick={() => setNfcBannerOpen(false)}
+                  className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition"
+                  title="Cerrar aviso"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Banner de Bienvenida Referido (Amigo) */}
+      <AnimatePresence>
+        {referralBanner && referralBannerOpen && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="bg-emerald-700 text-white px-4 py-3 shadow-md border-b border-white/20 relative z-30"
+          >
+            <div className="container mx-auto flex flex-col md:flex-row items-center justify-between gap-3 max-w-6xl">
+              <div className="flex items-center gap-3">
+                <div className="bg-white/20 p-2 rounded-full text-white backdrop-blur-xs">
+                  <Gift size={22} />
+                </div>
+                <div>
+                  <p className="font-header font-bold text-base flex items-center gap-2">
+                    ¡Tu amigo {referralBanner.referrer_name}{referralBanner.dog_name ? ` y ${referralBanner.dog_name}` : ''} te regaló un descuento especial! 🐾
+                  </p>
+                  <p className="text-xs text-white/90">
+                    Código: <span className="font-mono font-bold bg-white/20 px-2 py-0.5 rounded-md">{referralBanner.referral_code}</span>
+                    {" • "}
+                    <strong className="text-amber-300 font-bold text-xs bg-black/20 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                      <Sparkles size={11} /> {referralBanner.discount_percent}% de Descuento Exclusivo
+                    </strong> para tu primer pedido.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <a 
+                  href="#tienda" 
+                  className="bg-white text-emerald-800 font-header font-bold text-xs uppercase tracking-wider px-3.5 py-1.5 rounded-xl hover:bg-[#FAF7F2] transition shadow-xs"
+                >
+                  Ver Menús
+                </a>
+                <button 
+                  onClick={() => setReferralBannerOpen(false)}
                   className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition"
                   title="Cerrar aviso"
                 >

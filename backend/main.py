@@ -19,6 +19,7 @@ from PIL import Image, UnidentifiedImageError, ImageOps
 import io
 import uuid
 import random
+import string
 from datetime import datetime, timedelta, timezone
 import bcrypt
 import jwt
@@ -246,6 +247,8 @@ class OrderCreate(BaseModel):
     nfc_building_code: Optional[str] = None
     discount_amount: Optional[int] = 0
     coupon_code: Optional[str] = None
+    referral_code: Optional[str] = None
+    use_wallet_balance: Optional[bool] = False
 
 class CouponCreate(BaseModel):
     code: str
@@ -534,6 +537,72 @@ def notify_telegram(message: str):
             pass
     except Exception as e:
         print("Error enviando notificación a Telegram:", e)
+
+def generate_customer_referral_code(name: str, cursor) -> str:
+    base = re.sub(r'[^A-Z0-9]', '', (name or "").upper())[:5]
+    if len(base) < 3:
+        base = "AMIGO"
+    for _ in range(10):
+        digits = "".join(random.choices(string.digits, k=3))
+        code = f"{base}-{digits}"
+        cursor.execute("SELECT id FROM customers WHERE UPPER(referral_code) = %s", (code,))
+        if not cursor.fetchone():
+            return code
+    return f"REF-{int(time.time()) % 100000}"
+
+def check_and_award_referral(cursor, order_id: int):
+    """
+    Checks if order_id was referred by a customer code and awards the reward if not already awarded.
+    """
+    try:
+        cursor.execute("""
+            SELECT o.id, o.customer_name, o.customer_email, o.referral_code, o.payment_status, o.customer_id
+            FROM orders o
+            WHERE o.id = %s
+        """, (order_id,))
+        o = cursor.fetchone()
+        if not o or not o.get('referral_code'):
+            return
+
+        ref_code = o['referral_code'].strip().upper()
+        
+        # Verificar si ya se recompensó esta orden
+        cursor.execute("SELECT id FROM referral_transactions WHERE order_id = %s AND transaction_type = 'reward_earned'", (order_id,))
+        if cursor.fetchone():
+            return
+
+        # Buscar al cliente dueño de este código
+        cursor.execute("SELECT id, name, email FROM customers WHERE UPPER(referral_code) = %s", (ref_code,))
+        referrer = cursor.fetchone()
+        if not referrer:
+            return
+
+        # Evitar auto-referido
+        if referrer['email'].strip().lower() == o['customer_email'].strip().lower():
+            return
+
+        # Obtener monto de recompensa configurado (por defecto $5.000)
+        cursor.execute("SELECT value FROM system_settings WHERE key = 'referral_reward_amount'")
+        rew_row = cursor.fetchone()
+        reward_amount = int(rew_row['value']) if rew_row and rew_row.get('value') else 5000
+
+        # Acreditar a la billetera del referidor
+        cursor.execute("UPDATE customers SET wallet_balance = COALESCE(wallet_balance, 0) + %s WHERE id = %s", (reward_amount, referrer['id']))
+
+        # Registrar transacción
+        cursor.execute("""
+            INSERT INTO referral_transactions (referrer_customer_id, referee_customer_id, order_id, transaction_type, amount, description, status)
+            VALUES (%s, %s, %s, 'reward_earned', %s, %s, 'completed')
+        """, (referrer['id'], o.get('customer_id'), order_id, reward_amount, f"Recompensa por amigo referido: {o['customer_name']} (Pedido #{order_id})"))
+
+        # Notificar por Telegram
+        msg = f"🎁 *¡Recompensa por Referido Acreditada!* 🐾\n\n"
+        msg += f"👤 *Embajador:* {referrer['name']} ({referrer['email']})\n"
+        msg += f"🐶 *Amigo Comprador:* {o['customer_name']} (Pedido #{order_id})\n"
+        msg += f"💰 *Saldo Abonado a Billetera:* +${reward_amount:,} CLP\n"
+        notify_telegram(msg)
+    except Exception as e_ref:
+        print("Error en check_and_award_referral:", e_ref)
 
 def log_security_event(user_email: str, action: str, status: str = "success", ip_address: str = "127.0.0.1", details: str = ""):
     try:
@@ -961,11 +1030,12 @@ def customer_register(req: CustomerRegisterRequest):
             raise HTTPException(status_code=400, detail="Ya existe una cuenta con este correo electrónico. Inicia sesión.")
             
         pwd_hash = get_password_hash(req.password)
+        ref_code = generate_customer_referral_code(req.name.strip(), cursor)
         cursor.execute("""
-            INSERT INTO customers (name, email, password_hash, phone, address, city, region)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            RETURNING id, name, email, phone, address, city, region, created_at
-        """, (req.name.strip(), clean_email, pwd_hash, req.phone, req.address, req.city, req.region or "Región Metropolitana"))
+            INSERT INTO customers (name, email, password_hash, phone, address, city, region, referral_code)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, name, email, phone, address, city, region, referral_code, wallet_balance, created_at
+        """, (req.name.strip(), clean_email, pwd_hash, req.phone, req.address, req.city, req.region or "Región Metropolitana", ref_code))
         
         customer = cursor.fetchone()
         customer_id = customer["id"]
@@ -1032,11 +1102,19 @@ def customer_login(req: CustomerLoginRequest):
 def get_customer_profile(customer_id: int = Depends(get_current_customer)):
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, email, phone, address, city, region, created_at FROM customers WHERE id = %s", (customer_id,))
+        cursor.execute("SELECT id, name, email, phone, address, city, region, referral_code, wallet_balance, created_at FROM customers WHERE id = %s", (customer_id,))
         customer = cursor.fetchone()
         if not customer:
             raise HTTPException(status_code=404, detail="Cliente no encontrado")
             
+        if not customer.get("referral_code"):
+            ref_code = generate_customer_referral_code(customer["name"], cursor)
+            cursor.execute("UPDATE customers SET referral_code = %s WHERE id = %s", (ref_code, customer_id))
+            conn.commit()
+            customer["referral_code"] = ref_code
+            
+        customer["wallet_balance"] = float(customer.get("wallet_balance") or 0.0)
+
         cursor.execute("SELECT id, name, weight, age_stage, favorite_diet, notes, photo_url FROM customer_dogs WHERE customer_id = %s ORDER BY id ASC", (customer_id,))
         dogs = cursor.fetchall()
         for d in dogs:
@@ -1227,6 +1305,107 @@ def get_customer_orders(customer_id: int = Depends(get_current_customer)):
             o["items"] = cursor.fetchall()
             
         return orders
+
+# --- Customer Referral & Ambassadors Program Endpoints ---
+@app.get("/api/customer/referral")
+def get_customer_referral_info(customer_id: int = Depends(get_current_customer)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, name, email, referral_code, wallet_balance 
+            FROM customers WHERE id = %s
+        """, (customer_id,))
+        c = cursor.fetchone()
+        if not c:
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+        
+        ref_code = c.get('referral_code')
+        if not ref_code:
+            ref_code = generate_customer_referral_code(c['name'], cursor)
+            cursor.execute("UPDATE customers SET referral_code = %s WHERE id = %s", (ref_code, customer_id))
+            conn.commit()
+        
+        # Obtener configuracion del programa
+        cursor.execute("SELECT key, value FROM system_settings WHERE key IN ('referral_program_active', 'referral_friend_discount_percent', 'referral_reward_amount', 'referral_min_order_amount')")
+        settings = {r['key']: r['value'] for r in cursor.fetchall()}
+        
+        # Historial de transacciones de la billetera
+        cursor.execute("""
+            SELECT id, transaction_type, amount, description, status, created_at 
+            FROM referral_transactions 
+            WHERE referrer_customer_id = %s 
+            ORDER BY id DESC
+        """, (customer_id,))
+        txs = cursor.fetchall()
+        for t in txs:
+            if isinstance(t.get('created_at'), datetime):
+                t['created_at'] = t['created_at'].strftime("%d/%m/%Y %H:%M")
+            t['amount'] = float(t['amount'])
+        
+        # Amigos referidos (órdenes realizadas con este código)
+        cursor.execute("""
+            SELECT o.id, o.customer_name, o.total, o.payment_status, o.created_at
+            FROM orders o
+            WHERE UPPER(o.referral_code) = %s
+            ORDER BY o.id DESC
+        """, (ref_code.upper(),))
+        friends = cursor.fetchall()
+        for f in friends:
+            if isinstance(f.get('created_at'), datetime):
+                f['created_at'] = f['created_at'].strftime("%d/%m/%Y")
+        
+        wallet_bal = float(c.get('wallet_balance') or 0.0)
+        total_earned = sum(t['amount'] for t in txs if t['transaction_type'] == 'reward_earned' and t['status'] == 'completed')
+        
+        return {
+            "referral_code": ref_code,
+            "referral_url": f"https://origencanino.cl/?ref={ref_code}",
+            "wallet_balance": wallet_bal,
+            "total_earned": total_earned,
+            "total_friends": len(friends),
+            "discount_percent": int(settings.get('referral_friend_discount_percent', 15)),
+            "reward_amount": int(settings.get('referral_reward_amount', 5000)),
+            "min_order_amount": int(settings.get('referral_min_order_amount', 30000)),
+            "program_active": settings.get('referral_program_active', '1') == '1',
+            "transactions": txs,
+            "friends": friends
+        }
+
+@app.get("/api/referral/validate/{code}")
+def validate_referral_slug(code: str):
+    clean_code = (code or "").strip().upper()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT c.id, c.name, cd.name as dog_name
+            FROM customers c
+            LEFT JOIN customer_dogs cd ON cd.customer_id = c.id
+            WHERE UPPER(c.referral_code) = %s
+            ORDER BY cd.id ASC LIMIT 1
+        """, (clean_code,))
+        row = cursor.fetchone()
+        if not row:
+            return {"valid": False, "message": "Código de referido no encontrado"}
+        
+        cursor.execute("SELECT key, value FROM system_settings WHERE key IN ('referral_program_active', 'referral_friend_discount_percent', 'referral_min_order_amount')")
+        s = {r['key']: r['value'] for r in cursor.fetchall()}
+        if s.get('referral_program_active', '1') != '1':
+            return {"valid": False, "message": "El programa de referidos está temporalmente pausado"}
+            
+        first_name = (row['name'] or '').split()[0]
+        dog_str = f" y {row['dog_name']}" if row.get('dog_name') else ""
+        discount_pct = int(s.get('referral_friend_discount_percent', 15))
+        min_order = int(s.get('referral_min_order_amount', 30000))
+        
+        return {
+            "valid": True,
+            "referral_code": clean_code,
+            "referrer_name": first_name,
+            "dog_name": row.get('dog_name'),
+            "discount_percent": discount_pct,
+            "min_order_amount": min_order,
+            "welcome_message": f"¡Regalo de {first_name}{dog_str}! Tienes un {discount_pct}% OFF en tu primera compra."
+        }
 
 # --- Endpoints ---
 @app.get("/api/products", response_model=List[ProductResponse])
@@ -1778,7 +1957,18 @@ def create_order(order: OrderCreate, req: Request):
                         VALUES (%s, %s, %s, %s)
                     """, (linked_customer_id, order.dog_name, order.dog_weight, order.dog_age or 'adulto'))
 
+            wallet_discount = 0
+            if order.use_wallet_balance and linked_customer_id:
+                cursor.execute("SELECT wallet_balance FROM customers WHERE id = %s", (linked_customer_id,))
+                w_row = cursor.fetchone()
+                av_wallet = float(w_row['wallet_balance']) if w_row and w_row.get('wallet_balance') else 0.0
+                if av_wallet > 0:
+                    wallet_discount = int(min(av_wallet, total))
+                    total = max(0, total - wallet_discount)
+                    cursor.execute("UPDATE customers SET wallet_balance = wallet_balance - %s WHERE id = %s", (wallet_discount, linked_customer_id))
+
             coupon_applied = order.coupon_code.strip().upper() if order.coupon_code else None
+            ref_applied = order.referral_code.strip().upper() if order.referral_code else None
 
             cursor.execute("""
                 INSERT INTO orders (
@@ -1786,19 +1976,27 @@ def create_order(order: OrderCreate, req: Request):
                     customer_city, customer_region, subtotal, shipping_cost, total, 
                     is_subscription, dog_name, dog_weight, dog_age, payment_method, 
                     transfer_bank, transfer_receipt_number, nfc_building_code, 
-                    discount_amount, coupon_code, payment_status, customer_id
+                    discount_amount, coupon_code, payment_status, customer_id,
+                    referral_code, wallet_discount
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
                 RETURNING id
             """, (
                 order.customer_name, order.customer_email, order.customer_phone, order.customer_address, 
                 order.customer_city, order.customer_region, subtotal, shipping_cost, total, 
                 int(order.is_subscription), order.dog_name, order.dog_weight, order.dog_age,
                 order.payment_method or 'transferencia', order.transfer_bank, order.transfer_receipt_number,
-                order.nfc_building_code, discount, coupon_applied, initial_payment_status, linked_customer_id
+                order.nfc_building_code, discount, coupon_applied, initial_payment_status, linked_customer_id,
+                ref_applied, wallet_discount
             ))
             
             order_id = cursor.fetchone()['id']
+
+            if wallet_discount > 0 and linked_customer_id:
+                cursor.execute("""
+                    INSERT INTO referral_transactions (referrer_customer_id, order_id, transaction_type, amount, description, status)
+                    VALUES (%s, %s, 'wallet_spent', %s, %s, 'completed')
+                """, (linked_customer_id, order_id, -wallet_discount, f"Uso de saldo en Pedido #{order_id}"))
 
             # Registrar uso de cupón en la tabla coupon_usages e incrementar times_used si aplica
             if coupon_applied:
@@ -2007,6 +2205,7 @@ async def mercadopago_webhook(request: Request):
                             SET payment_status = 'Pagado', mercadopago_payment_id = %s
                             WHERE id = %s
                         """, (str(data_id), order_id))
+                        check_and_award_referral(cursor, order_id)
                         
                         # Obtener datos completos de la orden y productos para la notificación
                         cursor.execute("SELECT * FROM orders WHERE id = %s", (order_id,))
@@ -2415,6 +2614,52 @@ def validate_coupon_endpoint(req: ValidateCouponRequest):
         cursor.execute("SELECT * FROM coupons WHERE UPPER(code) = %s", (code,))
         c_row = cursor.fetchone()
         if not c_row:
+            # 3. Comprobar si es un Código de Referido / Amigo Embajador
+            cursor.execute("""
+                SELECT c.id, c.name, c.email, c.referral_code, cd.name as dog_name
+                FROM customers c
+                LEFT JOIN customer_dogs cd ON cd.customer_id = c.id
+                WHERE UPPER(c.referral_code) = %s
+                ORDER BY cd.id ASC LIMIT 1
+            """, (code,))
+            ref_row = cursor.fetchone()
+            if ref_row:
+                cursor.execute("SELECT key, value FROM system_settings WHERE key IN ('referral_program_active', 'referral_friend_discount_percent', 'referral_min_order_amount')")
+                s_rows = {r['key']: r['value'] for r in cursor.fetchall()}
+                if s_rows.get('referral_program_active', '1') != '1':
+                    return {"valid": False, "code": code, "message": "El programa de referidos no está activo en este momento."}
+                
+                # Anti-auto-referido
+                if clean_email and clean_email == ref_row['email'].strip().lower():
+                    return {"valid": False, "code": code, "message": "No puedes usar tu propio código de referido."}
+                
+                # Solo primera compra
+                if clean_email:
+                    cursor.execute("SELECT COUNT(*) as cnt FROM orders WHERE LOWER(customer_email) = %s AND payment_status != 'Cancelado'", (clean_email,))
+                    cnt_row = cursor.fetchone()
+                    if cnt_row and cnt_row['cnt'] > 0:
+                        return {"valid": False, "code": code, "message": "El código de referido es exclusivo para tu primera compra."}
+                
+                min_order = int(s_rows.get('referral_min_order_amount', 30000))
+                if subtotal < min_order:
+                    return {"valid": False, "code": code, "message": f"Este código de referido requiere una compra mínima de ${min_order:,} CLP.".replace(",", ".")}
+                
+                ref_percent = float(s_rows.get('referral_friend_discount_percent', 15))
+                discount = int(round(subtotal * (ref_percent / 100)))
+                first_name = (ref_row['name'] or 'un amigo').split()[0]
+                dog_str = f" y {ref_row['dog_name']}" if ref_row.get('dog_name') else ""
+                
+                return {
+                    "valid": True,
+                    "code": code,
+                    "is_referral": True,
+                    "discount_type": "percentage",
+                    "discount_value": ref_percent,
+                    "discount_amount": discount,
+                    "description": f"Regalo de {first_name}{dog_str}",
+                    "message": f"¡Código de amigo {code} aplicado! -${discount:,} CLP ({int(ref_percent)}% OFF de regalo de {first_name})".replace(",", ".")
+                }
+
             return {"valid": False, "code": code, "message": f"El cupón '{code}' no existe o no es válido."}
         
         coupon = dict(c_row)
@@ -2646,6 +2891,8 @@ def update_order(order_id: int, update_data: OrderStatusUpdate, current_user: st
             params.append(order_id)
             query = f"UPDATE orders SET {', '.join(updates)} WHERE id = %s"
             cursor.execute(query, tuple(params))
+            if update_data.payment_status == 'Pagado':
+                check_and_award_referral(cursor, order_id)
             conn.commit()
             return {"success": True, "message": "Orden actualizada"}
     except Exception as e:
@@ -2678,6 +2925,74 @@ def bulk_delete_orders(req: BulkDeleteOrdersRequest, current_user: str = Depends
             return {"success": True, "deleted_count": len(req.order_ids)}
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error eliminando los pedidos seleccionados.")
+
+# --- Admin Referrals & Ambassadors Endpoints ---
+@app.get("/api/admin/referrals/summary")
+def get_admin_referrals_summary(current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(DISTINCT referee_customer_id) as total_referred_orders, COALESCE(SUM(amount), 0) as total_rewards_paid FROM referral_transactions WHERE transaction_type = 'reward_earned'")
+            earned_row = cursor.fetchone()
+            
+            cursor.execute("SELECT COALESCE(SUM(ABS(amount)), 0) as total_wallet_spent FROM referral_transactions WHERE transaction_type = 'wallet_spent'")
+            spent_row = cursor.fetchone()
+            
+            cursor.execute("SELECT COUNT(*) as total_referral_orders, COALESCE(SUM(total), 0) as total_revenue FROM orders WHERE referral_code IS NOT NULL AND payment_status = 'Pagado'")
+            rev_row = cursor.fetchone()
+            
+            cursor.execute("""
+                SELECT c.id, c.name, c.email, c.referral_code, c.wallet_balance,
+                       COUNT(DISTINCT rt.id) as rewards_count,
+                       COALESCE(SUM(rt.amount), 0) as total_earned
+                FROM customers c
+                LEFT JOIN referral_transactions rt ON rt.referrer_customer_id = c.id AND rt.transaction_type = 'reward_earned'
+                WHERE c.referral_code IS NOT NULL
+                GROUP BY c.id, c.name, c.email, c.referral_code, c.wallet_balance
+                ORDER BY total_earned DESC, rewards_count DESC
+                LIMIT 20
+            """)
+            top_referrers = cursor.fetchall()
+            for tr in top_referrers:
+                tr['wallet_balance'] = float(tr.get('wallet_balance') or 0.0)
+                tr['total_earned'] = float(tr.get('total_earned') or 0.0)
+                
+            cursor.execute("SELECT key, value FROM system_settings WHERE key LIKE 'referral_%'")
+            settings = {r['key']: r['value'] for r in cursor.fetchall()}
+
+            return {
+                "total_referred_orders": rev_row['total_referral_orders'] if rev_row else 0,
+                "total_revenue": int(rev_row['total_revenue']) if rev_row else 0,
+                "total_rewards_paid": float(earned_row['total_rewards_paid']) if earned_row else 0.0,
+                "total_wallet_spent": float(spent_row['total_wallet_spent']) if spent_row else 0.0,
+                "top_referrers": top_referrers,
+                "settings": {
+                    "referral_program_active": settings.get("referral_program_active", "1") == "1",
+                    "referral_friend_discount_percent": int(settings.get("referral_friend_discount_percent", 15)),
+                    "referral_reward_amount": int(settings.get("referral_reward_amount", 5000)),
+                    "referral_min_order_amount": int(settings.get("referral_min_order_amount", 30000))
+                }
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/admin/referrals/settings")
+def update_admin_referrals_settings(payload: dict, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            for k in ["referral_program_active", "referral_friend_discount_percent", "referral_reward_amount", "referral_min_order_amount"]:
+                if k in payload:
+                    val = "1" if payload[k] is True else ("0" if payload[k] is False else str(payload[k]))
+                    cursor.execute("""
+                        INSERT INTO system_settings (key, value, updated_at)
+                        VALUES (%s, %s, CURRENT_TIMESTAMP)
+                        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
+                    """, (k, val))
+            conn.commit()
+            return {"success": True, "message": "Configuración de referidos guardada exitosamente"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- Testimonials Endpoints ---
 @app.get("/api/testimonials")

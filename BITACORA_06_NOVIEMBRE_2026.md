@@ -68,7 +68,27 @@
   - Integración nativa con `NDEFReader` para teléfonos Android (Google Chrome). Permite grabar y aplicar `makeReadOnly()` tocando físicamente el chip con el teléfono desde el panel web de Origen Canino, sin instalar aplicaciones adicionales.
   - En dispositivos de escritorio o sin antena Web NFC, el modal ofrece una guía guiada paso a paso con botones para copiar la URL exacta y la clave para herramientas externas (como *NFC Tools* o *NXP TagWriter*).
 
-### 4.2 Próxima Fase: Sistema de Referidos con QR ("Vendedores sin Sueldo")
-- Concepto alineado para habilitar a los clientes a compartir un QR con descuento exclusivo, recompensando tanto al referido como al cliente que refiere con descuentos o raciones de regalo.
+### 4.2 Sistema de Referidos y Embajadores por QR ("Vendedores sin Sueldo") - Implementado de Punta a Punta
+- **Base de Datos Hetzner PostgreSQL (`origen-canino-db`):**
+  - Nuevas columnas en `customers`: `referral_code` (único, ej: `CANELO-742`), `wallet_balance` (billetera virtual), `referred_by_customer_id`.
+  - Nueva tabla `referral_transactions`: auditoría contable de recompensas ganadas (`reward_earned`) y saldos utilizados (`wallet_spent`).
+  - Columnas en `orders`: `referral_code` y `wallet_discount`.
+  - Configuración inicial en `system_settings`: 15% OFF de bienvenida para el amigo, $5.000 CLP de abono por compra para el embajador, $30.000 compra mínima.
+  - Asignación de código exclusivo `CANELO-742` para Patricio Padilla.
+- **Backend FastAPI:**
+  - Auto-generación de códigos mnemotécnicos únicos al registrarse nuevos clientes (`generate_customer_referral_code`).
+  - Endpoint de perfil de referidos `GET /api/customer/referral` (datos de QR, enlace compartible, amigos compradores y saldo).
+  - Endpoint de validación pública `GET /api/referral/validate/{code}`.
+  - Integración en `POST /api/promotions/validate`: detecta automáticamente si el código ingresado en el checkout es de un amigo embajador y aplica el 15% OFF con mensaje personalizado.
+  - Deducción de billetera en `POST /api/orders`: si el cliente usa su saldo disponible, se descuenta directamente del total a pagar.
+  - Acreditación automática antifraude (`check_and_award_referral`): acredita los $5.000 a la billetera del cliente promotor cuando el pedido del amigo pasa a estado `Pagado` (Mercado Pago o Transferencia confirmada), con notificación en tiempo real a Telegram.
+  - Endpoints administrativos: `GET /api/admin/referrals/summary` y `POST /api/admin/referrals/settings`.
+- **Frontend y Experiencia de Usuario:**
+  - Pestaña **"Invita y Gana 🐾"** en el Portal de Clientes (`/mi-cuenta`):
+    - Generador de Códigos QR en alta resolución nativo con `qrcode.react`.
+    - Botón de compartir en WhatsApp con 1 toque con mensaje pre-redactado.
+    - Tarjeta de Billetera Virtual con saldo disponible y desglose de amigos compradores.
+  - Detección en Home (`?ref=CODE`): Banner cálido de bienvenida anunciando el regalo de su amigo y pre-cargando el descuento.
+  - Integración en Checkout: Soporte para pagar usando el saldo acumulado de billetera virtual.
 
 
