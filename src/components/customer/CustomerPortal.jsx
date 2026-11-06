@@ -253,36 +253,22 @@ const CustomerPortal = () => {
           <div className="absolute bottom-0 left-0 w-60 h-60 bg-secondary-orange/5 rounded-full blur-2xl pointer-events-none -ml-16 -mb-16" />
 
           <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-            <div className="flex items-center gap-4">
-              {/* Avatar Oficial con Logo Origen Canino */}
-              <div className="w-18 h-18 md:w-20 md:h-20 rounded-3xl bg-[#FAF7F2] p-2 border-2 border-primary-green/25 shadow-xs flex items-center justify-center shrink-0">
-                <img 
-                  src="/logo.webp" 
-                  alt="Origen Canino" 
-                  className="w-full h-full object-contain"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
-                />
-                <PawPrint size={32} className="text-primary-green hidden only:block" />
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="font-header text-2xl md:text-3xl text-secondary-brown font-extrabold tracking-tight">
+                  ¡Hola, {customer.name}!
+                </h1>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#db994b]/15 text-[#9e6320] text-xs font-bold rounded-full border border-[#db994b]/30">
+                  <Sparkles size={13} className="text-[#db994b]" />
+                  Cliente Nutrición Real
+                </span>
               </div>
 
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="font-header text-2xl md:text-3xl text-secondary-brown font-extrabold tracking-tight">
-                    ¡Hola, {customer.name}!
-                  </h1>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#db994b]/15 text-[#9e6320] text-xs font-bold rounded-full border border-[#db994b]/30">
-                    <Sparkles size={13} className="text-[#db994b]" />
-                    Cliente Nutrición Real
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-y-1 gap-x-3 text-xs md:text-sm text-stone-500 mt-1.5">
-                  <span className="flex items-center gap-1 text-stone-700 font-medium">
-                    <Mail size={13} className="text-primary-green" />
-                    {customer.email}
-                  </span>
+              <div className="flex flex-wrap items-center gap-y-1 gap-x-3 text-xs md:text-sm text-stone-500 mt-1.5">
+                <span className="flex items-center gap-1 text-stone-700 font-medium">
+                  <Mail size={13} className="text-primary-green" />
+                  {customer.email}
+                </span>
                   {customer.phone && (
                     <span className="flex items-center gap-1 text-stone-600">
                       • <Phone size={13} className="text-primary-green" />
@@ -297,7 +283,6 @@ const CustomerPortal = () => {
                   )}
                 </div>
               </div>
-            </div>
 
             {/* Acciones Rápidas */}
             <div className="flex items-center gap-2.5 w-full md:w-auto justify-end">
