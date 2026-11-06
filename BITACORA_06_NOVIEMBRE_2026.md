@@ -49,3 +49,26 @@
 - **Repositorio:** Sincronizado en rama `main` en GitHub.
 - **Bundle Frontend Activo:** `assets/index-BK3B3SNL.js` y `assets/index-DboOrQKK.css`.
 - **Servidor:** Hetzner VPS `167.233.122.18` operando con Nginx SSL y PostgreSQL 17 Alpine en `origen-canino-db`.
+
+---
+
+## 4. Jornada Mañana - 6 de Noviembre de 2026: Blindaje Hardware NFC y Formulario Dinámico
+
+### 4.1 Programador y Blindaje NFC en Panel Administrativo (`/admin` -> Puntos NFC)
+- **Modal Integrado de Grabación y Blindaje:**
+  - Nueva acción principal en tarjetas de edificios: **"Programar Chip NFC"** con acceso directo a hardware.
+  - Selección de dos niveles de seguridad según el caso de uso:
+    1. **Blindado Total (Solo Lectura Permanente - Quemado por Hardware):** Recomendado para acrílicos instalados en conserjerías de condominios. El chip se convierte irreversiblemente en ROM. Ningún usuario con apps externas (como *NFC Tools* o *Flipper Zero*) puede sobreescribir la URL ni inyectar enlaces fraudulentos.
+    2. **Modo Prueba / Protegido por Contraseña:** Para chips de taller/desarrollo que requieran ser regrabados.
+- **Seguridad de Contraseñas (Sin Hardcodeo):**
+  - La clave de seguridad NFC **NO queda escrita en el código fuente**.
+  - Se administra dinámicamente desde un formulario con visualización segura (toggle ver/ocultar) y botón de copiado.
+  - Se persiste en la tabla `system_settings` de PostgreSQL a través de los nuevos endpoints `GET /api/admin/nfc-settings` y `POST /api/admin/nfc-settings`.
+- **Soporte de Web NFC en el Navegador:**
+  - Integración nativa con `NDEFReader` para teléfonos Android (Google Chrome). Permite grabar y aplicar `makeReadOnly()` tocando físicamente el chip con el teléfono desde el panel web de Origen Canino, sin instalar aplicaciones adicionales.
+  - En dispositivos de escritorio o sin antena Web NFC, el modal ofrece una guía guiada paso a paso con botones para copiar la URL exacta y la clave para herramientas externas (como *NFC Tools* o *NXP TagWriter*).
+
+### 4.2 Próxima Fase: Sistema de Referidos con QR ("Vendedores sin Sueldo")
+- Concepto alineado para habilitar a los clientes a compartir un QR con descuento exclusivo, recompensando tanto al referido como al cliente que refiere con descuentos o raciones de regalo.
+
+

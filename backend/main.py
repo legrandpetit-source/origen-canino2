@@ -2137,6 +2137,46 @@ def delete_building(b_id: int, current_user: str = Depends(get_current_admin)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# --- NFC Settings (Master Password & Defaults) ---
+@app.get("/api/admin/nfc-settings")
+def get_admin_nfc_settings(current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT key, value FROM system_settings WHERE key IN ('nfc_master_password', 'nfc_default_mode')")
+            rows = cursor.fetchall()
+            settings = {r['key']: r['value'] for r in rows}
+            return {
+                "nfc_master_password": settings.get("nfc_master_password", "ORIGEN2026"),
+                "nfc_default_mode": settings.get("nfc_default_mode", "burn")
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/admin/nfc-settings")
+def update_admin_nfc_settings(payload: dict, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            if "nfc_master_password" in payload:
+                pwd = str(payload["nfc_master_password"]).strip()
+                cursor.execute("""
+                    INSERT INTO system_settings (key, value, updated_at)
+                    VALUES ('nfc_master_password', %s, CURRENT_TIMESTAMP)
+                    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
+                """, (pwd,))
+            if "nfc_default_mode" in payload:
+                mode = str(payload["nfc_default_mode"]).strip()
+                cursor.execute("""
+                    INSERT INTO system_settings (key, value, updated_at)
+                    VALUES ('nfc_default_mode', %s, CURRENT_TIMESTAMP)
+                    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
+                """, (mode,))
+            conn.commit()
+            return {"success": True, "message": "Configuración NFC guardada exitosamente"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # --- Public Bank & System Settings ---
 @app.get("/api/settings/bank-transfer")
 def get_public_bank_settings():
