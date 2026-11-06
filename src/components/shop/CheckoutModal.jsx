@@ -1258,7 +1258,7 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                                     validateAndApplyCoupon();
                                   }
                                 }}
-                                placeholder="Ej: BIENVENIDO10, CANELO15"
+                                placeholder="Ingresa tu código aquí"
                                 className="flex-1 border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono font-bold tracking-wider focus:ring-2 focus:ring-[#db994b] outline-none bg-white uppercase"
                               />
                               <button
