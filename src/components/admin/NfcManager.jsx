@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Building2, Plus, Copy, Check, Edit2, Trash2, MapPin, Sparkles, Navigation, 
   Phone, ExternalLink, Shield, ShieldCheck, ShieldAlert, Key, Lock, Unlock, 
@@ -40,6 +40,32 @@ const NfcManager = ({ fetchWithAuth }) => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [globalMasterPassword, setGlobalMasterPassword] = useState('ORIGEN2026');
   const [globalDefaultMode, setGlobalDefaultMode] = useState('burn');
+
+  // Controladores de sesión NFC y Timeout para evitar bloqueos en Android
+  const abortControllerRef = useRef(null);
+  const nfcTimeoutRef = useRef(null);
+
+  const cancelNfcSession = () => {
+    if (nfcTimeoutRef.current) {
+      clearTimeout(nfcTimeoutRef.current);
+      nfcTimeoutRef.current = null;
+    }
+    if (abortControllerRef.current) {
+      try {
+        abortControllerRef.current.abort();
+      } catch (e) {
+        console.warn("NFC abort:", e);
+      }
+      abortControllerRef.current = null;
+    }
+    setNfcStatus('idle');
+  };
+
+  useEffect(() => {
+    return () => {
+      cancelNfcSession();
+    };
+  }, []);
 
   // Detectar soporte de Web NFC
   const isWebNfcSupported = typeof window !== 'undefined' && 'NDEFReader' in window;
@@ -110,6 +136,7 @@ const NfcManager = ({ fetchWithAuth }) => {
   };
 
   const openProgramModal = (building) => {
+    cancelNfcSession();
     setSelectedBuilding(building);
     setNfcStatus('idle');
     setNfcError(null);
@@ -197,24 +224,35 @@ const NfcManager = ({ fetchWithAuth }) => {
     }
   };
 
-  // --- Grabación Web NFC Directa ---
-  const handleStartNfcWrite = async () => {
+  // --- Grabación Web NFC Directa (Arquitectura de 2 Pasos Segura con AbortController) ---
+  
+  // Paso 1: Grabar la URL en el Chip NFC
+  const handleStartNfcWriteUrl = async () => {
     if (!isWebNfcSupported) {
-      setNfcError('Web NFC no está disponible en este dispositivo. Abre este panel desde Chrome en un teléfono Android con NFC.');
+      setNfcError('Web NFC no está disponible en este dispositivo. Abre este panel desde Chrome en un teléfono Android con NFC activado.');
       setNfcStatus('error');
       return;
     }
 
     if (!selectedBuilding) return;
 
-    const targetUrl = `https://origencanino.cl/?nfc=${selectedBuilding.slug}`;
-    setNfcStatus('scanning');
+    cancelNfcSession();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    setNfcStatus('scanning_write');
     setNfcError(null);
+
+    // Timeout de 15s para evitar bloqueos en Android
+    nfcTimeoutRef.current = setTimeout(() => {
+      try { controller.abort(); } catch (e) {}
+      setNfcStatus('idle');
+      setNfcError('Tiempo de espera agotado (15s). No se detectó ningún chip. Asegúrate de tener el NFC encendido y acerca el sticker con firmeza.');
+    }, 15000);
+
+    const targetUrl = `https://origencanino.cl/?nfc=${selectedBuilding.slug}`;
 
     try {
       const ndef = new window.NDEFReader();
-      
-      // Escribir el registro URL en el chip
       await ndef.write({
         records: [
           {
@@ -222,31 +260,66 @@ const NfcManager = ({ fetchWithAuth }) => {
             data: targetUrl
           }
         ]
-      });
+      }, { signal: controller.signal });
 
-      // Si se seleccionó blindaje total / quemado permanente
+      if (nfcTimeoutRef.current) clearTimeout(nfcTimeoutRef.current);
+      if (navigator.vibrate) navigator.vibrate([100]);
+
       if (securityMode === 'burn') {
-        setNfcStatus('writing');
-        if (typeof ndef.makeReadOnly === 'function') {
-          await ndef.makeReadOnly();
-        }
+        // En modo blindaje, avanzamos al Paso 2: solicitar separar el chip y acercar de nuevo para sellar
+        setNfcStatus('written_step1_done');
+      } else {
+        setNfcStatus('success_unlocked');
       }
-
-      // Vibración de éxito si el teléfono la soporta
-      if (navigator.vibrate) {
-        navigator.vibrate([100, 50, 150]);
-      }
-
-      setNfcStatus('success');
     } catch (err) {
+      if (nfcTimeoutRef.current) clearTimeout(nfcTimeoutRef.current);
+      if (err.name === 'AbortError') return;
       console.error("Error al escribir chip NFC:", err);
       let msg = err.message || "Error al escribir en la etiqueta NFC";
       if (err.name === 'NotAllowedError') {
-        msg = "Permiso NFC no otorgado. Asegúrate de permitir el acceso a NFC en el navegador.";
+        msg = "Permiso NFC no otorgado. Concede el permiso en la barra de direcciones de Chrome.";
       } else if (err.name === 'NotSupportedError') {
-        msg = "El chip NFC no es compatible con este registro o formato.";
-      } else if (err.name === 'AbortError') {
-        msg = "La grabación fue cancelada o el chip se retiró antes de tiempo.";
+        msg = "El chip NFC no es compatible o tiene un formato no soportado.";
+      }
+      setNfcError(msg);
+      setNfcStatus('error');
+    }
+  };
+
+  // Paso 2: Sellar y Quemar Blindaje por Hardware (makeReadOnly)
+  const handleStartNfcBurnLock = async () => {
+    if (!isWebNfcSupported) return;
+
+    cancelNfcSession();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    setNfcStatus('scanning_lock');
+    setNfcError(null);
+
+    // Timeout de 15s para evitar bloqueo en Chrome
+    nfcTimeoutRef.current = setTimeout(() => {
+      try { controller.abort(); } catch (e) {}
+      setNfcStatus('written_step1_done');
+      setNfcError('Tiempo de espera agotado (15s). Vuelve a acercar el chip para aplicar el blindaje.');
+    }, 15000);
+
+    try {
+      const ndef = new window.NDEFReader();
+      if (typeof ndef.makeReadOnly !== 'function') {
+        throw new Error('makeReadOnly no es soportado por la versión actual del navegador.');
+      }
+      await ndef.makeReadOnly({ signal: controller.signal });
+
+      if (nfcTimeoutRef.current) clearTimeout(nfcTimeoutRef.current);
+      if (navigator.vibrate) navigator.vibrate([100, 50, 200]);
+      setNfcStatus('locked_success');
+    } catch (err) {
+      if (nfcTimeoutRef.current) clearTimeout(nfcTimeoutRef.current);
+      if (err.name === 'AbortError') return;
+      console.error("Error al blindar chip NFC:", err);
+      let msg = err.message || "Error al aplicar blindaje por hardware.";
+      if (err.name === 'NotAllowedError') {
+        msg = "Permiso NFC denegado al intentar blindar.";
       }
       setNfcError(msg);
       setNfcStatus('error');
@@ -594,55 +667,159 @@ const NfcManager = ({ fetchWithAuth }) => {
                 // Modo Directo Web NFC (Teléfono Android con Chrome)
                 <div className="text-center space-y-3">
                   {nfcStatus === 'idle' && (
-                    <button
-                      type="button"
-                      onClick={handleStartNfcWrite}
-                      className="w-full py-3.5 px-4 bg-primary-green hover:bg-primary-green-dark text-white font-bold rounded-xl transition shadow-md flex items-center justify-center gap-2 text-sm"
-                    >
-                      <Radio size={18} className="animate-pulse" />
-                      Tocar Teléfono al Chip para Grabar {securityMode === 'burn' ? 'y Blindar' : ''}
-                    </button>
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={handleStartNfcWriteUrl}
+                        className="w-full py-3.5 px-4 bg-primary-green hover:bg-primary-green-dark text-white font-bold rounded-xl transition shadow-md flex items-center justify-center gap-2 text-sm"
+                      >
+                        <Radio size={18} className="animate-pulse" />
+                        {securityMode === 'burn' 
+                          ? '1. Tocar Teléfono para Grabar URL (Paso 1 de 2)' 
+                          : 'Tocar Teléfono para Grabar Chip (Modo Prueba)'}
+                      </button>
+                      {securityMode === 'burn' && (
+                        <p className="text-[11px] text-gray-500">
+                          Primero grabaremos la URL y luego te pediremos separar el chip para sellar el blindaje permanente sin bloquear el teléfono.
+                        </p>
+                      )}
+                    </div>
                   )}
 
-                  {nfcStatus === 'scanning' && (
+                  {/* Escaneando para Grabar URL (Paso 1) */}
+                  {nfcStatus === 'scanning_write' && (
                     <div className="p-5 bg-blue-50 border border-blue-200 rounded-xl space-y-3 animate-pulse">
                       <Radio size={36} className="mx-auto text-blue-600 animate-spin" />
                       <div>
                         <strong className="block text-sm text-blue-900 font-bold">
-                          Esperando contacto con el Chip NFC...
+                          {securityMode === 'burn' ? 'Paso 1 de 2: ' : ''}Esperando contacto con el Chip NFC...
                         </strong>
                         <p className="text-xs text-blue-700 mt-1">
-                          Acerca el sticker o tarjeta NFC a la antena trasera de tu teléfono móvil.
+                          Acerca el sticker o tarjeta NFC a la antena trasera de tu teléfono móvil para escribir la URL.
                         </p>
                       </div>
                       <button
                         type="button"
-                        onClick={() => setNfcStatus('idle')}
-                        className="text-xs text-gray-500 hover:text-gray-700 underline"
+                        onClick={cancelNfcSession}
+                        className="text-xs text-gray-500 hover:text-gray-700 underline font-semibold"
                       >
                         Cancelar
                       </button>
                     </div>
                   )}
 
-                  {nfcStatus === 'writing' && (
-                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-center space-y-1">
-                      <Lock size={28} className="mx-auto text-amber-600 animate-bounce" />
-                      <strong className="block text-sm text-amber-900">Aplicando blindaje por hardware...</strong>
-                      <p className="text-xs text-amber-700">Sellando bits de memoria permanente en el chip.</p>
+                  {/* Paso 1 Completado: Solicitar separar el chip para pasar al Paso 2 */}
+                  {nfcStatus === 'written_step1_done' && (
+                    <div className="p-5 bg-amber-50/90 border-2 border-amber-400 rounded-2xl space-y-3 text-center shadow-xs">
+                      <div className="w-12 h-12 bg-green-100 text-green-700 rounded-full flex items-center justify-center mx-auto shadow-xs">
+                        <Check size={28} />
+                      </div>
+                      <div>
+                        <strong className="block text-base text-gray-900 font-bold">
+                          ✅ ¡Paso 1 Listo: URL Grabada con Éxito!
+                        </strong>
+                        <p className="text-xs text-gray-600 mt-1">
+                          La dirección del edificio ya está guardada en el chip.
+                        </p>
+                      </div>
+
+                      <div className="bg-white p-3 rounded-xl border border-amber-200 text-left space-y-1.5 text-xs">
+                        <strong className="text-amber-900 block font-bold">
+                          👉 INSTRUCCIÓN DE SEGURIDAD (IMPORTANTE):
+                        </strong>
+                        <ol className="list-decimal pl-4 space-y-1 text-gray-700 text-[11.5px]">
+                          <li><strong>Separa el chip de tu teléfono</strong> (retíralo unos centímetros).</li>
+                          <li>Presiona el botón de abajo <strong>"Sellar Blindaje Permanente"</strong>.</li>
+                          <li>Vuelve a acercar el chip para quemar los bits y bloquearlo de por vida.</li>
+                        </ol>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleStartNfcBurnLock}
+                        className="w-full py-3.5 px-4 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl transition shadow-md flex items-center justify-center gap-2 text-sm"
+                      >
+                        <ShieldCheck size={18} />
+                        🔒 Paso 2: Sellar Blindaje Permanente (ROM)
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={cancelNfcSession}
+                        className="text-xs text-gray-500 hover:text-gray-700 underline block mx-auto"
+                      >
+                        Terminar sin blindar (dejar chip regrabable)
+                      </button>
                     </div>
                   )}
 
-                  {nfcStatus === 'success' && (
+                  {/* Escaneando para Sellar Blindaje (Paso 2) */}
+                  {nfcStatus === 'scanning_lock' && (
+                    <div className="p-5 bg-amber-50 border-2 border-amber-300 rounded-xl space-y-3 animate-pulse">
+                      <Lock size={36} className="mx-auto text-amber-600 animate-bounce" />
+                      <div>
+                        <strong className="block text-sm text-amber-900 font-bold">
+                          Paso 2 de 2: Esperando contacto para Sellar Blindaje...
+                        </strong>
+                        <p className="text-xs text-amber-700 mt-1">
+                          Acerca el chip nuevamente a la parte trasera de tu teléfono móvil para quemar la memoria física en Solo Lectura.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setNfcStatus('written_step1_done')}
+                        className="text-xs text-gray-500 hover:text-gray-700 underline font-semibold"
+                      >
+                        Volver atrás
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Blindaje Total Completado Exitosamente */}
+                  {nfcStatus === 'locked_success' && (
+                    <div className="p-5 bg-green-50 border-2 border-green-500 rounded-2xl space-y-3 text-center shadow-xs">
+                      <div className="w-14 h-14 bg-green-500 text-white rounded-full flex items-center justify-center mx-auto shadow-md">
+                        <ShieldCheck size={36} />
+                      </div>
+                      <div>
+                        <strong className="block text-lg text-green-950 font-bold">
+                          🔒 ¡CHIP BLINDADO EXITOSAMENTE!
+                        </strong>
+                        <p className="text-xs text-green-800 mt-1.5 leading-relaxed max-w-sm mx-auto">
+                          Los bits físicos de memoria fueron sellados a nivel de silicio en modo <strong>Solo Lectura Permanente (ROM)</strong>.
+                        </p>
+                        <span className="inline-block mt-2 bg-green-200/70 text-green-900 text-[11px] font-bold px-3 py-1 rounded-full">
+                          🛡️ Inmune: Nadie con NFC Tools ni otra app podrá borrarlo jamás
+                        </span>
+                      </div>
+                      <div className="pt-2 flex justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setNfcStatus('idle')}
+                          className="px-4 py-2 bg-primary-green text-white text-xs font-bold rounded-lg hover:bg-primary-green-dark transition shadow-xs"
+                        >
+                          Programar Otro Chip
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsProgramModalOpen(false)}
+                          className="px-4 py-2 bg-gray-200 text-gray-700 text-xs font-bold rounded-lg hover:bg-gray-300 transition"
+                        >
+                          Listo / Cerrar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Grabación en Modo Prueba Exitosa */}
+                  {nfcStatus === 'success_unlocked' && (
                     <div className="p-5 bg-green-50 border border-green-200 rounded-xl space-y-2 text-center">
-                      <ShieldCheck size={40} className="mx-auto text-green-600" />
+                      <Radio size={36} className="mx-auto text-green-600" />
                       <strong className="block text-base text-green-900 font-bold">
-                        ¡Chip {securityMode === 'burn' ? 'Grabado y Blindado' : 'Grabado'} con Éxito!
+                        ¡Chip Grabado con Éxito (Modo Prueba)!
                       </strong>
                       <p className="text-xs text-green-700 max-w-sm mx-auto">
-                        {securityMode === 'burn'
-                          ? 'El chip ahora es de Solo Lectura Permanente. Ninguna persona ni app podrá sobrescribirlo jamás.'
-                          : 'El chip fue configurado para pruebas. Puedes volver a escribirlo cuando lo requieras.'}
+                        La URL quedó grabada en modo regrabable para pruebas de taller. Puedes volver a escribirlo cuando lo desees.
                       </p>
                       <div className="pt-2 flex justify-center gap-2">
                         <button
@@ -663,18 +840,28 @@ const NfcManager = ({ fetchWithAuth }) => {
                     </div>
                   )}
 
+                  {/* Error con Opción de Reintento */}
                   {nfcStatus === 'error' && (
                     <div className="p-4 bg-red-50 border border-red-200 rounded-xl space-y-2 text-center">
                       <AlertTriangle size={28} className="mx-auto text-red-600" />
-                      <strong className="block text-sm text-red-900 font-bold">No se pudo grabar el chip</strong>
+                      <strong className="block text-sm text-red-900 font-bold">No se pudo completar la operación</strong>
                       <p className="text-xs text-red-700">{nfcError}</p>
-                      <button
-                        type="button"
-                        onClick={handleStartNfcWrite}
-                        className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg transition"
-                      >
-                        Reintentar
-                      </button>
+                      <div className="pt-1 flex justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleStartNfcWriteUrl}
+                          className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg transition"
+                        >
+                          Reintentar Paso 1
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelNfcSession}
+                          className="px-3 py-1.5 bg-gray-200 text-gray-700 font-bold text-xs rounded-lg transition"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
