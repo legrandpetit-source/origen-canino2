@@ -392,54 +392,54 @@ const CustomerPortal = () => {
           </div>
         )}
 
-        {/* SEGMENTED CONTROL TABS */}
-        <div className="bg-[#EDE8DF] p-1.5 rounded-2xl border border-[#EBE4DA] flex gap-2 shadow-2xs">
+        {/* SEGMENTED CONTROL TABS - Grid 2x2 en móvil y 4 en escritorio para evitar cortes */}
+        <div className="bg-[#EDE8DF] p-1.5 rounded-2xl border border-[#EBE4DA] grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-2 shadow-2xs">
           <button
             onClick={() => setActiveTab('dogs')}
-            className={`flex-1 py-3 px-4 font-bold text-xs md:text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer ${
+            className={`py-2.5 px-3 font-bold text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer truncate ${
               activeTab === 'dogs' 
                 ? 'bg-primary-green text-white shadow-md' 
                 : 'text-secondary-brown hover:text-primary-green hover:bg-white/60'
             }`}
           >
-            <PawPrint size={17} />
-            <span>Mis Mascotas ({dogs.length})</span>
+            <PawPrint size={16} className="shrink-0" />
+            <span className="truncate">Mis Mascotas ({dogs.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('profile')}
-            className={`flex-1 py-3 px-4 font-bold text-xs md:text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer ${
+            className={`py-2.5 px-3 font-bold text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer truncate ${
               activeTab === 'profile' 
                 ? 'bg-primary-green text-white shadow-md' 
                 : 'text-secondary-brown hover:text-primary-green hover:bg-white/60'
             }`}
           >
-            <MapPin size={17} />
-            <span>Datos de Despacho</span>
+            <MapPin size={16} className="shrink-0" />
+            <span className="truncate">Despacho</span>
           </button>
 
           <button
             onClick={() => setActiveTab('orders')}
-            className={`flex-1 py-3 px-3 font-bold text-xs md:text-sm rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`py-2.5 px-3 font-bold text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer truncate ${
               activeTab === 'orders' 
                 ? 'bg-primary-green text-white shadow-md' 
                 : 'text-secondary-brown hover:text-primary-green hover:bg-white/60'
             }`}
           >
-            <ShoppingBag size={17} />
-            <span>Historial ({orders.length})</span>
+            <ShoppingBag size={16} className="shrink-0" />
+            <span className="truncate">Historial ({orders.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('referrals')}
-            className={`flex-1 py-3 px-3 font-bold text-xs md:text-sm rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`py-2.5 px-3 font-bold text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer truncate ${
               activeTab === 'referrals' 
                 ? 'bg-primary-green text-white shadow-md' 
                 : 'text-secondary-brown hover:text-primary-green hover:bg-white/60'
             }`}
           >
-            <Gift size={17} />
-            <span>Invita y Gana 🐾</span>
+            <Gift size={16} className="shrink-0" />
+            <span className="truncate">Invita y Gana 🐾</span>
           </button>
         </div>
 
@@ -495,17 +495,23 @@ const CustomerPortal = () => {
                           <div className="flex items-center gap-3.5">
                             {/* Avatar con foto o ícono + upload directo WebP */}
                             <div className="relative group/avatar w-14 h-14 rounded-2xl overflow-hidden bg-[#faf7f2] border-2 border-primary-green/25 shadow-2xs shrink-0 flex items-center justify-center">
-                              {dog.photo_url ? (
+                              {dog.photo_url && (
                                 <img 
                                   src={dog.photo_url} 
                                   alt={dog.name} 
                                   className="w-full h-full object-cover" 
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    const fallback = e.target.parentElement?.querySelector('.dog-avatar-fallback');
+                                    if (fallback) fallback.style.display = 'flex';
+                                  }}
                                 />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-primary-green p-2.5">
-                                  <PawPrint size={26} />
-                                </div>
                               )}
+                              <div 
+                                className={`dog-avatar-fallback w-full h-full items-center justify-center text-primary-green p-2.5 ${dog.photo_url ? 'hidden' : 'flex'}`}
+                              >
+                                <PawPrint size={26} />
+                              </div>
 
                               {/* Botón flotante para subir/cambiar foto */}
                               <label 

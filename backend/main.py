@@ -49,7 +49,7 @@ try:
     ]
     for src_root in source_roots:
         if os.path.isdir(src_root):
-            for sub in ["products", "testimonials", "blog"]:
+            for sub in ["products", "testimonials", "blog", "dogs"]:
                 sub_src = os.path.join(src_root, sub)
                 sub_dst = os.path.join("uploads", sub)
                 if os.path.isdir(sub_src):

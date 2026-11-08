@@ -333,52 +333,54 @@ const NfcManager = ({ fetchWithAuth }) => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-5 rounded-2xl border border-gray-200 gap-4 shadow-sm">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-3.5 sm:p-5 rounded-2xl border border-gray-200 gap-3 sm:gap-4 shadow-xs">
         <div>
-          <h3 className="font-header text-2xl text-secondary-brown flex items-center gap-2">
-            <Building2 className="text-primary-green" /> 
-            Red de Puntos NFC (Condominios y Edificios)
+          <h3 className="font-header text-xl sm:text-2xl text-secondary-brown flex items-center gap-2">
+            <Building2 className="text-primary-green shrink-0" size={22} /> 
+            <span>Red de Puntos NFC (Edificios)</span>
           </h3>
-          <p className="text-xs text-gray-500 mt-1">
-            Administra los chips NFC de conserjería, georreferencias de calle y enlaces con blindaje anti-manipulación.
+          <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5 leading-tight">
+            Chips de conserjería, georreferencias y blindaje permanente anti-manipulación.
           </p>
         </div>
         
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 w-full md:w-auto">
           <button
             onClick={() => setIsSettingsModalOpen(true)}
-            className="bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold px-3 py-2.5 rounded-xl flex items-center gap-2 transition border border-gray-200 text-sm shadow-xs"
+            className="flex-1 md:flex-initial bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold px-3 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition border border-gray-200 text-xs sm:text-sm shadow-2xs"
             title="Configurar clave de seguridad NFC personalizable"
           >
-            <ShieldCheck size={17} className="text-primary-green" /> Seguridad NFC
+            <ShieldCheck size={16} className="text-primary-green shrink-0" /> 
+            <span>Seguridad NFC</span>
           </button>
 
           <button
             onClick={openCreateModal}
-            className="bg-primary-green hover:bg-primary-green-dark text-white font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition shadow-sm text-sm"
+            className="flex-1 md:flex-initial bg-primary-green hover:bg-primary-green-dark text-white font-bold px-3.5 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm text-xs sm:text-sm shrink-0"
           >
-            <Plus size={18} /> Registrar Nuevo Edificio
+            <Plus size={16} /> 
+            <span>Nuevo Edificio</span>
           </button>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-gray-200">
-          <span className="text-xs text-gray-500 font-semibold uppercase">Puntos Instalados</span>
-          <p className="text-2xl font-bold text-secondary-brown mt-1">{buildings.length}</p>
+      {/* KPI Cards - Grid 2x2 en móvil y 4 en escritorio */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
+        <div className="bg-white p-2.5 sm:p-3.5 rounded-xl border border-gray-200 shadow-2xs">
+          <span className="text-[10px] sm:text-xs text-gray-500 font-bold uppercase tracking-wider block truncate">Puntos Instalados</span>
+          <p className="text-lg sm:text-2xl font-black text-secondary-brown mt-0.5">{buildings.length}</p>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200">
-          <span className="text-xs text-gray-500 font-semibold uppercase">Lecturas / Visitas NFC</span>
-          <p className="text-2xl font-bold text-blue-600 mt-1">{totalVisits}</p>
+        <div className="bg-white p-2.5 sm:p-3.5 rounded-xl border border-gray-200 shadow-2xs">
+          <span className="text-[10px] sm:text-xs text-gray-500 font-bold uppercase tracking-wider block truncate">Lecturas / Visitas</span>
+          <p className="text-lg sm:text-2xl font-black text-blue-600 mt-0.5">{totalVisits}</p>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200">
-          <span className="text-xs text-gray-500 font-semibold uppercase">Pedidos Captados</span>
-          <p className="text-2xl font-bold text-primary-green mt-1">{totalOrders}</p>
+        <div className="bg-white p-2.5 sm:p-3.5 rounded-xl border border-gray-200 shadow-2xs">
+          <span className="text-[10px] sm:text-xs text-gray-500 font-bold uppercase tracking-wider block truncate">Pedidos Captados</span>
+          <p className="text-lg sm:text-2xl font-black text-primary-green mt-0.5">{totalOrders}</p>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200">
-          <span className="text-xs text-gray-500 font-semibold uppercase">Ventas por NFC</span>
-          <p className="text-2xl font-bold text-primary-green-dark mt-1">${totalRevenue.toLocaleString('es-CL')}</p>
+        <div className="bg-white p-2.5 sm:p-3.5 rounded-xl border border-gray-200 shadow-2xs">
+          <span className="text-[10px] sm:text-xs text-gray-500 font-bold uppercase tracking-wider block truncate">Ventas por NFC</span>
+          <p className="text-lg sm:text-2xl font-black text-primary-green-dark mt-0.5">${totalRevenue.toLocaleString('es-CL')}</p>
         </div>
       </div>
 
