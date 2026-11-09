@@ -5,6 +5,7 @@ import { useCart } from '../../context/CartContext';
 import Especialidades from './Especialidades';
 import Blog from './Blog';
 import CalculatorModal from './CalculatorModal';
+import HeroCalculator from './HeroCalculator';
 import ComparisonTable from './ComparisonTable';
 import LogisticsSteps from './LogisticsSteps';
 import TransitionGuide from './TransitionGuide';
@@ -191,42 +192,61 @@ const Home = () => {
         )}
       </AnimatePresence>
 
-      {/* Hero Section */}
-      <section id="inicio" className="container mx-auto px-4 sm:px-6 py-8 md:py-14 flex flex-col md:flex-row items-center gap-8 md:gap-12 max-w-6xl">
-        <div className="md:w-1/2 text-center md:text-left">
+      {/* Hero Section con Calculadora Médica CRO */}
+      <section id="inicio" className="container mx-auto px-4 sm:px-6 py-6 md:py-12 flex flex-col lg:flex-row items-center gap-8 lg:gap-12 max-w-6xl">
+        <div className="lg:w-1/2 text-center lg:text-left">
           
-          <span className="inline-block bg-[#EBF2DA] text-[#4E5824] text-[11px] sm:text-xs font-bold tracking-widest uppercase px-3.5 py-1 rounded-full mb-3 shadow-xs">
-            Comida Real • Vida Saludable
-          </span>
+          <div className="inline-flex items-center gap-2 bg-[#EBF2DA] text-[#4E5824] text-[11px] sm:text-xs font-bold tracking-widest uppercase px-3.5 py-1 rounded-full mb-3 shadow-xs">
+            <Sparkles size={12} className="text-primary-green" />
+            <span>Comida Real • Vida Saludable</span>
+          </div>
 
           <motion.h1 
             initial={{ opacity: 0, y: -15 }}
             animate={{ opacity: 1, y: 0 }}
-            className="font-header text-4xl sm:text-5xl lg:text-6xl font-extrabold text-secondary-brown mb-4 leading-tight tracking-tight"
+            className="font-header text-4xl sm:text-5xl lg:text-5xl font-extrabold text-secondary-brown mb-4 leading-tight tracking-tight"
           >
-            Nutrición Evolutiva para su Bienestar
+            Nutrición Evolutiva para el Bienestar de tu Perro
           </motion.h1>
 
           <motion.p 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.15 }}
-            className="text-sm sm:text-base md:text-lg text-secondary-brown-light/85 mb-6 max-w-lg leading-relaxed font-sans"
+            className="text-sm sm:text-base text-secondary-brown-light/85 mb-5 max-w-lg leading-relaxed font-sans"
           >
-            Ofrecemos dietas BARF crudas y recetas cocinadas al vapor con ingredientes 100% naturales de grado humano. Diseñamos la porción diaria perfecta según las características únicas de tu perro.
+            Dietas BARF crudas y recetas cocinadas al vapor con ingredientes 100% naturales de grado humano. Olvídate de las alergias de piel, digestión pesada y sarro dental.
           </motion.p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-3">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setIsCalculatorOpen(true)}
+          {/* Micro-beneficios con checks */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-6 text-xs text-secondary-brown font-medium max-w-lg mx-auto lg:mx-0">
+            <div className="flex items-center gap-2 justify-center lg:justify-start">
+              <span className="text-primary-green font-bold text-sm">✓</span>
+              <span>100% Grado Humano, sin harinas ni rellenos</span>
+            </div>
+            <div className="flex items-center gap-2 justify-center lg:justify-start">
+              <span className="text-primary-green font-bold text-sm">✓</span>
+              <span>Cadena de frío -18°C Santiago & V Región</span>
+            </div>
+            <div className="flex items-center gap-2 justify-center lg:justify-start">
+              <span className="text-primary-green font-bold text-sm">✓</span>
+              <span>Pautas por porción médica según peso</span>
+            </div>
+            <div className="flex items-center gap-2 justify-center lg:justify-start">
+              <span className="text-primary-green font-bold text-sm">✓</span>
+              <span>Pack de Transición sin suscripción forzada</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3">
+            <a
+              href="#calculadora"
               className="w-full sm:w-auto bg-secondary-orange hover:bg-[#c98336] text-white px-6 py-3.5 rounded-2xl font-header font-bold text-sm shadow-md transition flex items-center justify-center gap-2 group"
             >
               <Calculator size={18} />
-              <span>Calculadora de Raciones</span>
+              <span>Calcular Ración Diaria</span>
               <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-            </motion.button>
+            </a>
 
             <a
               href="#tienda"
@@ -235,55 +255,35 @@ const Home = () => {
               Ver Menú Completo
             </a>
           </div>
+
+          {/* Prueba Social / Métricas */}
+          <div className="mt-8 pt-5 border-t border-[#E8DFC8]/60 flex items-center justify-center lg:justify-start gap-6 text-xs text-gray-500 font-sans">
+            <div>
+              <span className="font-header font-black text-secondary-brown text-base block leading-none">
+                +500
+              </span>
+              <span>Perritos Sanos</span>
+            </div>
+            <div className="w-px h-6 bg-gray-200" />
+            <div>
+              <span className="font-header font-black text-primary-green text-base block leading-none">
+                100%
+              </span>
+              <span>Natural & Crudo</span>
+            </div>
+            <div className="w-px h-6 bg-gray-200" />
+            <div>
+              <span className="font-header font-black text-secondary-orange text-base block leading-none">
+                4.9/5 ⭐
+              </span>
+              <span>Satisfacción</span>
+            </div>
+          </div>
         </div>
 
-        {/* Lado Imagen Hero */}
-        <div className="md:w-1/2 relative flex justify-center mt-6 md:mt-0">
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.6 }}
-            className="relative"
-          >
-            {/* Logo en tarjeta blanca limpia */}
-            <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-xl border border-[#EBE4DA] max-w-[320px] sm:max-w-[380px]">
-              <img 
-                src="/logo.webp" 
-                alt="Origen Canino Logo Oficial" 
-                className="w-full h-auto object-contain rounded-2xl" 
-              />
-            </div>
-
-            {/* Badge Flotante 1 - Digestibilidad */}
-            <motion.div 
-              animate={{ y: [0, -8, 0] }}
-              transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-              className="absolute -top-4 -left-4 sm:-left-8 bg-white/95 backdrop-blur-xs px-3.5 py-2.5 rounded-2xl shadow-lg border border-[#EBE4DA] flex items-center gap-2.5 z-10"
-            >
-              <div className="bg-red-50 text-accent-red p-2 rounded-xl">
-                <HeartPulse size={20} />
-              </div>
-              <div className="text-left">
-                <p className="font-header font-bold text-secondary-brown text-xs sm:text-sm leading-tight">100% Digestible</p>
-                <p className="text-[10px] text-gray-500 font-sans">Adiós a las alergias de piel</p>
-              </div>
-            </motion.div>
-
-            {/* Badge Flotante 2 - Salud Dental */}
-            <motion.div 
-              animate={{ y: [0, -8, 0] }}
-              transition={{ repeat: Infinity, duration: 4.5, ease: "easeInOut", delay: 1 }}
-              className="absolute -bottom-4 -right-4 sm:-right-6 bg-white/95 backdrop-blur-xs px-3.5 py-2.5 rounded-2xl shadow-lg border border-[#EBE4DA] flex items-center gap-2.5 z-10"
-            >
-              <div className="bg-emerald-50 text-primary-green p-2 rounded-xl">
-                <Bone size={20} />
-              </div>
-              <div className="text-left">
-                <p className="font-header font-bold text-secondary-brown text-xs sm:text-sm leading-tight">Dientes Sanos</p>
-                <p className="text-[10px] text-gray-500 font-sans">Acción enzimática natural</p>
-              </div>
-            </motion.div>
-          </motion.div>
+        {/* Lado Calculadora Médica Hero */}
+        <div className="lg:w-1/2 w-full mt-4 lg:mt-0">
+          <HeroCalculator />
         </div>
       </section>
 

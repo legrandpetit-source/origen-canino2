@@ -5,11 +5,35 @@ import { Helmet } from 'react-helmet-async';
 
 const BlogPost = () => {
   const { slug } = useParams();
-  const [post, setPost] = useState(null);
-  const [loading, setLoading] = useState(true);
+
+  // Recuperar datos pre-renderizados por el servidor (FastAPI SSR / SEO)
+  const getInitialPost = () => {
+    try {
+      const serverScript = document.getElementById('server-blog-post');
+      if (serverScript && serverScript.textContent) {
+        const parsed = JSON.parse(serverScript.textContent);
+        if (parsed && parsed.slug === slug) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Error leyendo post pre-renderizado del servidor:', e);
+    }
+    return null;
+  };
+
+  const [post, setPost] = useState(getInitialPost);
+  const [loading, setLoading] = useState(() => !getInitialPost());
 
   useEffect(() => {
     window.scrollTo(0, 0); // Scroll to top when page loads
+    
+    // Si ya tenemos el post hidratado del servidor y coincide con el slug, no hacemos fetch bloqueante
+    if (post && post.slug === slug) {
+      return;
+    }
+
+    setLoading(true);
     fetch(`/api/blog/${slug}`)
       .then(res => {
         if (!res.ok) throw new Error('Artículo no encontrado');

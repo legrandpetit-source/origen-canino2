@@ -84,3 +84,4 @@ A partir de las pruebas de campo, capturas de pantalla y audios enviados, se abo
 * **Commit:** `8ee07dd` - *feat(referrals): mantenedor dinamico de embajadores en admin y atribucion con perrito*
 * **Build Vite:** Exitoso (`built in 12.10s`).
 * **Deploy VPS:** Activo en Hetzner Cloud (`167.233.122.18`).
+

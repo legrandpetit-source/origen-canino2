@@ -307,6 +307,35 @@ def init_database():
                 );
             """)
 
+            # 16. Tabla de Prospectos / Leads de Calculadora (CRO & Multi-Agente)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS leads (
+                    id SERIAL PRIMARY KEY,
+                    customer_name TEXT,
+                    phone TEXT NOT NULL,
+                    email TEXT,
+                    dog_name TEXT,
+                    dog_breed TEXT,
+                    dog_age TEXT,
+                    dog_weight NUMERIC(5,2),
+                    activity_level TEXT,
+                    diet_type TEXT,
+                    daily_grams NUMERIC(6,1),
+                    monthly_kilos NUMERIC(6,1),
+                    estimated_monthly_cost INTEGER,
+                    health_notes TEXT,
+                    utm_source TEXT,
+                    utm_medium TEXT,
+                    utm_campaign TEXT,
+                    utm_content TEXT,
+                    utm_term TEXT,
+                    ip_address TEXT,
+                    status TEXT DEFAULT 'nuevo',
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
             cursor.execute("""
                 ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL;
             """)

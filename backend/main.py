@@ -2,13 +2,14 @@ import os
 import re
 import json
 import time
+import html
 from collections import defaultdict
 from threading import Lock
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, Form, UploadFile, File, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response, HTMLResponse
 from pydantic import BaseModel
 from typing import List, Optional
 import urllib.request
@@ -378,6 +379,27 @@ class CustomerDogCreateUpdate(BaseModel):
     favorite_diet: Optional[str] = None
     notes: Optional[str] = None
     photo_url: Optional[str] = None
+
+class LeadCreate(BaseModel):
+    customer_name: Optional[str] = None
+    phone: str
+    email: Optional[str] = None
+    dog_name: Optional[str] = None
+    dog_breed: Optional[str] = None
+    dog_age: Optional[str] = None
+    dog_weight: Optional[float] = None
+    activity_level: Optional[str] = None
+    diet_type: Optional[str] = None
+    daily_grams: Optional[float] = None
+    monthly_kilos: Optional[float] = None
+    estimated_monthly_cost: Optional[int] = None
+    health_notes: Optional[str] = None
+    pack_type: Optional[str] = None
+    utm_source: Optional[str] = None
+    utm_medium: Optional[str] = None
+    utm_campaign: Optional[str] = None
+    utm_content: Optional[str] = None
+    utm_term: Optional[str] = None
 
 # --- Auth Config ---
 SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key-origen")
@@ -1856,33 +1878,194 @@ def delete_blog_post(post_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error eliminando el artículo.")
 
-from fastapi.responses import Response
+@app.get("/robots.txt")
+def get_robots_txt():
+    content = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Allow: /blog/\n"
+        "Allow: /uploads/\n"
+        "Disallow: /admin\n"
+        "Disallow: /api/\n"
+        "Disallow: /mi-cuenta\n\n"
+        "Sitemap: https://origencanino.cl/sitemap.xml\n"
+    )
+    return Response(content=content, media_type="text/plain; charset=utf-8")
 
 @app.get("/sitemap.xml")
 def generate_sitemap():
-    # Obtener todos los blogs para el sitemap
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT slug FROM blog_posts WHERE active = 1")
-        rows = cursor.fetchall()
-        
-    xml_content = '<?xml version="1.0" encoding="UTF-8"%s>\\n'
-    xml_content += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\\n'
-    
     base_url = "https://origencanino.cl"
-    
-    # Static routes
-    static_routes = ["/", "/admin"]
-    for route in static_routes:
-        xml_content += f"  <url>\\n    <loc>{base_url}{route}</loc>\\n  </url>\\n"
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT slug, created_at FROM blog_posts WHERE active = 1 ORDER BY created_at DESC")
+            rows = cursor.fetchall()
+    except Exception as e:
+        print(f"Error cargando blogs para sitemap: {e}")
+        rows = []
         
-    # Dynamic blog routes
+    xml_lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        '  <url>',
+        f'    <loc>{base_url}/</loc>',
+        '    <changefreq>weekly</changefreq>',
+        '    <priority>1.0</priority>',
+        '  </url>',
+        '  <url>',
+        f'    <loc>{base_url}/#tienda</loc>',
+        '    <changefreq>daily</changefreq>',
+        '    <priority>0.9</priority>',
+        '  </url>',
+        '  <url>',
+        f'    <loc>{base_url}/#planes</loc>',
+        '    <changefreq>weekly</changefreq>',
+        '    <priority>0.8</priority>',
+        '  </url>',
+        '  <url>',
+        f'    <loc>{base_url}/#transicion</loc>',
+        '    <changefreq>monthly</changefreq>',
+        '    <priority>0.8</priority>',
+        '  </url>',
+    ]
     for row in rows:
-        xml_content += f"  <url>\\n    <loc>{base_url}/blog/{row['slug']}</loc>\\n  </url>\\n"
-        
-    xml_content += "</urlset>"
-    
-    return Response(content=xml_content, media_type="application/xml")
+        slug = row["slug"]
+        lastmod_tag = ""
+        created_at = row.get("created_at")
+        if created_at:
+            try:
+                if isinstance(created_at, datetime):
+                    lastmod_str = created_at.strftime("%Y-%m-%d")
+                else:
+                    lastmod_str = str(created_at)[:10]
+                lastmod_tag = f"\n    <lastmod>{lastmod_str}</lastmod>"
+            except Exception:
+                pass
+        xml_lines.append(
+            f'  <url>\n'
+            f'    <loc>{base_url}/blog/{slug}</loc>'
+            f'{lastmod_tag}\n'
+            f'    <changefreq>weekly</changefreq>\n'
+            f'    <priority>0.8</priority>\n'
+            f'  </url>'
+        )
+    xml_lines.append('</urlset>')
+    return Response(content="\n".join(xml_lines), media_type="application/xml; charset=utf-8")
+
+# --- Leads & CRO Conversion Engine ---
+@app.post("/api/leads")
+def create_lead(lead: LeadCreate, req: Request):
+    ip = get_client_ip(req)
+    if rate_limiter.is_rate_limited(f"leads_{ip}", max_requests=10, window_seconds=300):
+        raise HTTPException(status_code=429, detail="Demasiadas solicitudes. Por favor espera unos minutos.")
+
+    phone_clean = re.sub(r"[^\d+]", "", lead.phone or "").strip()
+    if not phone_clean:
+        raise HTTPException(status_code=400, detail="El teléfono es obligatorio para contactarte.")
+
+    lead_id = None
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO leads (
+                    customer_name, phone, email, dog_name, dog_breed, dog_age,
+                    dog_weight, activity_level, diet_type, daily_grams, monthly_kilos,
+                    estimated_monthly_cost, health_notes, utm_source, utm_medium,
+                    utm_campaign, utm_content, utm_term, ip_address, status
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s,
+                    %s, %s, %s, %s, 'nuevo'
+                ) RETURNING id;
+            """, (
+                (lead.customer_name or "").strip()[:150],
+                phone_clean[:50],
+                (lead.email or "").strip().lower()[:150],
+                (lead.dog_name or "").strip()[:100],
+                (lead.dog_breed or "").strip()[:100],
+                (lead.dog_age or "").strip()[:50],
+                lead.dog_weight,
+                (lead.activity_level or "").strip()[:50],
+                (lead.diet_type or "").strip()[:50],
+                lead.daily_grams,
+                lead.monthly_kilos,
+                lead.estimated_monthly_cost,
+                (lead.health_notes or "").strip()[:255],
+                (lead.utm_source or "").strip()[:100],
+                (lead.utm_medium or "").strip()[:100],
+                (lead.utm_campaign or "").strip()[:100],
+                (lead.utm_content or "").strip()[:100],
+                (lead.utm_term or "").strip()[:100],
+                ip
+            ))
+            row = cursor.fetchone()
+            if row:
+                lead_id = row['id']
+            conn.commit()
+    except Exception as e:
+        print(f"Error guardando lead en BD: {e}")
+
+    # Despachar notificación inmediata al bot de Telegram (@OrigenCanino_bot)
+    try:
+        cost_str = f"${lead.estimated_monthly_cost:,} CLP".replace(",", ".") if lead.estimated_monthly_cost else "A cotizar"
+        diet_str = "BARF (Cruda)" if (lead.diet_type or "").lower() == "barf" else "Cocinada al Vapor"
+        tg_msg = (
+            f"🐶 *¡Nuevo Prospecto Captado en Calculadora Web!*\n\n"
+            f"👤 *Cliente:* {lead.customer_name or 'Sin nombre'}\n"
+            f"📱 *WhatsApp:* `{phone_clean}`\n"
+            f"📧 *Email:* {lead.email or 'No provisto'}\n"
+            f"🐾 *Perrito:* *{lead.dog_name or 'Perrito'}* ({lead.dog_breed or 'Raza no especificada'}, {lead.dog_age or 'Adulto'})\n"
+            f"⚖️ *Peso:* {lead.dog_weight or 0} kg | *Actividad:* {lead.activity_level or 'Normal'}\n"
+            f"🥩 *Dieta:* {diet_str}\n"
+            f"🍖 *Ración Diaria:* {lead.daily_grams or 0} g/día (~{lead.monthly_kilos or 0} kg/mes)\n"
+            f"💰 *Plan Mensual:* {cost_str}\n"
+        )
+        if lead.health_notes:
+            tg_msg += f"⚠️ *Salud / Alergias:* {lead.health_notes}\n"
+        if lead.utm_source or lead.utm_campaign:
+            tg_msg += f"📍 *Origen:* {lead.utm_source or '-'} / {lead.utm_medium or '-'} / {lead.utm_campaign or '-'}\n"
+        tg_msg += f"🌐 *IP:* `{ip}`"
+
+        notify_telegram(tg_msg)
+    except Exception as tg_err:
+        print(f"Error notificando lead a Telegram: {tg_err}")
+
+    # Formatear link de WhatsApp directo para el cliente
+    business_phone = "56974436590"
+    dog_display = lead.dog_name or "mi perro"
+    prefilled_text = (
+        f"¡Hola Origen Canino! 🐾 Calculé la porción para {dog_display} "
+        f"({lead.dog_weight or 0}kg, {lead.dog_breed or 'raza'}), "
+        f"su ración estimada es {lead.daily_grams or 0}g/día de {lead.diet_type or 'comida natural'}. "
+        f"Quisiera recibir su pauta nutricional y activar el 10% de descuento en mi primer pedido."
+    )
+    encoded_text = urllib.parse.quote(prefilled_text)
+    whatsapp_url = f"https://wa.me/{business_phone}?text={encoded_text}"
+
+    return {
+        "success": True,
+        "lead_id": lead_id,
+        "whatsapp_url": whatsapp_url,
+        "message": "¡Excelente! Registramos los datos de tu perrito. Nuestro equipo te enviará la pauta nutricional."
+    }
+
+@app.get("/api/admin/leads")
+def get_admin_leads(limit: int = 50, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM leads 
+                ORDER BY created_at DESC 
+                LIMIT %s;
+            """, (limit,))
+            rows = cursor.fetchall()
+            return rows
+    except Exception as e:
+        print(f"Error consultando leads: {e}")
+        return []
 
 @app.post("/api/contact")
 def submit_contact(msg: ContactMessage):
@@ -3191,24 +3374,7 @@ async def admin_upload_testimonial_photo(t_id: int, file: UploadFile = File(...)
         print("Error uploading testimonial photo:", e)
         raise HTTPException(status_code=500, detail="Error procesando la foto del testimonio")
 
-# --- Serve Frontend (for Nixpacks / Production) ---
-dist_path = os.path.join(os.path.dirname(__file__), "..", "dist")
-if os.path.isdir(dist_path):
-    app.mount("/assets", StaticFiles(directory=os.path.join(dist_path, "assets")), name="assets")
-    
-    @app.get("/{full_path:path}")
-    async def serve_frontend(full_path: str):
-        # Serve exact file if it exists
-        file_path = os.path.join(dist_path, full_path)
-        if os.path.isfile(file_path):
-            return FileResponse(file_path)
-        # Otherwise fallback to index.html (SPA routing)
-        return FileResponse(os.path.join(dist_path, "index.html"))
 
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
 
 @app.get("/api/admin/finance/report")
 def get_finance_report(month: int, year: int, current_user: str = Depends(get_current_admin)):
@@ -3352,3 +3518,132 @@ def get_product_nutrition(product_id: int, current_user: str = Depends(get_curre
     except Exception as e:
         print(f"Error calculating nutrition: {e}")
         raise HTTPException(status_code=500, detail="Error calculando nutricion")
+
+# --- Serve Frontend con Pre-renderizado SEO (FastAPI & Googlebot / Redes Sociales) ---
+dist_path = os.path.join(os.path.dirname(__file__), "..", "dist")
+if os.path.isdir(dist_path):
+    app.mount("/assets", StaticFiles(directory=os.path.join(dist_path, "assets")), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        # 1. Servir archivo estático exacto si existe en /dist
+        file_path = os.path.join(dist_path, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+
+        index_file = os.path.join(dist_path, "index.html")
+        if not os.path.isfile(index_file):
+            return HTMLResponse("<h1>Sitio en mantenimiento</h1>", status_code=503)
+
+        # 2. Inyección SEO dinámica para Googlebot / Redes Sociales en artículos de blog
+        clean_path = full_path.strip("/")
+        if clean_path.startswith("blog/") or clean_path == "blog":
+            parts = clean_path.split("/")
+            if len(parts) >= 2 and parts[1]:
+                slug = parts[1].strip()
+                try:
+                    with get_connection() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("""
+                            SELECT id, slug, title, excerpt, content, image, created_at 
+                            FROM blog_posts 
+                            WHERE slug = %s AND active = 1
+                        """, (slug,))
+                        post = cursor.fetchone()
+                    
+                    if post:
+                        with open(index_file, "r", encoding="utf-8") as f:
+                            html_content = f.read()
+
+                        # Sanitizar datos para inyección HTML
+                        post_title = html.escape(post['title'])
+                        post_excerpt = html.escape(post['excerpt'] or "")
+                        post_image = post['image'] or "https://origencanino.cl/logo.webp"
+                        if not post_image.startswith("http"):
+                            post_image = f"https://origencanino.cl{post_image}"
+                        post_url = f"https://origencanino.cl/blog/{slug}"
+                        
+                        created_iso = post['created_at'].isoformat() if isinstance(post.get('created_at'), datetime) else str(post.get('created_at', ''))
+
+                        # Structured Data (Schema.org BlogPosting)
+                        schema_ld = {
+                            "@context": "https://schema.org",
+                            "@type": "BlogPosting",
+                            "headline": post['title'],
+                            "description": post['excerpt'],
+                            "image": post_image,
+                            "url": post_url,
+                            "datePublished": created_iso,
+                            "author": {
+                                "@type": "Organization",
+                                "name": "Origen Canino",
+                                "url": "https://origencanino.cl"
+                            },
+                            "publisher": {
+                                "@type": "Organization",
+                                "name": "Origen Canino",
+                                "logo": {
+                                    "@type": "ImageObject",
+                                    "url": "https://origencanino.cl/logo.webp"
+                                }
+                            }
+                        }
+                        schema_script = f'<script type="application/ld+json">{json.dumps(schema_ld, ensure_ascii=False)}</script>'
+
+                        # Payload pre-cargado para hidratación instantánea de React (cero loading, cero error 404)
+                        post_dict = {
+                            "id": post["id"],
+                            "slug": post["slug"],
+                            "title": post["title"],
+                            "excerpt": post["excerpt"],
+                            "content": post["content"],
+                            "image": post["image"],
+                            "created_at": created_iso
+                        }
+                        payload_script = f'<script id="server-blog-post" type="application/json">{json.dumps(post_dict, ensure_ascii=False)}</script>'
+
+                        # Reemplazar título
+                        html_content = re.sub(r"<title>.*?</title>", f"<title>{post_title} | Origen Canino Blog</title>", html_content, flags=re.I)
+                        
+                        # Inyectar Meta Tags en <head>
+                        seo_tags = (
+                            f'\n    <meta name="description" content="{post_excerpt}">'
+                            f'\n    <link rel="canonical" href="{post_url}">'
+                            f'\n    <meta property="og:type" content="article">'
+                            f'\n    <meta property="og:title" content="{post_title} | Origen Canino">'
+                            f'\n    <meta property="og:description" content="{post_excerpt}">'
+                            f'\n    <meta property="og:image" content="{post_image}">'
+                            f'\n    <meta property="og:url" content="{post_url}">'
+                            f'\n    <meta name="twitter:card" content="summary_large_image">'
+                            f'\n    <meta name="twitter:title" content="{post_title} | Origen Canino">'
+                            f'\n    <meta name="twitter:description" content="{post_excerpt}">'
+                            f'\n    <meta name="twitter:image" content="{post_image}">'
+                            f'\n    {schema_script}'
+                            f'\n    {payload_script}\n  </head>'
+                        )
+                        html_content = html_content.replace("</head>", seo_tags, 1)
+
+                        # Inyectar contenido en el fallback de <div id="root"> para que Googlebot indexe el texto inmediatamente sin esperar JS
+                        pre_rendered_body = (
+                            f'<div id="root">'
+                            f'<article style="max-width:800px;margin:40px auto;padding:20px;font-family:sans-serif;" data-pre-rendered="true">'
+                            f'<h1>{post_title}</h1>'
+                            f'<p style="font-weight:bold;color:#555;">{post_excerpt}</p>'
+                            f'<img src="{post_image}" alt="{post_title}" style="max-width:100%;height:auto;border-radius:12px;" />'
+                            f'<div style="white-space:pre-wrap;line-height:1.7;margin-top:20px;">{html.escape(post["content"])}</div>'
+                            f'</article>'
+                            f'</div>'
+                        )
+                        html_content = html_content.replace('<div id="root"></div>', pre_rendered_body, 1)
+
+                        return HTMLResponse(content=html_content, status_code=200)
+                except Exception as err:
+                    print(f"Error pre-renderizando blog {slug}: {err}")
+
+        # Fallback a index.html estándar (SPA routing)
+        return FileResponse(index_file)
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
