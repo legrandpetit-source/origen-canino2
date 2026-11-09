@@ -51,11 +51,11 @@ const criteriaData = [
 
 const ComparisonTable = () => {
   return (
-    <section className="py-8 md:py-14 bg-[#FAF7F2]">
+    <section className="py-6 md:py-8 bg-[#FAF7F2]">
       <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
         
         {/* Encabezado */}
-        <div className="text-center max-w-2xl mx-auto mb-8 md:mb-10">
+        <div className="text-center max-w-2xl mx-auto mb-5 md:mb-6">
           <span className="inline-block bg-[#EBF2DA] text-[#4E5824] text-[11px] sm:text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-full mb-2.5">
             Diferencia Evolutiva
           </span>

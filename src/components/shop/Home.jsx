@@ -193,10 +193,10 @@ const Home = () => {
       </AnimatePresence>
 
       {/* Hero Section con Calculadora Médica CRO */}
-      <section id="inicio" className="container mx-auto px-4 sm:px-6 py-6 md:py-12 flex flex-col lg:flex-row items-center gap-8 lg:gap-12 max-w-6xl">
+      <section id="inicio" className="container mx-auto px-4 sm:px-6 pt-3 pb-5 md:pt-5 md:pb-7 flex flex-col lg:flex-row items-center gap-6 lg:gap-10 max-w-6xl">
         <div className="lg:w-1/2 text-center lg:text-left">
           
-          <div className="inline-flex items-center gap-2 bg-[#EBF2DA] text-[#4E5824] text-[11px] sm:text-xs font-bold tracking-widest uppercase px-3.5 py-1 rounded-full mb-3 shadow-xs">
+          <div className="inline-flex items-center gap-2 bg-[#EBF2DA] text-[#4E5824] text-[11px] sm:text-xs font-bold tracking-widest uppercase px-3.5 py-1 rounded-full mb-2.5 shadow-xs">
             <Sparkles size={12} className="text-primary-green" />
             <span>Comida Real • Vida Saludable</span>
           </div>
@@ -204,7 +204,7 @@ const Home = () => {
           <motion.h1 
             initial={{ opacity: 0, y: -15 }}
             animate={{ opacity: 1, y: 0 }}
-            className="font-header text-4xl sm:text-5xl lg:text-5xl font-extrabold text-secondary-brown mb-4 leading-tight tracking-tight"
+            className="font-header text-3xl sm:text-4xl lg:text-5xl font-extrabold text-secondary-brown mb-3 leading-tight tracking-tight"
           >
             Nutrición Evolutiva para el Bienestar de tu Perro
           </motion.h1>
@@ -213,13 +213,13 @@ const Home = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.15 }}
-            className="text-sm sm:text-base text-secondary-brown-light/85 mb-5 max-w-lg leading-relaxed font-sans"
+            className="text-xs sm:text-sm md:text-base text-secondary-brown-light/85 mb-4 max-w-lg leading-relaxed font-sans"
           >
             Dietas BARF crudas y recetas cocinadas al vapor con ingredientes 100% naturales de grado humano. Olvídate de las alergias de piel, digestión pesada y sarro dental.
           </motion.p>
 
           {/* Micro-beneficios con checks */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-6 text-xs text-secondary-brown font-medium max-w-lg mx-auto lg:mx-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-5 text-xs text-secondary-brown font-medium max-w-lg mx-auto lg:mx-0">
             <div className="flex items-center gap-2 justify-center lg:justify-start">
               <span className="text-primary-green font-bold text-sm">✓</span>
               <span>100% Grado Humano, sin harinas ni rellenos</span>
@@ -241,7 +241,7 @@ const Home = () => {
           <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3">
             <a
               href="#calculadora"
-              className="w-full sm:w-auto bg-secondary-orange hover:bg-[#c98336] text-white px-6 py-3.5 rounded-2xl font-header font-bold text-sm shadow-md transition flex items-center justify-center gap-2 group"
+              className="w-full sm:w-auto bg-secondary-orange hover:bg-[#c98336] text-white px-5 py-3 rounded-2xl font-header font-bold text-sm shadow-md transition flex items-center justify-center gap-2 group"
             >
               <Calculator size={18} />
               <span>Calcular Ración Diaria</span>
@@ -250,28 +250,28 @@ const Home = () => {
 
             <a
               href="#tienda"
-              className="w-full sm:w-auto bg-white hover:bg-[#F2ECE1] text-secondary-brown border border-[#E0D5C3] px-6 py-3.5 rounded-2xl font-header font-bold text-sm transition text-center shadow-xs"
+              className="w-full sm:w-auto bg-white hover:bg-[#F2ECE1] text-secondary-brown border border-[#E0D5C3] px-5 py-3 rounded-2xl font-header font-bold text-sm transition text-center shadow-xs"
             >
               Ver Menú Completo
             </a>
           </div>
 
           {/* Prueba Social / Métricas */}
-          <div className="mt-8 pt-5 border-t border-[#E8DFC8]/60 flex items-center justify-center lg:justify-start gap-6 text-xs text-gray-500 font-sans">
+          <div className="mt-5 pt-3 border-t border-[#E8DFC8]/60 flex items-center justify-center lg:justify-start gap-6 text-xs text-gray-500 font-sans">
             <div>
               <span className="font-header font-black text-secondary-brown text-base block leading-none">
                 +500
               </span>
               <span>Perritos Sanos</span>
             </div>
-            <div className="w-px h-6 bg-gray-200" />
+            <div className="w-px h-5 bg-gray-200" />
             <div>
               <span className="font-header font-black text-primary-green text-base block leading-none">
                 100%
               </span>
               <span>Natural & Crudo</span>
             </div>
-            <div className="w-px h-6 bg-gray-200" />
+            <div className="w-px h-5 bg-gray-200" />
             <div>
               <span className="font-header font-black text-secondary-orange text-base block leading-none">
                 4.9/5 ⭐
@@ -282,7 +282,7 @@ const Home = () => {
         </div>
 
         {/* Lado Calculadora Médica Hero */}
-        <div className="lg:w-1/2 w-full mt-4 lg:mt-0">
+        <div className="lg:w-1/2 w-full mt-2 lg:mt-0">
           <HeroCalculator />
         </div>
       </section>
@@ -294,11 +294,11 @@ const Home = () => {
       <Especialidades />
 
       {/* Catálogo Fresco Unificado (Stitch Style) */}
-      <section id="tienda" className="py-10 md:py-16 bg-[#FAF7F2] scroll-mt-20">
+      <section id="tienda" className="py-6 md:py-8 bg-[#FAF7F2] scroll-mt-20">
         <div id="shop-section" className="container mx-auto px-4 sm:px-6 max-w-6xl">
           
           {/* Encabezado y Selector de Filtros */}
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 pb-6 border-b border-[#EBE4DA]">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6 pb-4 border-b border-[#EBE4DA]">
             <div>
               <span className="inline-block bg-[#EBF2DA] text-[#4E5824] text-[11px] sm:text-xs font-bold tracking-widest uppercase px-3.5 py-1 rounded-full mb-2.5 shadow-2xs">
                 Catálogo Fresco

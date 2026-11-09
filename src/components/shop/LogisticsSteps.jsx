@@ -4,9 +4,9 @@ import { Snowflake, MessageCircle, Truck } from 'lucide-react';
 
 const LogisticsSteps = () => {
   return (
-    <section className="py-10 md:py-14 bg-white">
+    <section className="py-6 md:py-8 bg-white">
       <div className="container mx-auto px-4 sm:px-6 max-w-5xl">
-        <div className="text-center max-w-xl mx-auto mb-8 md:mb-10">
+        <div className="text-center max-w-xl mx-auto mb-5 md:mb-6">
           <span className="inline-block bg-[#EBF2DA] text-[#4E5824] text-[11px] sm:text-xs font-bold tracking-widest uppercase px-3.5 py-1 rounded-full mb-2">
             Proceso & Despacho
           </span>

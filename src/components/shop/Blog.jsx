@@ -21,9 +21,9 @@ const Blog = () => {
   }, []);
 
   return (
-    <section id="blog" className="py-10 md:py-16 bg-bg-cream relative">
+    <section id="blog" className="py-6 md:py-8 bg-bg-cream relative">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-10">
+        <div className="text-center mb-5">
           <p className="text-primary-green font-bold tracking-widest text-sm md:text-base uppercase mb-3 flex items-center justify-center gap-2">
             <BookOpen size={18} /> Origen Blog
           </p>

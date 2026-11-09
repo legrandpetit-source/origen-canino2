@@ -3,11 +3,11 @@ import { MapPin, Truck, ShieldCheck, Clock } from 'lucide-react';
 
 const DeliveryArea = () => {
   return (
-    <section id="despacho" className="py-10 md:py-14 bg-[#FAF7F2] scroll-mt-20">
+    <section id="despacho" className="py-6 md:py-8 bg-[#FAF7F2] scroll-mt-20">
       <div className="container mx-auto px-4 sm:px-6 max-w-5xl">
         
         {/* Encabezado Compacto */}
-        <div className="text-center max-w-xl mx-auto mb-8">
+        <div className="text-center max-w-xl mx-auto mb-5">
           <span className="inline-block bg-[#EBF2DA] text-[#4E5824] text-[11px] sm:text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-full mb-2">
             Cobertura Logística
           </span>

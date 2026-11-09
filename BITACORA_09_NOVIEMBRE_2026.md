@@ -82,3 +82,4 @@
 2. **Compilación de Frontend (Vite 5.4):**
    - `npm run build`: Compilación exitosa en `10.16s`.
    - Generados chunks de producción en `dist/`.
+
