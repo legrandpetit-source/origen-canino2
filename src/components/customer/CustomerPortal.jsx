@@ -1000,7 +1000,14 @@ const CustomerPortal = () => {
                   {referralInfo.friends.map((f, idx) => (
                     <div key={idx} className="py-3.5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs">
                       <div>
-                        <strong className="text-secondary-brown text-sm block">{f.customer_name}</strong>
+                        <strong className="text-secondary-brown text-sm block flex items-center gap-1.5 flex-wrap">
+                          <span>{f.customer_name}</span>
+                          {f.dog_name && (
+                            <span className="text-[11px] font-semibold text-primary-green bg-green-50 px-2 py-0.5 rounded-md border border-green-200/50">
+                              🐶 {f.dog_name}
+                            </span>
+                          )}
+                        </strong>
                         <span className="text-stone-400">Fecha: {f.created_at} • Pedido #{f.id}</span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1010,7 +1017,9 @@ const CustomerPortal = () => {
                             ? 'bg-emerald-100 text-emerald-800'
                             : 'bg-amber-100 text-amber-800'
                         }`}>
-                          {f.payment_status?.toLowerCase().includes('pagado') ? '+ $5.000 Acreditados' : 'Pendiente de Pago'}
+                          {f.payment_status?.toLowerCase().includes('pagado') 
+                            ? `+ $${(referralInfo?.reward_amount || 5000).toLocaleString('es-CL')} Acreditados` 
+                            : 'Pendiente de Pago'}
                         </span>
                       </div>
                     </div>

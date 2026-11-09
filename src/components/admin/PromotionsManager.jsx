@@ -25,11 +25,12 @@ import {
   Users,
   Copy,
   Check,
-  X
+  X,
+  Wallet
 } from 'lucide-react';
 
 export default function PromotionsManager({ fetchWithAuth }) {
-  const [activeSubTab, setActiveSubTab] = useState('coupons'); // 'coupons' | 'welcome'
+  const [activeSubTab, setActiveSubTab] = useState('coupons'); // 'coupons' | 'welcome' | 'referrals'
 
   // --- First-Order Welcome Promo State ---
   const [enabled, setEnabled] = useState(true);
@@ -38,6 +39,23 @@ export default function PromotionsManager({ fetchWithAuth }) {
   const [title, setTitle] = useState('¡10% OFF en tu primera compra!');
   const [description, setDescription] = useState('Descuento automático exclusivo para nuevos clientes en su primer pedido.');
   const [savingWelcome, setSavingWelcome] = useState(false);
+
+  // --- Dynamic Referrals & Ambassadors State ---
+  const [referralSummary, setReferralSummary] = useState({
+    total_referred_orders: 0,
+    total_revenue: 0,
+    total_rewards_paid: 0,
+    total_wallet_spent: 0,
+    top_referrers: []
+  });
+  const [referralSettings, setReferralSettings] = useState({
+    referral_program_active: true,
+    referral_friend_discount_percent: 15,
+    referral_reward_amount: 5000,
+    referral_min_order_amount: 30000
+  });
+  const [loadingReferrals, setLoadingReferrals] = useState(false);
+  const [savingReferrals, setSavingReferrals] = useState(false);
 
   // Email simulation check
   const [testEmail, setTestEmail] = useState('');
@@ -113,14 +131,71 @@ export default function PromotionsManager({ fetchWithAuth }) {
     }
   };
 
+  const fetchReferralData = async () => {
+    setLoadingReferrals(true);
+    try {
+      const res = await fetchWithAuth('/api/admin/referrals/summary');
+      if (res.ok) {
+        const data = await res.json();
+        setReferralSummary({
+          total_referred_orders: data.total_referred_orders || 0,
+          total_revenue: data.total_revenue || 0,
+          total_rewards_paid: data.total_rewards_paid || 0,
+          total_wallet_spent: data.total_wallet_spent || 0,
+          top_referrers: data.top_referrers || []
+        });
+        if (data.settings) {
+          setReferralSettings({
+            referral_program_active: data.settings.referral_program_active ?? true,
+            referral_friend_discount_percent: data.settings.referral_friend_discount_percent ?? 15,
+            referral_reward_amount: data.settings.referral_reward_amount ?? 5000,
+            referral_min_order_amount: data.settings.referral_min_order_amount ?? 30000
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching referral data:', err);
+    } finally {
+      setLoadingReferrals(false);
+    }
+  };
+
   useEffect(() => {
     const init = async () => {
       setLoading(true);
-      await Promise.all([fetchPromoSettings(), fetchCouponsList()]);
+      await Promise.all([fetchPromoSettings(), fetchCouponsList(), fetchReferralData()]);
       setLoading(false);
     };
     init();
   }, []);
+
+  const handleSaveReferrals = async (e) => {
+    if (e) e.preventDefault();
+    setSavingReferrals(true);
+    try {
+      const res = await fetchWithAuth('/api/admin/referrals/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          referral_program_active: referralSettings.referral_program_active,
+          referral_friend_discount_percent: Number(referralSettings.referral_friend_discount_percent),
+          referral_reward_amount: Number(referralSettings.referral_reward_amount),
+          referral_min_order_amount: Number(referralSettings.referral_min_order_amount)
+        })
+      });
+      if (res.ok) {
+        notify('success', '¡Ajustes del Programa de Embajadores guardados correctamente!');
+        fetchReferralData();
+      } else {
+        notify('error', 'Error al guardar los ajustes de referidos.');
+      }
+    } catch (err) {
+      console.error(err);
+      notify('error', 'Error al conectar con el servidor.');
+    } finally {
+      setSavingReferrals(false);
+    }
+  };
 
   // Save Welcome Promo
   const handleSaveWelcome = async (e) => {
@@ -343,22 +418,22 @@ export default function PromotionsManager({ fetchWithAuth }) {
         </div>
 
         {/* Sub-Tabs Switcher */}
-        <div className="bg-[#EDE8DF] p-1.5 rounded-2xl border border-[#EBE4DA] flex gap-2 self-start md:self-auto shadow-2xs">
+        <div className="bg-[#EDE8DF] p-1.5 rounded-2xl border border-[#EBE4DA] flex flex-wrap gap-1.5 self-start md:self-auto shadow-2xs">
           <button
             onClick={() => setActiveSubTab('coupons')}
-            className={`px-4 py-2.5 rounded-xl font-bold text-xs md:text-sm transition flex items-center gap-2 cursor-pointer ${
+            className={`px-3.5 py-2 rounded-xl font-bold text-xs md:text-sm transition flex items-center gap-2 cursor-pointer ${
               activeSubTab === 'coupons'
                 ? 'bg-[#677333] text-white shadow-sm'
                 : 'text-stone-700 hover:text-[#677333] hover:bg-white/60'
             }`}
           >
             <Tag size={15} />
-            <span>Cupones de Campaña ({coupons.length})</span>
+            <span>Cupones ({coupons.length})</span>
           </button>
 
           <button
             onClick={() => setActiveSubTab('welcome')}
-            className={`px-4 py-2.5 rounded-xl font-bold text-xs md:text-sm transition flex items-center gap-2 cursor-pointer ${
+            className={`px-3.5 py-2 rounded-xl font-bold text-xs md:text-sm transition flex items-center gap-2 cursor-pointer ${
               activeSubTab === 'welcome'
                 ? 'bg-[#677333] text-white shadow-sm'
                 : 'text-stone-700 hover:text-[#677333] hover:bg-white/60'
@@ -366,6 +441,21 @@ export default function PromotionsManager({ fetchWithAuth }) {
           >
             <Sparkles size={15} />
             <span>1ra Compra (Automática)</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveSubTab('referrals');
+              fetchReferralData();
+            }}
+            className={`px-3.5 py-2 rounded-xl font-bold text-xs md:text-sm transition flex items-center gap-2 cursor-pointer ${
+              activeSubTab === 'referrals'
+                ? 'bg-[#677333] text-white shadow-sm'
+                : 'text-stone-700 hover:text-[#677333] hover:bg-white/60'
+            }`}
+          >
+            <Wallet size={15} />
+            <span>Embajadores & Referidos QR</span>
           </button>
         </div>
       </div>
@@ -769,6 +859,265 @@ export default function PromotionsManager({ fetchWithAuth }) {
                       <span>Cliente Recurrente: Ya posee {emailCheckResult.order_count} orden(es) registrada(s). No aplica descuento de primera compra.</span>
                     </div>
                   )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUBTAB 3: PROGRAMA DE EMBAJADORES Y REFERIDOS QR */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'referrals' && (
+        <div className="space-y-6">
+          {/* Header & Status Card */}
+          <div className="bg-white p-5 sm:p-7 rounded-3xl border border-stone-100 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider font-body flex items-center gap-1.5 ${
+                  referralSettings.referral_program_active
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-stone-200 text-stone-600'
+                }`}>
+                  <span className={`w-2 h-2 rounded-full ${referralSettings.referral_program_active ? 'bg-emerald-500 animate-pulse' : 'bg-stone-400'}`}></span>
+                  {referralSettings.referral_program_active ? 'Programa Activo' : 'Programa Pausado'}
+                </span>
+                <span className="text-xs text-stone-400 font-body">Vendedores sin Sueldo</span>
+              </div>
+              <h3 className="font-display font-black text-xl sm:text-2xl text-[#3c2716]">
+                Embajadores & Billetera de Referidos
+              </h3>
+              <p className="text-xs sm:text-sm text-stone-600 font-body mt-1 max-w-2xl">
+                Los clientes recomiendan su enlace/código QR a sus amigos pet parents. Cuando su amigo realiza su primera compra, el embajador recibe saldo automático en su billetera digital para descontar en su siguiente compra.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setReferralSettings(prev => ({ ...prev, referral_program_active: !prev.referral_program_active }))}
+              className={`px-4 py-2.5 rounded-2xl font-bold font-body text-xs sm:text-sm flex items-center gap-2 transition cursor-pointer shrink-0 ${
+                referralSettings.referral_program_active
+                  ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
+                  : 'bg-[#677333] text-white hover:bg-[#556029]'
+              }`}
+            >
+              {referralSettings.referral_program_active ? (
+                <>
+                  <ToggleRight size={18} />
+                  <span>Pausar Programa</span>
+                </>
+              ) : (
+                <>
+                  <ToggleLeft size={18} />
+                  <span>Activar Programa</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* 4 KPI Metrics - Responsive 2x2 on Mobile, 4 Cols Desktop */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
+            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-stone-100 shadow-2xs">
+              <span className="text-[10px] sm:text-xs font-bold text-stone-500 uppercase tracking-wider block font-body">
+                Pedidos Referidos
+              </span>
+              <p className="text-xl sm:text-3xl font-black text-[#3c2716] font-display mt-1">
+                {referralSummary.total_referred_orders}
+              </p>
+              <span className="text-[10px] text-stone-400 mt-0.5 block">Compras 1ra vez</span>
+            </div>
+
+            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-stone-100 shadow-2xs">
+              <span className="text-[10px] sm:text-xs font-bold text-stone-500 uppercase tracking-wider block font-body">
+                Ventas Generadas
+              </span>
+              <p className="text-xl sm:text-3xl font-black text-primary-green font-display mt-1">
+                ${Number(referralSummary.total_revenue || 0).toLocaleString('es-CL')}
+              </p>
+              <span className="text-[10px] text-stone-400 mt-0.5 block">Ingresos por referidos</span>
+            </div>
+
+            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-stone-100 shadow-2xs">
+              <span className="text-[10px] sm:text-xs font-bold text-stone-500 uppercase tracking-wider block font-body">
+                Recompensas Billetera
+              </span>
+              <p className="text-xl sm:text-3xl font-black text-amber-700 font-display mt-1">
+                ${Number(referralSummary.total_rewards_paid || 0).toLocaleString('es-CL')}
+              </p>
+              <span className="text-[10px] text-stone-400 mt-0.5 block">Acreditadas a clientes</span>
+            </div>
+
+            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-stone-100 shadow-2xs">
+              <span className="text-[10px] sm:text-xs font-bold text-stone-500 uppercase tracking-wider block font-body">
+                Saldo Canjeado
+              </span>
+              <p className="text-xl sm:text-3xl font-black text-[#677333] font-display mt-1">
+                ${Number(referralSummary.total_wallet_spent || 0).toLocaleString('es-CL')}
+              </p>
+              <span className="text-[10px] text-stone-400 mt-0.5 block">Usado en checkout</span>
+            </div>
+          </div>
+
+          {/* Mantenedor Dinámico + Top Embajadores */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
+            {/* Formulario de Ajustes Dinámicos */}
+            <div className="lg:col-span-5 bg-white p-5 sm:p-7 rounded-3xl border border-stone-100 shadow-sm space-y-5">
+              <div className="border-b border-stone-100 pb-3">
+                <h4 className="font-display font-extrabold text-base sm:text-lg text-[#3c2716] flex items-center gap-2">
+                  <DollarSign size={18} className="text-[#677333]" />
+                  <span>Mantenedor de Parámetros</span>
+                </h4>
+                <p className="text-xs text-stone-500 font-body mt-0.5">
+                  Ajusta los valores del programa. Se guardan en la base de datos sin tocar código.
+                </p>
+              </div>
+
+              <form onSubmit={handleSaveReferrals} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#3c2716] uppercase tracking-wider mb-1 font-display">
+                    Recompensa para el Embajador ($ CLP)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-stone-400 text-sm">$</span>
+                    <input
+                      type="number"
+                      min="1000"
+                      step="500"
+                      required
+                      value={referralSettings.referral_reward_amount}
+                      onChange={(e) => setReferralSettings(prev => ({ ...prev, referral_reward_amount: e.target.value }))}
+                      className="w-full pl-8 pr-3.5 py-2.5 rounded-xl border border-stone-200 text-sm font-body font-bold text-[#3c2716] focus:outline-none focus:ring-2 focus:ring-[#677333]"
+                    />
+                  </div>
+                  <p className="text-[11px] text-stone-400 font-body mt-1">
+                    Monto que se acredita a la billetera del cliente cuando su amigo compra por primera vez (ej: $5.000).
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#3c2716] uppercase tracking-wider mb-1 font-display">
+                    Compra Mínima del Amigo ($ CLP)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-stone-400 text-sm">$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1000"
+                      required
+                      value={referralSettings.referral_min_order_amount}
+                      onChange={(e) => setReferralSettings(prev => ({ ...prev, referral_min_order_amount: e.target.value }))}
+                      className="w-full pl-8 pr-3.5 py-2.5 rounded-xl border border-stone-200 text-sm font-body font-bold text-[#3c2716] focus:outline-none focus:ring-2 focus:ring-[#677333]"
+                    />
+                  </div>
+                  <p className="text-[11px] text-stone-400 font-body mt-1">
+                    El amigo debe gastar al menos este monto en su primer pedido para desbloquear la recompensa (ej: $30.000 o $35.000).
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#3c2716] uppercase tracking-wider mb-1 font-display">
+                    Descuento de Bienvenida para el Amigo (% OFF)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="1"
+                      max="50"
+                      required
+                      value={referralSettings.referral_friend_discount_percent}
+                      onChange={(e) => setReferralSettings(prev => ({ ...prev, referral_friend_discount_percent: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 text-sm font-body font-bold text-[#3c2716] focus:outline-none focus:ring-2 focus:ring-[#677333]"
+                    />
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-bold text-stone-400 text-sm">%</span>
+                  </div>
+                  <p className="text-[11px] text-stone-400 font-body mt-1">
+                    Porcentaje de descuento automático que recibe el amigo al comprar usando el código del embajador (ej: 15%).
+                  </p>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={savingReferrals}
+                    className="w-full py-3 bg-[#677333] hover:bg-[#556029] text-white font-bold rounded-2xl transition shadow-sm text-xs sm:text-sm font-body flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {savingReferrals ? <RefreshCw className="animate-spin" size={16} /> : <Save size={16} />}
+                    <span>Guardar Parámetros en Base de Datos</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Ranking de Embajadores (Top Referrers) */}
+            <div className="lg:col-span-7 bg-white p-5 sm:p-7 rounded-3xl border border-stone-100 shadow-sm space-y-4">
+              <div className="flex justify-between items-center border-b border-stone-100 pb-3">
+                <div>
+                  <h4 className="font-display font-extrabold text-base sm:text-lg text-[#3c2716] flex items-center gap-2">
+                    <Users size={18} className="text-[#677333]" />
+                    <span>Ranking de Embajadores</span>
+                  </h4>
+                  <p className="text-xs text-stone-500 font-body mt-0.5">
+                    Clientes activos con saldo y amigos recomendados.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchReferralData}
+                  disabled={loadingReferrals}
+                  className="p-2 rounded-xl text-stone-500 hover:text-[#677333] hover:bg-stone-50 transition cursor-pointer"
+                  title="Actualizar ranking"
+                >
+                  <RefreshCw size={16} className={loadingReferrals ? 'animate-spin' : ''} />
+                </button>
+              </div>
+
+              {referralSummary.top_referrers.length === 0 ? (
+                <div className="py-12 text-center">
+                  <Users size={36} className="text-stone-300 mx-auto mb-3" />
+                  <p className="text-xs sm:text-sm font-bold text-stone-500 font-body">
+                    Aún no hay transacciones de embajadores registradas.
+                  </p>
+                  <p className="text-[11px] text-stone-400 mt-1 max-w-sm mx-auto">
+                    Cuando los clientes compartan su código QR desde "Mi Cuenta &gt; Invita y Gana" y sus amigos compren, aparecerán aquí.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto -mx-2 sm:mx-0">
+                  <table className="w-full text-left text-xs font-body">
+                    <thead>
+                      <tr className="border-b border-stone-100 text-[11px] font-bold text-stone-400 uppercase tracking-wider">
+                        <th className="py-2.5 px-3">Cliente</th>
+                        <th className="py-2.5 px-3">Código QR</th>
+                        <th className="py-2.5 px-3 text-center">Amigos</th>
+                        <th className="py-2.5 px-3 text-right">Billetera</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-50">
+                      {referralSummary.top_referrers.map((emb, idx) => (
+                        <tr key={emb.id || idx} className="hover:bg-stone-50/60 transition">
+                          <td className="py-3 px-3">
+                            <strong className="text-secondary-brown block">{emb.name}</strong>
+                            <span className="text-[10px] text-stone-400 block">{emb.email}</span>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="px-2 py-0.5 bg-stone-100 rounded text-stone-700 font-mono font-bold text-[11px]">
+                              {emb.referral_code || 'SIN CÓDIGO'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span className="px-2 py-0.5 bg-green-50 text-emerald-800 font-bold rounded-full text-[11px]">
+                              {emb.rewards_count || 0}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-right font-black text-[#677333]">
+                            ${Number(emb.wallet_balance || 0).toLocaleString('es-CL')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>

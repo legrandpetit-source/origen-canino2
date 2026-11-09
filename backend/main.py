@@ -589,11 +589,21 @@ def check_and_award_referral(cursor, order_id: int):
         # Acreditar a la billetera del referidor
         cursor.execute("UPDATE customers SET wallet_balance = COALESCE(wallet_balance, 0) + %s WHERE id = %s", (reward_amount, referrer['id']))
 
+        # Obtener nombre del perrito del amigo comprador si está registrado
+        dog_info = ""
+        if o.get('customer_id'):
+            cursor.execute("SELECT name FROM customer_dogs WHERE customer_id = %s ORDER BY id ASC LIMIT 1", (o['customer_id'],))
+            d_row = cursor.fetchone()
+            if d_row and d_row.get('name'):
+                dog_info = f" (y su perrito 🐶 {d_row['name']})"
+
+        trans_desc = f"Descuento por referido: compra de comida de {o['customer_name']}{dog_info} (Pedido #{order_id})"
+
         # Registrar transacción
         cursor.execute("""
             INSERT INTO referral_transactions (referrer_customer_id, referee_customer_id, order_id, transaction_type, amount, description, status)
             VALUES (%s, %s, %s, 'reward_earned', %s, %s, 'completed')
-        """, (referrer['id'], o.get('customer_id'), order_id, reward_amount, f"Recompensa por amigo referido: {o['customer_name']} (Pedido #{order_id})"))
+        """, (referrer['id'], o.get('customer_id'), order_id, reward_amount, trans_desc))
 
         # Notificar por Telegram
         msg = f"🎁 *¡Recompensa por Referido Acreditada!* 🐾\n\n"
@@ -1344,7 +1354,8 @@ def get_customer_referral_info(customer_id: int = Depends(get_current_customer))
         
         # Amigos referidos (órdenes realizadas con este código)
         cursor.execute("""
-            SELECT o.id, o.customer_name, o.total, o.payment_status, o.created_at
+            SELECT o.id, o.customer_name, o.customer_id, o.total, o.payment_status, o.created_at,
+                   (SELECT name FROM customer_dogs cd WHERE cd.customer_id = o.customer_id ORDER BY cd.id ASC LIMIT 1) as dog_name
             FROM orders o
             WHERE UPPER(o.referral_code) = %s
             ORDER BY o.id DESC
