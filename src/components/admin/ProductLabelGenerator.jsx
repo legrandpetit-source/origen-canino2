@@ -309,3 +309,4 @@ const ProductLabelGenerator = ({ activeLine, totalKg, isOpen, onClose }) => {
 };
 
 export default ProductLabelGenerator;
+
