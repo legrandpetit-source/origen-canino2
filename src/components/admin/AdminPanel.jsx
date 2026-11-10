@@ -610,7 +610,12 @@ const AdminPanel = () => {
 
               {/* --- KITCHEN TAB (CALCULADORAS INDUSTRIALES: BARF COGOTE & COCINADA CERDO) --- */}
               {activeTab === 'kitchen' && (
-                <KitchenProductionManager fetchWithAuth={fetchWithAuth} />
+                <KitchenProductionManager 
+                  fetchWithAuth={fetchWithAuth} 
+                  ingredients={ingredients} 
+                  fetchIngredients={fetchData}
+                  products={products}
+                />
               )}
 
               {/* --- PARTNERS TAB (AGENTE 1: ALIANZAS VET & PET B2B) --- */}

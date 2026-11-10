@@ -8,18 +8,24 @@ import {
 } from 'lucide-react';
 import ProductLabelGenerator from './ProductLabelGenerator';
 
-const KitchenProductionManager = ({ fetchWithAuth }) => {
+const KitchenProductionManager = ({ fetchWithAuth, ingredients = [], fetchIngredients, products = [] }) => {
   const [activeLine, setActiveLine] = useState('barf'); // 'barf' o 'cocinada'
   const [activeSubTab, setActiveSubTab] = useState('recipe'); // 'recipe', 'history', 'breakeven', 'cold'
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [showCostSettings, setShowCostSettings] = useState(false);
 
-  // --- HISTORIAL DE COSTOS ---
+  // --- HISTORIAL DE COSTOS & INSUMOS ---
   const [costHistory, setCostHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyNote, setHistoryNote] = useState('');
   const [savingHistory, setSavingHistory] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+
+  // Historial de precios de insumos en feria / mayoristas
+  const [ingredientHistory, setIngredientHistory] = useState([]);
+  const [loadingIngHistory, setLoadingIngHistory] = useState(false);
+  const [historyViewMode, setHistoryViewMode] = useState('batches'); // 'batches' | 'ingredients'
+  const [exportingRecipe, setExportingRecipe] = useState(false);
 
   // --- PUNTO DE EQUILIBRIO (COSTOS FIJOS) ---
   const [monthlyRent, setMonthlyRent] = useState(250000);
@@ -74,6 +80,140 @@ const KitchenProductionManager = ({ fetchWithAuth }) => {
   const [costCookedPanaKg, setCostCookedPanaKg] = useState(1450);
   const [costCalciumKg, setCostCalciumKg] = useState(2500);
   const [costCookedPackagingUnit, setCostCookedPackagingUnit] = useState(250);
+
+  // --- SINCRONIZACIÓN AUTOMÁTICA CON MAESTRO DE INGREDIENTES ---
+  useEffect(() => {
+    if (!ingredients || ingredients.length === 0) return;
+
+    const getPrice = (terms, fallback) => {
+      const match = ingredients.find(item => 
+        terms.some(t => item.name.toLowerCase().includes(t.toLowerCase()))
+      );
+      return match ? Number(match.cost_per_unit) : fallback;
+    };
+
+    setCostCogoteKg(prev => getPrice(['cogote'], prev));
+    setCostPanaKg(prev => getPrice(['pana pollo', 'pana de pollo', 'pana'], prev));
+    setCostContreKg(prev => getPrice(['contre pollo', 'contre de pollo', 'contre'], prev));
+    setCostZapalloCamoteKg(prev => getPrice(['zapallo camote', 'camote'], prev));
+    setCostZanahoriaKg(prev => getPrice(['zanahoria'], prev));
+    setCostBetarragaKg(prev => getPrice(['betarraga'], prev));
+    setCostZapalloItalianoKg(prev => getPrice(['zapallo italiano', 'italiano'], prev));
+    setCostManzanaKg(prev => getPrice(['manzana'], prev));
+    setCostApioKg(prev => getPrice(['apio'], prev));
+    setCostEggUnit(prev => getPrice(['huevo'], prev));
+    setCostCerdoKg(prev => getPrice(['cerdo', 'carne cerdo'], prev));
+    setCostCookedPanaKg(prev => getPrice(['pana cerdo', 'pana'], prev));
+    setCostPackagingUnit(prev => getPrice(['bolsa', 'etiqueta', 'envase'], prev));
+  }, [ingredients]);
+
+  const loadIngredientHistory = async () => {
+    if (!fetchWithAuth) return;
+    setLoadingIngHistory(true);
+    try {
+      const res = await fetchWithAuth('/api/admin/ingredients/history');
+      if (res.ok) {
+        const data = await res.json();
+        setIngredientHistory(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingIngHistory(false);
+    }
+  };
+
+  const handleExportRecipeToProduct = async () => {
+    if (!products || products.length === 0) {
+      alert("No se encontraron productos en el catálogo.");
+      return;
+    }
+
+    const targetProduct = products.find(p => 
+      activeLine === 'barf' 
+        ? (p.name.toLowerCase().includes('barf') || p.name.toLowerCase().includes('cruda'))
+        : (p.name.toLowerCase().includes('cocinada') || p.name.toLowerCase().includes('vapor'))
+    );
+
+    if (!targetProduct) {
+      alert(`No se encontró un producto en el catálogo para la línea ${activeLine === 'barf' ? 'BARF' : 'Cocinada'}.`);
+      return;
+    }
+
+    if (!window.confirm(`¿Deseas exportar la formulación estándar (1 kg) de ${activeLine === 'barf' ? 'Dieta BARF' : 'Dieta Cocinada'} a la receta del producto "${targetProduct.name}"? Esto vinculará la materia prima y costos fijos de empaque.`)) {
+      return;
+    }
+
+    setExportingRecipe(true);
+    try {
+      const findId = (terms) => {
+        const match = ingredients.find(i => terms.some(t => i.name.toLowerCase().includes(t.toLowerCase())));
+        return match ? match.id : null;
+      };
+
+      let recipeItems = [];
+      if (activeLine === 'barf') {
+        const rules = [
+          { terms: ['cogote'], qty: 0.70 },
+          { terms: ['pana pollo', 'pana de pollo', 'pana'], qty: 0.05 },
+          { terms: ['contre pollo', 'contre de pollo', 'contre'], qty: 0.10 },
+          { terms: ['zapallo camote', 'camote'], qty: 0.079 },
+          { terms: ['zanahoria'], qty: 0.048 },
+          { terms: ['betarraga'], qty: 0.015 },
+          { terms: ['zapallo italiano', 'italiano'], qty: 0.012 },
+          { terms: ['manzana'], qty: 0.010 },
+          { terms: ['apio'], qty: 0.007 }
+        ];
+        for (const r of rules) {
+          const id = findId(r.terms);
+          if (id) recipeItems.push({ ingredient_id: id, quantity: r.qty });
+        }
+      } else {
+        const rules = [
+          { terms: ['cerdo'], qty: 0.70 },
+          { terms: ['pana cerdo', 'pana'], qty: 0.05 },
+          { terms: ['zapallo camote', 'camote'], qty: 0.10 },
+          { terms: ['zanahoria'], qty: 0.10 }
+        ];
+        for (const r of rules) {
+          const id = findId(r.terms);
+          if (id) recipeItems.push({ ingredient_id: id, quantity: r.qty });
+        }
+      }
+
+      if (recipeItems.length === 0) {
+        alert("No se pudieron enlazar los ingredientes porque aún no existen en el Maestro de Ingredientes.");
+        return;
+      }
+
+      const res = await fetchWithAuth(`/api/admin/products/${targetProduct.id}/recipe`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: recipeItems })
+      });
+
+      // Actualizar costo de envase
+      await fetchWithAuth(`/api/products/${targetProduct.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...targetProduct,
+          fixed_cost: activeLine === 'barf' ? costPackagingUnit : costCookedPackagingUnit
+        })
+      });
+
+      if (res.ok) {
+        alert(`¡Receta sincronizada con éxito para "${targetProduct.name}"! Ahora el catálogo de productos refleja exactamente los costos de cocina.`);
+      } else {
+        alert("Error al sincronizar receta.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error al sincronizar receta.");
+    } finally {
+      setExportingRecipe(false);
+    }
+  };
 
   // ==========================================
   // CÁLCULOS MATEMÁTICOS LÍNEA 1: BARF (BASE COGOTE = 70%)
@@ -224,9 +364,13 @@ const KitchenProductionManager = ({ fetchWithAuth }) => {
 
   useEffect(() => {
     if (activeSubTab === 'history') {
-      loadHistory();
+      if (historyViewMode === 'batches') {
+        loadHistory();
+      } else {
+        loadIngredientHistory();
+      }
     }
-  }, [activeSubTab, activeLine]);
+  }, [activeSubTab, activeLine, historyViewMode]);
 
   const handleSaveToHistory = async () => {
     if (!fetchWithAuth) return;
@@ -313,6 +457,16 @@ const KitchenProductionManager = ({ fetchWithAuth }) => {
 
         <div className="flex flex-wrap items-center gap-2">
           <button
+            onClick={handleExportRecipeToProduct}
+            disabled={exportingRecipe}
+            className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2.5 rounded-2xl font-bold text-xs transition shadow-2xs cursor-pointer"
+            title="Sincronizar formulación para 1kg con la Receta del Producto en Catálogo"
+          >
+            <Layers size={15} />
+            <span>{exportingRecipe ? 'Sincronizando...' : 'Exportar a Receta Catálogo'}</span>
+          </button>
+
+          <button
             onClick={() => setShowSaveModal(true)}
             className="flex items-center gap-1.5 bg-stone-900 hover:bg-stone-800 text-white px-3.5 py-2.5 rounded-2xl font-bold text-xs transition shadow-2xs cursor-pointer"
             title="Archivar costos y margen actual en el historial histórico"
@@ -397,6 +551,24 @@ const KitchenProductionManager = ({ fetchWithAuth }) => {
       {/* ========================================================================= */}
       {activeSubTab === 'recipe' && (
         <div className="space-y-6">
+
+          {/* Banner de Sincronización con Maestro de Ingredientes */}
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-emerald-50/90 border border-emerald-200/80 px-4 py-2.5 rounded-2xl text-xs">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="font-bold text-emerald-950">
+                Sincronización en Vivo: Los costos de insumos y materia prima se alimentan automáticamente desde tu Maestro ({ingredients.length} insumos registrados).
+              </span>
+            </div>
+            {fetchIngredients && (
+              <button 
+                onClick={fetchIngredients}
+                className="text-emerald-800 hover:text-emerald-950 font-bold flex items-center gap-1 text-[11px] underline cursor-pointer"
+              >
+                <RefreshCw size={12} /> Refrescar Precios
+              </button>
+            )}
+          </div>
 
           {/* Selector de Paneles Independientes (BARF vs COCINADA) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1255,84 +1427,184 @@ const KitchenProductionManager = ({ fetchWithAuth }) => {
               </div>
             </div>
 
-            {/* Selector de Línea para Historial */}
-            <div className="flex items-center gap-2 my-4">
-              <button
-                onClick={() => setActiveLine('barf')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  activeLine === 'barf' ? 'bg-emerald-600 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                }`}
-              >
-                Línea BARF Cruda
-              </button>
-              <button
-                onClick={() => setActiveLine('cocinada')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  activeLine === 'cocinada' ? 'bg-amber-600 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                }`}
-              >
-                Línea Cocinada Cerdo
-              </button>
+            {/* Selector de Modo para Historial: Lotes vs Precios Insumos */}
+            <div className="flex flex-wrap items-center justify-between gap-3 my-4">
+              <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-2xl">
+                <button
+                  onClick={() => setHistoryViewMode('batches')}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    historyViewMode === 'batches' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-500 hover:text-stone-800'
+                  }`}
+                >
+                  <Archive size={14} />
+                  <span>Lotes de Producción</span>
+                </button>
+                <button
+                  onClick={() => { setHistoryViewMode('ingredients'); loadIngredientHistory(); }}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    historyViewMode === 'ingredients' ? 'bg-white text-amber-900 shadow-xs' : 'text-stone-500 hover:text-stone-800'
+                  }`}
+                >
+                  <History size={14} className="text-amber-600" />
+                  <span>Historial de Precios de Insumos (Feria / Mayoristas)</span>
+                </button>
+              </div>
+
+              {historyViewMode === 'batches' && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setActiveLine('barf')}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      activeLine === 'barf' ? 'bg-emerald-600 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                    }`}
+                  >
+                    BARF Cruda
+                  </button>
+                  <button
+                    onClick={() => setActiveLine('cocinada')}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      activeLine === 'cocinada' ? 'bg-amber-600 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                    }`}
+                  >
+                    Cocinada Cerdo
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Tabla Histórica */}
-            {loadingHistory ? (
-              <div className="text-center py-10 text-xs text-stone-400">Cargando historial de costos...</div>
-            ) : costHistory.length === 0 ? (
-              <div className="text-center py-12 bg-stone-50 rounded-2xl border border-stone-200 p-6">
-                <Archive size={32} className="mx-auto text-stone-300 mb-2" />
-                <p className="text-xs font-bold text-stone-700">Aún no hay registros archivados para esta línea</p>
-                <p className="text-[11px] text-stone-400 mt-0.5">Haz clic en "Archivar Costos de Hoy" para guardar el primer punto de referencia.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto rounded-2xl border border-stone-200">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-stone-100 text-stone-600 font-bold uppercase text-[10px] tracking-wider">
-                    <tr>
-                      <th className="p-3">Fecha</th>
-                      <th className="p-3">Línea</th>
-                      <th className="p-3 text-right">Lote (kg)</th>
-                      <th className="p-3 text-right">Costo / kg</th>
-                      <th className="p-3 text-right">PVP / kg</th>
-                      <th className="p-3 text-right">Margen %</th>
-                      <th className="p-3 text-right">Margen $</th>
-                      <th className="p-3">Notas / Factura</th>
-                      <th className="p-3 text-center">Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-100">
-                    {costHistory.map((item) => (
-                      <tr key={item.id} className="hover:bg-stone-50 transition">
-                        <td className="p-3 font-mono font-medium text-stone-600">
-                          {new Date(item.created_at).toLocaleDateString('es-CL')}
-                        </td>
-                        <td className="p-3">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                            item.production_line === 'barf' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                          }`}>
-                            {item.production_line}
-                          </span>
-                        </td>
-                        <td className="p-3 text-right font-mono font-bold">{item.batch_total_kg} kg</td>
-                        <td className="p-3 text-right font-mono font-bold text-stone-900">${item.cost_per_kg?.toLocaleString('es-CL')}</td>
-                        <td className="p-3 text-right font-mono text-stone-600">${item.pvp_price?.toLocaleString('es-CL')}</td>
-                        <td className="p-3 text-right font-mono font-black text-emerald-700">{item.gross_margin_percent}%</td>
-                        <td className="p-3 text-right font-mono font-bold text-emerald-800">+${item.gross_margin_clp?.toLocaleString('es-CL')}</td>
-                        <td className="p-3 text-stone-500 italic max-w-xs truncate">{item.provider_notes || '—'}</td>
-                        <td className="p-3 text-center">
-                          <button
-                            onClick={() => handleDeleteHistoryItem(item.id)}
-                            className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                            title="Eliminar registro"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            {/* VISTA 1: TABLA HISTÓRICA DE LOTES */}
+            {historyViewMode === 'batches' && (
+              <>
+                {loadingHistory ? (
+                  <div className="text-center py-10 text-xs text-stone-400">Cargando historial de costos...</div>
+                ) : costHistory.length === 0 ? (
+                  <div className="text-center py-12 bg-stone-50 rounded-2xl border border-stone-200 p-6">
+                    <Archive size={32} className="mx-auto text-stone-300 mb-2" />
+                    <p className="text-xs font-bold text-stone-700">Aún no hay registros archivados para esta línea</p>
+                    <p className="text-[11px] text-stone-400 mt-0.5">Haz clic en "Archivar Costos de Hoy" para guardar el primer punto de referencia.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-stone-200">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-stone-100 text-stone-600 font-bold uppercase text-[10px] tracking-wider">
+                        <tr>
+                          <th className="p-3">Fecha</th>
+                          <th className="p-3">Línea</th>
+                          <th className="p-3 text-right">Lote (kg)</th>
+                          <th className="p-3 text-right">Costo / kg</th>
+                          <th className="p-3 text-right">PVP / kg</th>
+                          <th className="p-3 text-right">Margen %</th>
+                          <th className="p-3 text-right">Margen $</th>
+                          <th className="p-3">Notas / Factura</th>
+                          <th className="p-3 text-center">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-100">
+                        {costHistory.map((item) => (
+                          <tr key={item.id} className="hover:bg-stone-50 transition">
+                            <td className="p-3 font-mono font-medium text-stone-600">
+                              {new Date(item.created_at).toLocaleDateString('es-CL')}
+                            </td>
+                            <td className="p-3">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                item.production_line === 'barf' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                              }`}>
+                                {item.production_line}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right font-mono font-bold">{item.batch_total_kg} kg</td>
+                            <td className="p-3 text-right font-mono font-bold text-stone-900">${item.cost_per_kg?.toLocaleString('es-CL')}</td>
+                            <td className="p-3 text-right font-mono text-stone-600">${item.pvp_price?.toLocaleString('es-CL')}</td>
+                            <td className="p-3 text-right font-mono font-black text-emerald-700">{item.gross_margin_percent}%</td>
+                            <td className="p-3 text-right font-mono font-bold text-emerald-800">+${item.gross_margin_clp?.toLocaleString('es-CL')}</td>
+                            <td className="p-3 text-stone-500 italic max-w-xs truncate">{item.provider_notes || '—'}</td>
+                            <td className="p-3 text-center">
+                              <button
+                                onClick={() => handleDeleteHistoryItem(item.id)}
+                                className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                title="Eliminar registro"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* VISTA 2: TABLA HISTÓRICA DE PRECIOS DE INSUMOS (FERIA / PROVEEDORES) */}
+            {historyViewMode === 'ingredients' && (
+              <>
+                {loadingIngHistory ? (
+                  <div className="text-center py-10 text-xs text-stone-400">Cargando variaciones de insumos...</div>
+                ) : ingredientHistory.length === 0 ? (
+                  <div className="text-center py-12 bg-stone-50 rounded-2xl border border-stone-200 p-6">
+                    <History size={32} className="mx-auto text-stone-300 mb-2" />
+                    <p className="text-xs font-bold text-stone-700">Aún no hay variaciones de precios registradas</p>
+                    <p className="text-[11px] text-stone-400 mt-0.5">Al actualizar precios en el Maestro de Ingredientes, el sistema generará automáticamente la curva histórica aquí.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-stone-200">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-stone-100 text-stone-600 font-bold uppercase text-[10px] tracking-wider">
+                        <tr>
+                          <th className="p-3">Fecha</th>
+                          <th className="p-3">Insumo</th>
+                          <th className="p-3 text-right">Precio Anterior</th>
+                          <th className="p-3 text-right">Precio Nuevo</th>
+                          <th className="p-3 text-center">Variación</th>
+                          <th className="p-3">Notas</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-100">
+                        {ingredientHistory.map((item, idx) => {
+                          const prev = item.previous_price ? Number(item.previous_price) : null;
+                          const curr = Number(item.price);
+                          const diff = prev !== null ? curr - prev : 0;
+                          const pct = prev && prev > 0 ? ((diff / prev) * 100).toFixed(1) : null;
+                          const isIncrease = diff > 0;
+                          const isDecrease = diff < 0;
+
+                          return (
+                            <tr key={item.id || idx} className="hover:bg-stone-50 transition">
+                              <td className="p-3 font-mono text-stone-500">
+                                {item.created_at ? new Date(item.created_at).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                              </td>
+                              <td className="p-3 font-bold text-stone-900">{item.ingredient_name}</td>
+                              <td className="p-3 text-right font-mono text-stone-500">
+                                {prev !== null ? `$${prev.toLocaleString('es-CL')}` : <span className="text-stone-400 italic">Inicial</span>}
+                              </td>
+                              <td className="p-3 text-right font-mono font-bold text-stone-900">
+                                ${curr.toLocaleString('es-CL')} / {item.unit || 'kg'}
+                              </td>
+                              <td className="p-3 text-center">
+                                {prev === null ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 text-stone-600">Alta</span>
+                                ) : isIncrease ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800 inline-flex items-center gap-1">
+                                    <TrendingUp size={11} /> +${diff.toLocaleString('es-CL')} (+{pct}%)
+                                  </span>
+                                ) : isDecrease ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 inline-flex items-center gap-1">
+                                    <TrendingDown size={11} /> -${Math.abs(diff).toLocaleString('es-CL')} ({pct}%)
+                                  </span>
+                                ) : (
+                                  <span className="text-stone-400">Sin cambio</span>
+                                )}
+                              </td>
+                              <td className="p-3 text-stone-600 italic max-w-xs truncate">{item.notes || '—'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

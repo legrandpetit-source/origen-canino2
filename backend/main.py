@@ -1814,6 +1814,34 @@ def update_recipe(product_id: int, r: RecipeUpdate, current_user: str = Depends(
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error actualizando receta")
 
+@app.post("/api/admin/products/{product_id}/recipe")
+def add_recipe_ingredient(product_id: int, item: RecipeItem, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM product_ingredients WHERE product_id = %s AND ingredient_id = %s", (product_id, item.ingredient_id))
+            cursor.execute("""
+                INSERT INTO product_ingredients (product_id, ingredient_id, quantity)
+                VALUES (%s, %s, %s)
+            """, (product_id, item.ingredient_id, item.quantity))
+            conn.commit()
+            return {"success": True}
+    except Exception as e:
+        print(f"Error agregando ingrediente a receta: {e}")
+        raise HTTPException(status_code=500, detail="Error guardando ingrediente en receta")
+
+@app.delete("/api/admin/products/{product_id}/recipe/{ingredient_id}")
+def delete_recipe_ingredient(product_id: int, ingredient_id: int, current_user: str = Depends(get_current_admin)):
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM product_ingredients WHERE product_id = %s AND ingredient_id = %s", (product_id, ingredient_id))
+            conn.commit()
+            return {"success": True}
+    except Exception as e:
+        print(f"Error eliminando ingrediente de receta: {e}")
+        raise HTTPException(status_code=500, detail="Error eliminando ingrediente de receta")
+
 @app.delete("/api/products/{product_id}")
 def delete_product(product_id: int, current_user: str = Depends(get_current_admin)):
     try:
