@@ -257,6 +257,16 @@ class PartnerCreateUpdate(BaseModel):
     notes: Optional[str] = None
     contact_channel: Optional[str] = "whatsapp"
 
+class KitchenCostHistoryCreate(BaseModel):
+    production_line: str
+    batch_total_kg: float
+    cost_per_kg: int
+    pvp_price: int
+    gross_margin_percent: float
+    gross_margin_clp: int
+    raw_costs: Optional[dict] = None
+    provider_notes: Optional[str] = None
+
 class OrderItem(BaseModel):
     id: int
     name: str
@@ -2351,6 +2361,57 @@ def trigger_partner_scraper(current_user: str = Depends(get_current_admin)):
         "added": added,
         "message": f"Radar de alianzas completado: {added} nuevos prospectos calificados con Lead Scoring."
     }
+
+# --- HISTORIAL DE COSTOS Y RENTABILIDAD DE COCINA ---
+@app.get("/api/admin/kitchen/history")
+def get_kitchen_cost_history(line: Optional[str] = None, current_user: str = Depends(get_current_admin)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        query = "SELECT * FROM kitchen_cost_history WHERE 1=1"
+        params = []
+        if line:
+            query += " AND production_line = %s"
+            params.append(line)
+        query += " ORDER BY created_at DESC LIMIT 50"
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+        result = []
+        for r in rows:
+            row_dict = dict(r)
+            if hasattr(row_dict.get("created_at"), 'isoformat'):
+                row_dict["created_at"] = row_dict["created_at"].isoformat()
+            result.append(row_dict)
+        return result
+
+@app.post("/api/admin/kitchen/history")
+def create_kitchen_cost_history(h: KitchenCostHistoryCreate, current_user: str = Depends(get_current_admin)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO kitchen_cost_history (
+                production_line, batch_total_kg, cost_per_kg,
+                pvp_price, gross_margin_percent, gross_margin_clp,
+                raw_costs, provider_notes
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, created_at;
+        """, (
+            h.production_line, h.batch_total_kg, h.cost_per_kg,
+            h.pvp_price, h.gross_margin_percent, h.gross_margin_clp,
+            json.dumps(h.raw_costs) if h.raw_costs else None,
+            h.provider_notes
+        ))
+        row = cursor.fetchone()
+        conn.commit()
+        return {"success": True, "id": row["id"]}
+
+@app.delete("/api/admin/kitchen/history/{item_id}")
+def delete_kitchen_cost_history(item_id: int, current_user: str = Depends(get_current_admin)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM kitchen_cost_history WHERE id = %s", (item_id,))
+        conn.commit()
+        return {"success": True}
 
 @app.get("/robots.txt")
 def get_robots_txt():

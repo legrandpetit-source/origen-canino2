@@ -1,16 +1,39 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ChefHat, Scale, AlertTriangle, AlertCircle, CheckCircle2, 
   Printer, Info, Flame, Drumstick, Egg, Sparkles, RefreshCw,
   FileText, Check, ShieldAlert, Tag, DollarSign, TrendingUp,
-  Wallet, Coins, ChevronDown, ChevronUp
+  Wallet, Coins, ChevronDown, ChevronUp, Snowflake, History,
+  BarChart3, Layers, PlusCircle, Trash2, Archive, TrendingDown
 } from 'lucide-react';
 import ProductLabelGenerator from './ProductLabelGenerator';
 
-const KitchenProductionManager = () => {
+const KitchenProductionManager = ({ fetchWithAuth }) => {
   const [activeLine, setActiveLine] = useState('barf'); // 'barf' o 'cocinada'
+  const [activeSubTab, setActiveSubTab] = useState('recipe'); // 'recipe', 'history', 'breakeven', 'cold'
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [showCostSettings, setShowCostSettings] = useState(false);
+
+  // --- HISTORIAL DE COSTOS ---
+  const [costHistory, setCostHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyNote, setHistoryNote] = useState('');
+  const [savingHistory, setSavingHistory] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+
+  // --- PUNTO DE EQUILIBRIO (COSTOS FIJOS) ---
+  const [monthlyRent, setMonthlyRent] = useState(250000);
+  const [monthlyElectricity, setMonthlyElectricity] = useState(120000);
+  const [monthlyMaintenance, setMonthlyMaintenance] = useState(80000);
+
+  // --- CAPACIDAD DE FRÍO & MAQUINARIAS ---
+  const [freezers, setFreezers] = useState([
+    { id: 1, name: 'Freezer Horizontal 1 (500L)', capacityKg: 250, currentStockKg: 140, active: true },
+    { id: 2, name: 'Freezer Horizontal 2 (300L)', capacityKg: 150, currentStockKg: 85, active: true },
+  ]);
+  const [simulatedMachinesCount, setSimulatedMachinesCount] = useState(1);
+  const [simulatedMachineCapacity, setSimulatedMachineCapacity] = useState(250); // 500L = 250 kg
+  const [simulatedMachinePrice, setSimulatedMachinePrice] = useState(580000); // $580.000 CLP
 
   // --- ESTADO LÍNEA 1: BARF CRUDA (BASE COGOTE) ---
   const [cogoteKg, setCogoteKg] = useState(100);
@@ -139,6 +162,116 @@ const KitchenProductionManager = () => {
   const activeTotalProfit = activeLine === 'barf' ? barfTotalProfit : cookedTotalProfit;
   const activeTotalRevenue = activeLine === 'barf' ? barfTotalRevenue : cookedTotalRevenue;
 
+  // ==========================================
+  // CÁLCULOS: PUNTO DE EQUILIBRIO (BREAK-EVEN)
+  // ==========================================
+  const totalFixedCosts = monthlyRent + monthlyElectricity + monthlyMaintenance;
+  const breakEvenKg = activeMarginPerKg > 0 ? Math.ceil(totalFixedCosts / activeMarginPerKg) : 0;
+  const breakEvenDogs = Math.ceil(breakEvenKg / 15); // Perro mediano: 15 kg/mes
+  const activeKilosPlanned = activeLine === 'barf' ? barfTotalMezcla : cookedTotalMezcla;
+  const breakEvenCoveragePercent = breakEvenKg > 0 ? Math.min(200, Math.round((activeKilosPlanned / breakEvenKg) * 100)) : 0;
+
+  // ==========================================
+  // CÁLCULOS: CAPACIDAD DE FRÍO & MAQUINARIAS
+  // ==========================================
+  const totalFreezerCapacity = freezers.filter(f => f.active).reduce((sum, f) => sum + f.capacityKg, 0);
+  const totalCurrentStock = freezers.filter(f => f.active).reduce((sum, f) => sum + f.currentStockKg, 0);
+  const totalWithNewBatch = totalCurrentStock + activeKilosPlanned;
+  const occupancyPercent = totalFreezerCapacity > 0 ? Math.round((totalCurrentStock / totalFreezerCapacity) * 100) : 0;
+  const occupancyWithNewBatchPercent = totalFreezerCapacity > 0 ? Math.round((totalWithNewBatch / totalFreezerCapacity) * 100) : 0;
+
+  // Simulador de Expansión de Maquinaria
+  const simulatedAdditionalCapacity = simulatedMachinesCount * simulatedMachineCapacity;
+  const simulatedTotalCapacity = totalFreezerCapacity + simulatedAdditionalCapacity;
+  const simulatedAdditionalDogs = Math.floor(simulatedAdditionalCapacity / 15);
+  const simulatedAdditionalMonthlyRevenue = simulatedAdditionalCapacity * activePvp;
+  const simulatedAdditionalMonthlyProfit = simulatedAdditionalCapacity * activeMarginPerKg;
+  const simulatedInvestmentTotal = simulatedMachinesCount * simulatedMachinePrice;
+  const simulatedRoiMonths = simulatedAdditionalMonthlyProfit > 0 ? (simulatedInvestmentTotal / simulatedAdditionalMonthlyProfit).toFixed(1) : '0';
+
+  // --- LLAMADAS API HISTORIAL ---
+  const loadHistory = async () => {
+    if (!fetchWithAuth) return;
+    setLoadingHistory(true);
+    try {
+      const res = await fetchWithAuth(`/api/admin/kitchen/history?line=${activeLine}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCostHistory(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSubTab === 'history') {
+      loadHistory();
+    }
+  }, [activeSubTab, activeLine]);
+
+  const handleSaveToHistory = async () => {
+    if (!fetchWithAuth) return;
+    setSavingHistory(true);
+    try {
+      const payload = {
+        production_line: activeLine,
+        batch_total_kg: activeKilosPlanned,
+        cost_per_kg: activeCostPerKg,
+        pvp_price: activePvp,
+        gross_margin_percent: parseFloat(activeMarginPercent),
+        gross_margin_clp: activeMarginPerKg,
+        raw_costs: activeLine === 'barf' ? {
+          cogote_kg: costCogoteKg,
+          pana_kg: costPanaKg,
+          contre_kg: costContreKg,
+          veg_kg: costVegKg,
+          egg_unit: costEggUnit,
+          additives_kg: costAdditivesKg,
+          packaging_unit: costPackagingUnit
+        } : {
+          cerdo_kg: costCerdoKg,
+          pana_kg: costCookedPanaKg,
+          veg_kg: costCookedVegKg,
+          calcium_kg: costCalciumKg,
+          packaging_unit: costCookedPackagingUnit
+        },
+        provider_notes: historyNote
+      };
+
+      const res = await fetchWithAuth('/api/admin/kitchen/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        alert('¡Costos y márgenes archivados con éxito en el historial!');
+        setHistoryNote('');
+        setShowSaveModal(false);
+        loadHistory();
+      } else {
+        alert('Error al guardar en el historial');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSavingHistory(false);
+    }
+  };
+
+  const handleDeleteHistoryItem = async (id) => {
+    if (!window.confirm('¿Seguro que deseas eliminar este registro histórico?')) return;
+    try {
+      const res = await fetchWithAuth(`/api/admin/kitchen/history/${id}`, { method: 'DELETE' });
+      if (res.ok) loadHistory();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -164,6 +297,15 @@ const KitchenProductionManager = () => {
 
         <div className="flex flex-wrap items-center gap-2">
           <button
+            onClick={() => setShowSaveModal(true)}
+            className="flex items-center gap-1.5 bg-stone-900 hover:bg-stone-800 text-white px-3.5 py-2.5 rounded-2xl font-bold text-xs transition shadow-2xs cursor-pointer"
+            title="Archivar costos y margen actual en el historial histórico"
+          >
+            <Archive size={15} className="text-amber-400" />
+            <span>Archivar Costos Lote</span>
+          </button>
+
+          <button
             onClick={() => setShowLabelModal(true)}
             className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-stone-900 px-4 py-2.5 rounded-2xl font-bold text-xs transition shadow-2xs cursor-pointer"
             title="Generar e imprimir etiquetas de empaque con análisis garantizado AAFCO/SAG"
@@ -178,13 +320,70 @@ const KitchenProductionManager = () => {
             title="Imprimir hoja de ruta para la mesa de cocina"
           >
             <Printer size={15} />
-            <span>Imprimir Ficha de Lote</span>
+            <span>Imprimir Ficha</span>
           </button>
         </div>
       </div>
 
-      {/* Selector de Paneles Independientes (BARF vs COCINADA) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* Barra de Sub-Pestañas Estratégicas de Cocina */}
+      <div className="bg-white p-1.5 rounded-2xl border border-stone-200 shadow-2xs flex flex-wrap gap-1">
+        <button
+          onClick={() => setActiveSubTab('recipe')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+            activeSubTab === 'recipe'
+              ? 'bg-stone-900 text-white shadow-xs'
+              : 'text-stone-600 hover:bg-stone-100'
+          }`}
+        >
+          <ChefHat size={15} />
+          <span>1. Receta & Producción</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('history')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+            activeSubTab === 'history'
+              ? 'bg-stone-900 text-white shadow-xs'
+              : 'text-stone-600 hover:bg-stone-100'
+          }`}
+        >
+          <History size={15} />
+          <span>2. Historial de Costos & Alertas</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('breakeven')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+            activeSubTab === 'breakeven'
+              ? 'bg-stone-900 text-white shadow-xs'
+              : 'text-stone-600 hover:bg-stone-100'
+          }`}
+        >
+          <BarChart3 size={15} />
+          <span>3. Punto de Equilibrio (Break-Even)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('cold')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+            activeSubTab === 'cold'
+              ? 'bg-stone-900 text-white shadow-xs'
+              : 'text-stone-600 hover:bg-stone-100'
+          }`}
+        >
+          <Snowflake size={15} className="text-cyan-500" />
+          <span>4. Capacidad de Frío & Maquinarias</span>
+        </button>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* SUB-PESTAÑA 1: RECETAS Y PRODUCCIÓN                                        */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'recipe' && (
+        <div className="space-y-6">
+
+          {/* Selector de Paneles Independientes (BARF vs COCINADA) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button
           onClick={() => setActiveLine('barf')}
           className={`p-4 rounded-3xl text-left transition border-2 cursor-pointer flex items-center gap-3.5 ${
@@ -935,6 +1134,419 @@ const KitchenProductionManager = () => {
                   </tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-PESTAÑA 2: HISTORIAL DE COSTOS & ALERTAS DE INFLACIÓN                  */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'history' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-3xl p-6 shadow-xs border border-stone-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 bg-amber-100 text-amber-800 rounded-lg">
+                    <History size={16} />
+                  </span>
+                  <h3 className="text-xl font-black font-header text-stone-800">
+                    Historial de Costos de Producción & Margen
+                  </h3>
+                </div>
+                <p className="text-xs text-stone-500 font-sans mt-0.5">
+                  Registro histórico de variaciones de insumos y precios de materias primas para proteger tu margen.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowSaveModal(true)}
+                  className="flex items-center gap-1.5 bg-stone-900 hover:bg-stone-800 text-white px-4 py-2 rounded-xl font-bold text-xs transition shadow-2xs cursor-pointer"
+                >
+                  <Archive size={14} className="text-amber-400" />
+                  Archivar Costos de Hoy
+                </button>
+                <button
+                  onClick={loadHistory}
+                  className="p-2 text-stone-500 hover:text-stone-800 hover:bg-stone-100 rounded-xl transition cursor-pointer"
+                  title="Refrescar historial"
+                >
+                  <RefreshCw size={15} className={loadingHistory ? 'animate-spin' : ''} />
+                </button>
+              </div>
+            </div>
+
+            {/* Selector de Línea para Historial */}
+            <div className="flex items-center gap-2 my-4">
+              <button
+                onClick={() => setActiveLine('barf')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  activeLine === 'barf' ? 'bg-emerald-600 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                }`}
+              >
+                Línea BARF Cruda
+              </button>
+              <button
+                onClick={() => setActiveLine('cocinada')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  activeLine === 'cocinada' ? 'bg-amber-600 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                }`}
+              >
+                Línea Cocinada Cerdo
+              </button>
+            </div>
+
+            {/* Tabla Histórica */}
+            {loadingHistory ? (
+              <div className="text-center py-10 text-xs text-stone-400">Cargando historial de costos...</div>
+            ) : costHistory.length === 0 ? (
+              <div className="text-center py-12 bg-stone-50 rounded-2xl border border-stone-200 p-6">
+                <Archive size={32} className="mx-auto text-stone-300 mb-2" />
+                <p className="text-xs font-bold text-stone-700">Aún no hay registros archivados para esta línea</p>
+                <p className="text-[11px] text-stone-400 mt-0.5">Haz clic en "Archivar Costos de Hoy" para guardar el primer punto de referencia.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-2xl border border-stone-200">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-stone-100 text-stone-600 font-bold uppercase text-[10px] tracking-wider">
+                    <tr>
+                      <th className="p-3">Fecha</th>
+                      <th className="p-3">Línea</th>
+                      <th className="p-3 text-right">Lote (kg)</th>
+                      <th className="p-3 text-right">Costo / kg</th>
+                      <th className="p-3 text-right">PVP / kg</th>
+                      <th className="p-3 text-right">Margen %</th>
+                      <th className="p-3 text-right">Margen $</th>
+                      <th className="p-3">Notas / Factura</th>
+                      <th className="p-3 text-center">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100">
+                    {costHistory.map((item) => (
+                      <tr key={item.id} className="hover:bg-stone-50 transition">
+                        <td className="p-3 font-mono font-medium text-stone-600">
+                          {new Date(item.created_at).toLocaleDateString('es-CL')}
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                            item.production_line === 'barf' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {item.production_line}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold">{item.batch_total_kg} kg</td>
+                        <td className="p-3 text-right font-mono font-bold text-stone-900">${item.cost_per_kg?.toLocaleString('es-CL')}</td>
+                        <td className="p-3 text-right font-mono text-stone-600">${item.pvp_price?.toLocaleString('es-CL')}</td>
+                        <td className="p-3 text-right font-mono font-black text-emerald-700">{item.gross_margin_percent}%</td>
+                        <td className="p-3 text-right font-mono font-bold text-emerald-800">+${item.gross_margin_clp?.toLocaleString('es-CL')}</td>
+                        <td className="p-3 text-stone-500 italic max-w-xs truncate">{item.provider_notes || '—'}</td>
+                        <td className="p-3 text-center">
+                          <button
+                            onClick={() => handleDeleteHistoryItem(item.id)}
+                            className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                            title="Eliminar registro"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-PESTAÑA 3: PUNTO DE EQUILIBRIO (BREAK-EVEN POINT)                      */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'breakeven' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-3xl p-6 shadow-xs border border-stone-200 space-y-6">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="p-1.5 bg-blue-100 text-blue-800 rounded-lg">
+                  <BarChart3 size={16} />
+                </span>
+                <h3 className="text-xl font-black font-header text-stone-800">
+                  Calculador de Punto de Equilibrio (*Break-Even Point*)
+                </h3>
+              </div>
+              <p className="text-xs text-stone-500 font-sans">
+                Determina exactamente cuántos kilos o perros suscritos necesitas vender para cubrir todos tus costos fijos operativos.
+              </p>
+            </div>
+
+            {/* Inputs de Costos Fijos */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-5 bg-stone-50 rounded-2xl border border-stone-200">
+              <div>
+                <label className="block text-xs font-bold text-stone-700 mb-1">Arriendo Cocina / Taller ($/mes):</label>
+                <input
+                  type="number"
+                  value={monthlyRent}
+                  onChange={(e) => setMonthlyRent(Number(e.target.value) || 0)}
+                  className="w-full bg-white px-3 py-2 border border-stone-300 rounded-xl font-bold text-sm text-stone-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-stone-700 mb-1">Electricidad Congeladores ($/mes):</label>
+                <input
+                  type="number"
+                  value={monthlyElectricity}
+                  onChange={(e) => setMonthlyElectricity(Number(e.target.value) || 0)}
+                  className="w-full bg-white px-3 py-2 border border-stone-300 rounded-xl font-bold text-sm text-stone-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-stone-700 mb-1">Mantención & Otros Gastos ($/mes):</label>
+                <input
+                  type="number"
+                  value={monthlyMaintenance}
+                  onChange={(e) => setMonthlyMaintenance(Number(e.target.value) || 0)}
+                  className="w-full bg-white px-3 py-2 border border-stone-300 rounded-xl font-bold text-sm text-stone-900"
+                />
+              </div>
+            </div>
+
+            {/* Resultados Clave del Break-Even */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-stone-900 text-white p-5 rounded-2xl shadow-sm">
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">Total Gastos Fijos</span>
+                <div className="text-2xl sm:text-3xl font-black font-header text-white mt-1">
+                  ${totalFixedCosts.toLocaleString('es-CL')} <span className="text-xs font-normal text-stone-400">/ mes</span>
+                </div>
+                <p className="text-[11px] text-stone-400 mt-2">Para mantener la planta operativa 24/7</p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 p-5 rounded-2xl">
+                <span className="text-[10px] font-black uppercase tracking-wider text-blue-800">Kilos para Estar en Cero</span>
+                <div className="text-2xl sm:text-3xl font-black font-header text-blue-900 mt-1">
+                  {breakEvenKg.toLocaleString('es-CL')} <span className="text-xs font-normal text-blue-600">kg / mes</span>
+                </div>
+                <p className="text-[11px] text-blue-700 mt-2">Basado en tu margen actual de ${activeMarginPerKg.toLocaleString('es-CL')} / kg</p>
+              </div>
+
+              <div className="bg-emerald-50 border border-emerald-200 p-5 rounded-2xl">
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">Perros Medianos Requeridos</span>
+                <div className="text-2xl sm:text-3xl font-black font-header text-emerald-900 mt-1">
+                  {breakEvenDogs} <span className="text-xs font-normal text-emerald-600">perros / mes</span>
+                </div>
+                <p className="text-[11px] text-emerald-700 mt-2">Consumo prom. 15 kg/mes. Desde el perro #{breakEvenDogs + 1}, todo es utilidad neta.</p>
+              </div>
+            </div>
+
+            {/* Barra de Progreso y Diagnóstico */}
+            <div className="p-4 bg-amber-50/60 border border-amber-200 rounded-2xl">
+              <div className="flex justify-between items-center text-xs font-bold text-amber-900 mb-2">
+                <span>Cobertura del Lote Actual ({activeKilosPlanned.toFixed(1)} kg) vs. Punto de Equilibrio</span>
+                <span>{breakEvenCoveragePercent}%</span>
+              </div>
+              <div className="w-full bg-amber-200/50 h-3 rounded-full overflow-hidden">
+                <div
+                  className="bg-emerald-600 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, breakEvenCoveragePercent)}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-amber-800 mt-2">
+                {breakEvenCoveragePercent >= 100
+                  ? `✓ ¡Excelente! Con este lote de ${activeKilosPlanned.toFixed(1)} kg cubres el 100% de tus costos fijos mensuales y te quedan ganancias limpias.`
+                  : `Necesitas producir y vender ${Math.max(0, breakEvenKg - Math.round(activeKilosPlanned))} kg adicionales este mes para llegar al punto de equilibrio.`}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUB-PESTAÑA 4: CAPACIDAD DE FRÍO & SIMULADOR DE MAQUINARIA (ROI)          */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'cold' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-3xl p-6 shadow-xs border border-stone-200 space-y-6">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="p-1.5 bg-cyan-100 text-cyan-800 rounded-lg">
+                  <Snowflake size={16} />
+                </span>
+                <h3 className="text-xl font-black font-header text-stone-800">
+                  Capacidad de Frío (-18°C) & Expansión de Maquinaria
+                </h3>
+              </div>
+              <p className="text-xs text-stone-500 font-sans">
+                Monitorea el espacio de congeladores disponible y simula el retorno de inversión (ROI) al adquirir nuevas máquinas.
+              </p>
+            </div>
+
+            {/* Congeladores Actuales */}
+            <div className="space-y-3">
+              <span className="text-xs font-bold text-stone-700 block">Tus Máquinas Congeladoras Activas:</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {freezers.map(f => (
+                  <div key={f.id} className="p-4 bg-stone-50 border border-stone-200 rounded-2xl flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-stone-800 text-sm flex items-center gap-1.5">
+                        <Snowflake size={14} className="text-cyan-600" />
+                        {f.name}
+                      </div>
+                      <div className="text-xs text-stone-500 mt-0.5">
+                        Capacidad máx: <strong className="text-stone-700">{f.capacityKg} kg</strong> • Stock actual: <strong className="text-stone-700">{f.currentStockKg} kg</strong>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-lg uppercase">
+                      Activo
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Termómetro de Ocupación de Frío */}
+            <div className="bg-cyan-50/50 border border-cyan-200 p-5 rounded-2xl space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold text-cyan-900">Ocupación Actual de Frío:</span>
+                <span className="font-black text-cyan-900 font-mono">{occupancyPercent}% ({totalCurrentStock} de {totalFreezerCapacity} kg)</span>
+              </div>
+              <div className="w-full bg-cyan-200/60 h-3 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    occupancyPercent > 85 ? 'bg-red-500' : occupancyPercent > 70 ? 'bg-amber-500' : 'bg-cyan-600'
+                  }`}
+                  style={{ width: `${Math.min(100, occupancyPercent)}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-cyan-800">
+                Tienes espacio libre para <strong>{Math.max(0, totalFreezerCapacity - totalCurrentStock)} kg adicionales</strong> antes de saturar tus congeladores.
+              </p>
+            </div>
+
+            {/* SIMULADOR DE EXPANSIÓN DE MAQUINARIA (ROI) */}
+            <div className="bg-stone-900 text-white p-6 rounded-3xl space-y-4">
+              <div className="flex items-center gap-2">
+                <Sparkles size={18} className="text-amber-400" />
+                <h4 className="text-base font-black font-header text-amber-400">
+                  Simulador de Expansión de Maquinaria & Retorno de Inversión (ROI)
+                </h4>
+              </div>
+              <p className="text-xs text-stone-300 font-sans">
+                ¿Qué pasa si compras una máquina adicional para producir más comida y sumar nuevos clientes?
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <div>
+                  <label className="block text-[11px] font-bold text-stone-300 mb-1">Máquinas a comprar:</label>
+                  <select
+                    value={simulatedMachinesCount}
+                    onChange={(e) => setSimulatedMachinesCount(Number(e.target.value) || 1)}
+                    className="w-full bg-stone-800 text-white px-3 py-2 rounded-xl text-xs font-bold border border-stone-700"
+                  >
+                    <option value={1}>1 Freezer Industrial</option>
+                    <option value={2}>2 Freezers Industriales</option>
+                    <option value={3}>3 Freezers Industriales</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-stone-300 mb-1">Capacidad por máquina:</label>
+                  <select
+                    value={simulatedMachineCapacity}
+                    onChange={(e) => setSimulatedMachineCapacity(Number(e.target.value) || 250)}
+                    className="w-full bg-stone-800 text-white px-3 py-2 rounded-xl text-xs font-bold border border-stone-700"
+                  >
+                    <option value={150}>300 Litros (~150 kg)</option>
+                    <option value={250}>500 Litros (~250 kg)</option>
+                    <option value={350}>700 Litros (~350 kg)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-stone-300 mb-1">Precio Compra Máquina ($):</label>
+                  <input
+                    type="number"
+                    value={simulatedMachinePrice}
+                    onChange={(e) => setSimulatedMachinePrice(Number(e.target.value) || 0)}
+                    className="w-full bg-stone-800 text-white px-3 py-2 rounded-xl text-xs font-bold border border-stone-700"
+                  />
+                </div>
+              </div>
+
+              {/* Métricas del ROI */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-stone-800">
+                <div className="bg-stone-800/80 p-3 rounded-xl">
+                  <span className="text-[10px] text-stone-400 block font-bold uppercase">Inversión Total</span>
+                  <div className="text-lg font-black text-white mt-0.5">${simulatedInvestmentTotal.toLocaleString('es-CL')}</div>
+                </div>
+
+                <div className="bg-stone-800/80 p-3 rounded-xl">
+                  <span className="text-[10px] text-stone-400 block font-bold uppercase">Capacidad Extra</span>
+                  <div className="text-lg font-black text-cyan-400 mt-0.5">+{simulatedAdditionalCapacity} kg <span className="text-[10px] font-normal text-stone-400">(+{simulatedAdditionalDogs} perros)</span></div>
+                </div>
+
+                <div className="bg-stone-800/80 p-3 rounded-xl">
+                  <span className="text-[10px] text-stone-400 block font-bold uppercase">Utilidad Mensual Extra</span>
+                  <div className="text-lg font-black text-emerald-400 mt-0.5">+${simulatedAdditionalMonthlyProfit.toLocaleString('es-CL')} / mes</div>
+                </div>
+
+                <div className="bg-emerald-950/80 border border-emerald-500/30 p-3 rounded-xl">
+                  <span className="text-[10px] text-emerald-300 block font-black uppercase">Plazo Retorno (ROI)</span>
+                  <div className="text-xl font-black text-amber-400 mt-0.5">{simulatedRoiMonths} meses</div>
+                  <span className="text-[9px] text-emerald-200">¡Se paga sola en ~{Math.round(parseFloat(simulatedRoiMonths) * 30)} días!</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Modal Archivar Costos en Historial */}
+      {showSaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-stone-200">
+            <h3 className="text-lg font-black font-header text-stone-800 mb-2">
+              Archivar Costos de este Lote en el Historial
+            </h3>
+            <p className="text-xs text-stone-500 mb-4">
+              Se guardará el costo actual de <strong>${activeCostPerKg.toLocaleString('es-CL')} / kg</strong> y el margen de <strong>{activeMarginPercent}%</strong> para la línea {activeLine === 'barf' ? 'BARF' : 'Cocinada'}.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-stone-700 mb-1">Nota del Proveedor / Factura (Opcional):</label>
+                <input
+                  type="text"
+                  value={historyNote}
+                  onChange={(e) => setHistoryNote(e.target.value)}
+                  placeholder="Ej: Compra Lo Valledor Factura 5410, subió el cerdo 5%"
+                  className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-800"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSaveModal(false)}
+                  className="px-4 py-2 text-xs font-bold text-stone-600 hover:text-stone-900"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={savingHistory}
+                  onClick={handleSaveToHistory}
+                  className="px-5 py-2 bg-stone-900 hover:bg-stone-800 text-white font-bold text-xs rounded-xl shadow-xs disabled:opacity-50"
+                >
+                  {savingHistory ? 'Guardando...' : 'Confirmar y Archivar'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

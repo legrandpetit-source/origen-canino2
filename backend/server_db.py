@@ -374,6 +374,22 @@ def init_database():
                 );
             """)
 
+            # 19. Tabla de Historial de Costos de Cocina & Rentabilidad
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS kitchen_cost_history (
+                    id SERIAL PRIMARY KEY,
+                    production_line TEXT NOT NULL,
+                    batch_total_kg NUMERIC(8,2) NOT NULL,
+                    cost_per_kg INTEGER NOT NULL,
+                    pvp_price INTEGER NOT NULL,
+                    gross_margin_percent NUMERIC(5,2) NOT NULL,
+                    gross_margin_clp INTEGER NOT NULL,
+                    raw_costs JSONB,
+                    provider_notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
             # Migraciones Blog SEO enriquecido
             cursor.execute("""
                 ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS meta_title TEXT;

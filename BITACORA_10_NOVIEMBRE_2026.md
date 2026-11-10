@@ -52,6 +52,22 @@ En esta jornada se ejecutó y completó la puesta en código de los tres grandes
 - **Python Backend Compilation (`py_compile`):** Verificación de sintaxis Python 3.12 exitosa.
 
 ---
+
+## 4. SUITE DE ANALÍTICA EMPRESARIAL & CAPACIDAD INDUSTRIAL (ACTUALIZACIÓN 2)
+
+Se incorporaron tres módulos estratégicos a la suite de Cocina:
+
+1. **Historial de Costos & Alertas de Variación de Insumos (`kitchen_cost_history`):**
+   - Base de datos en PostgreSQL con registro de línea, lote en kg, costo por kg, PVP, margen % y notas de factura/proveedor.
+   - Botón directo para archivar costos del día y visualización histórica con cálculo de variación.
+2. **Punto de Equilibrio (*Break-Even Point*):**
+   - Ingreso de costos fijos mensuales (electricidad de congeladores, arriendo de cocina y mantención).
+   - Cálculo en tiempo real de kilos mínimos mensuales y número exacto de perros medianos fidelizados necesarios para pagar la planta antes de generar ganancia neta.
+3. **Control de Capacidad de Frío (-18°C) & Simulador de Maquinaria (ROI):**
+   - Monitoreo de congeladores industriales activos y porcentaje de ocupación en frío.
+   - Simulador de expansión: Cálculo de kilos extra, perros mensuales adicionales y plazo de recuperación de la inversión (ROI en días/meses) al comprar freezers adicionales.
+
+---
 **Firmado y auditado por:**  
 Patricio Padilla Legrand Petit & Antigravity Multi-Agent System
 
