@@ -27,10 +27,11 @@ const KitchenProductionManager = ({ fetchWithAuth, ingredients = [], fetchIngred
   const [historyViewMode, setHistoryViewMode] = useState('batches'); // 'batches' | 'ingredients'
   const [exportingRecipe, setExportingRecipe] = useState(false);
 
-  // --- PUNTO DE EQUILIBRIO (COSTOS FIJOS) ---
+  // --- PUNTO DE EQUILIBRIO (COSTOS FIJOS) & META 200 KG/SEM ---
   const [monthlyRent, setMonthlyRent] = useState(250000);
   const [monthlyElectricity, setMonthlyElectricity] = useState(120000);
   const [monthlyMaintenance, setMonthlyMaintenance] = useState(80000);
+  const [targetWeeklyKg, setTargetWeeklyKg] = useState(200); // Meta estratégica de Patricio: 200 kg/semana
 
   // --- CAPACIDAD DE FRÍO & MAQUINARIAS ---
   const [freezers, setFreezers] = useState([
@@ -326,6 +327,22 @@ const KitchenProductionManager = ({ fetchWithAuth, ingredients = [], fetchIngred
   const breakEvenDogs = Math.ceil(breakEvenKg / 15); // Perro mediano: 15 kg/mes
   const activeKilosPlanned = activeLine === 'barf' ? barfTotalMezcla : cookedTotalMezcla;
   const breakEvenCoveragePercent = breakEvenKg > 0 ? Math.min(200, Math.round((activeKilosPlanned / breakEvenKg) * 100)) : 0;
+
+  // Cálculos de la Meta Estratégica: 200 kg / semana (800 kg / mes)
+  const targetMonthlyKg = targetWeeklyKg * 4;
+  const targetMonthlyDogs = Math.round(targetMonthlyKg / 15);
+  const targetGrossRevenue = targetMonthlyKg * activePvp;
+  const targetTotalVariableCost = targetMonthlyKg * activeCostPerKg;
+  const targetContributionMargin = targetGrossRevenue - targetTotalVariableCost;
+  const targetNetProfitMonthly = targetContributionMargin - totalFixedCosts;
+  const targetNetProfitWeekly = Math.round(targetNetProfitMonthly / 4);
+
+  // Días de utilidad neta para financiar adquisiciones:
+  const dailyNetProfit = targetNetProfitMonthly / 30;
+  const daysToFundFreezer = dailyNetProfit > 0 ? Math.ceil(580000 / dailyNetProfit) : 0;
+  const daysToFundMoledora = dailyNetProfit > 0 ? Math.ceil(900000 / dailyNetProfit) : 0;
+  const assistantMonthlyCost = 350000;
+  const profitWithAssistant = targetNetProfitMonthly - assistantMonthlyCost;
 
   // ==========================================
   // CÁLCULOS: CAPACIDAD DE FRÍO & MAQUINARIAS
@@ -1707,6 +1724,113 @@ const KitchenProductionManager = ({ fetchWithAuth, ingredients = [], fetchIngred
                   ? `✓ ¡Excelente! Con este lote de ${activeKilosPlanned.toFixed(1)} kg cubres el 100% de tus costos fijos mensuales y te quedan ganancias limpias.`
                   : `Necesitas producir y vender ${Math.max(0, breakEvenKg - Math.round(activeKilosPlanned))} kg adicionales este mes para llegar al punto de equilibrio.`}
               </p>
+            </div>
+
+            {/* --- SECCIÓN ESTRATÉGICA: HITO 200 KG/SEMANA (HOJA DE RUTA PATRICIO) --- */}
+            <div className="bg-stone-900 text-white p-6 rounded-3xl border border-stone-800 shadow-xl space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-800 pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 bg-amber-500/20 text-amber-400 rounded-xl">
+                      <TrendingUp size={18} />
+                    </span>
+                    <h4 className="text-lg font-black font-header text-white">
+                      Hoja de Ruta Estratégica: Meta {targetWeeklyKg} Kilos / Semana
+                    </h4>
+                  </div>
+                  <p className="text-xs text-stone-400 mt-1">
+                    Proyección de volumen sostenible ({targetMonthlyKg} kg/mes) para alcanzar la utilidad que financia nuevo personal y maquinaria de frío.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 bg-stone-800/80 p-2 rounded-2xl border border-stone-700">
+                  <span className="text-xs text-stone-400 font-bold pl-2">Meta semanal:</span>
+                  <input
+                    type="number"
+                    value={targetWeeklyKg}
+                    onChange={(e) => setTargetWeeklyKg(Math.max(10, Number(e.target.value) || 0))}
+                    className="w-20 bg-stone-900 text-amber-400 font-black text-sm px-2.5 py-1.5 rounded-xl border border-stone-700 text-center outline-none focus:border-amber-400"
+                  />
+                  <span className="text-xs text-stone-400 font-bold pr-2">kg/sem</span>
+                </div>
+              </div>
+
+              {/* 4 KPIs Clave de la Meta */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-stone-800/60 p-4 rounded-2xl border border-stone-700/60">
+                  <span className="text-[10px] font-bold uppercase text-stone-400 tracking-wider">Volumen Mensual</span>
+                  <div className="text-xl sm:text-2xl font-black text-white mt-1">
+                    {targetMonthlyKg.toLocaleString('es-CL')} <span className="text-xs font-normal text-stone-400">kg/mes</span>
+                  </div>
+                  <p className="text-[11px] text-amber-400 font-bold mt-1">~{targetMonthlyDogs} perros suscritos</p>
+                </div>
+
+                <div className="bg-stone-800/60 p-4 rounded-2xl border border-stone-700/60">
+                  <span className="text-[10px] font-bold uppercase text-stone-400 tracking-wider">Facturación Bruta</span>
+                  <div className="text-xl sm:text-2xl font-black text-white mt-1">
+                    ${targetGrossRevenue.toLocaleString('es-CL')}
+                  </div>
+                  <p className="text-[11px] text-stone-400 mt-1">${(targetGrossRevenue / 4).toLocaleString('es-CL')} por semana</p>
+                </div>
+
+                <div className="bg-stone-800/60 p-4 rounded-2xl border border-stone-700/60">
+                  <span className="text-[10px] font-bold uppercase text-stone-400 tracking-wider">Costos Totales (Var + Fijos)</span>
+                  <div className="text-xl sm:text-2xl font-black text-rose-300 mt-1">
+                    ${(targetTotalVariableCost + totalFixedCosts).toLocaleString('es-CL')}
+                  </div>
+                  <p className="text-[11px] text-stone-400 mt-1">Insumos + Arriendo + Luz</p>
+                </div>
+
+                <div className="bg-emerald-950/60 p-4 rounded-2xl border border-emerald-500/40">
+                  <span className="text-[10px] font-bold uppercase text-emerald-400 tracking-wider">Ganancia Neta en Bolsillo</span>
+                  <div className="text-xl sm:text-2xl font-black text-emerald-400 mt-1">
+                    +${targetNetProfitMonthly.toLocaleString('es-CL')}
+                  </div>
+                  <p className="text-[11px] text-emerald-300 font-bold mt-1">+${targetNetProfitWeekly.toLocaleString('es-CL')} limpios/sem</p>
+                </div>
+              </div>
+
+              {/* Plan de Reinversión de Maquinaria y Personal */}
+              <div className="bg-stone-800/40 p-5 rounded-2xl border border-stone-700/60 space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-400 font-black text-sm">🚀 Plan de Reinversión al Alcanzar los {targetWeeklyKg} kg/semana:</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                  <div className="p-3.5 bg-stone-900/80 rounded-xl border border-stone-700 space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-cyan-300 flex items-center gap-1.5"><Snowflake size={14}/> 1. Capacidad de Frío</span>
+                      <span className="text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-800 px-2 py-0.5 rounded-full font-bold">{daysToFundFreezer} días</span>
+                    </div>
+                    <p className="text-stone-300 font-bold text-sm">Freezer 500L ($580.000)</p>
+                    <p className="text-[11px] text-stone-400">
+                      Almacena 250 kg extras. Con tu utilidad neta de ${targetNetProfitMonthly.toLocaleString('es-CL')}, se autofinancia en solo <strong>{daysToFundFreezer} días de ventas</strong>.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 bg-stone-900/80 rounded-xl border border-stone-700 space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-amber-300 flex items-center gap-1.5"><ChefHat size={14}/> 2. Personal de Cocina</span>
+                      <span className="text-[10px] bg-amber-950 text-amber-300 border border-amber-800 px-2 py-0.5 rounded-full font-bold">Part-time</span>
+                    </div>
+                    <p className="text-stone-300 font-bold text-sm">Ayudante ($350.000 / mes)</p>
+                    <p className="text-[11px] text-stone-400">
+                      Te libera del 70% de la molienda y envasado pesado. Tu utilidad neta sigue siendo de <strong>+${profitWithAssistant.toLocaleString('es-CL')}/mes</strong>.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 bg-stone-900/80 rounded-xl border border-stone-700 space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-emerald-300 flex items-center gap-1.5"><Scale size={14}/> 3. Moledora Industrial</span>
+                      <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded-full font-bold">{daysToFundMoledora} días</span>
+                    </div>
+                    <p className="text-stone-300 font-bold text-sm">Moledora Hueso ($900.000)</p>
+                    <p className="text-[11px] text-stone-400">
+                      Reduce el tiempo de preparación a la mitad. Se autofinancia con menos de <strong>{daysToFundMoledora} días</strong> de utilidad líquida.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
