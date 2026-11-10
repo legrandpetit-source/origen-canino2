@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Save, X, Sparkles, Loader, History, TrendingUp, TrendingDown, Clock, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Edit2, Trash2, Save, X, Sparkles, Loader, History, TrendingUp, TrendingDown, Clock, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
 
 const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) => {
+  const nameInputRef = useRef(null);
   const [editingIngredient, setEditingIngredient] = useState(null);
   const [isAdding, setIsAdding] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [lastSavedMsg, setLastSavedMsg] = useState(null);
 
   // --- HISTORIAL DE PRECIOS ---
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -41,9 +44,14 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
     kcal_per_100g: 0, protein_g: 0, fat_g: 0, fiber_g: 0, moisture_g: 0, ash_g: 0, carbs_g: 0
   });
 
-  const handleSave = async (e) => {
-    e.preventDefault();
-    console.log("DEBUG: Guardando ingrediente...", formData);
+  const handleSave = async (e, keepOpen = false) => {
+    if (e) e.preventDefault();
+    if (!formData.name.trim()) {
+      alert("Por favor ingresa el nombre del insumo.");
+      return;
+    }
+    setSaving(true);
+    setLastSavedMsg(null);
     try {
       const url = isAdding ? '/api/admin/ingredients' : `/api/admin/ingredients/${editingIngredient.id}`;
       const method = isAdding ? 'POST' : 'PUT';
@@ -55,14 +63,33 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
       });
 
       if (res.ok) {
-        setIsAdding(false);
-        setEditingIngredient(null);
+        const savedName = formData.name;
+        const savedCost = formData.cost_per_unit;
+        const savedUnit = formData.unit;
         fetchIngredients();
+
+        if (keepOpen && isAdding) {
+          // Mantener el formulario abierto para ingresar el siguiente insumo sin interrupción
+          setFormData({ 
+            name: '', cost_per_unit: 0, unit: 'kg',
+            kcal_per_100g: 0, protein_g: 0, fat_g: 0, fiber_g: 0, moisture_g: 0, ash_g: 0, carbs_g: 0
+          });
+          setLastSavedMsg(`✓ Insumo "${savedName}" ($${Number(savedCost).toLocaleString()}/${savedUnit}) guardado correctamente. Puedes ingresar el siguiente ahora:`);
+          setTimeout(() => {
+            nameInputRef.current?.focus();
+          }, 100);
+        } else {
+          setIsAdding(false);
+          setEditingIngredient(null);
+        }
       } else {
         alert('Error al guardar ingrediente');
       }
     } catch (err) {
       console.error(err);
+      alert('Error de conexión al guardar ingrediente');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -119,11 +146,16 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
       name: '', cost_per_unit: 0, unit: 'kg',
       kcal_per_100g: 0, protein_g: 0, fat_g: 0, fiber_g: 0, moisture_g: 0, ash_g: 0, carbs_g: 0
     });
+    setLastSavedMsg(null);
     setIsAdding(true);
     setEditingIngredient(null);
+    setTimeout(() => {
+      nameInputRef.current?.focus();
+    }, 100);
   };
 
   const openEdit = (ing) => {
+    setLastSavedMsg(null);
     setFormData({ 
       name: ing.name, cost_per_unit: ing.cost_per_unit, unit: ing.unit,
       kcal_per_100g: ing.kcal_per_100g || 0,
@@ -159,19 +191,88 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
       </div>
 
       {(isAdding || editingIngredient) && (
-        <form onSubmit={handleSave} className="bg-gray-50 p-6 rounded-lg border border-gray-200 mb-8">
+        <form onSubmit={(e) => handleSave(e, isAdding)} className="bg-gray-50 p-6 rounded-2xl border-2 border-stone-200 mb-8 shadow-xs">
+          {/* Cabecera del Formulario con Botón Volver */}
+          <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-200">
+            <div className="flex items-center gap-2.5">
+              <button 
+                type="button" 
+                onClick={() => { setIsAdding(false); setEditingIngredient(null); setLastSavedMsg(null); }}
+                className="p-1.5 hover:bg-gray-200 rounded-xl text-gray-600 transition cursor-pointer"
+                title="Volver a la lista de ingredientes"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <div>
+                <h4 className="font-header text-lg font-bold text-stone-800">
+                  {isAdding ? 'Ingreso Continuo de Insumos' : `Editando: ${editingIngredient.name}`}
+                </h4>
+                <p className="text-xs text-gray-500">
+                  {isAdding 
+                    ? 'Guarda cada insumo y el formulario se mantendrá abierto para ingresar el siguiente sin salir.'
+                    : 'Modifica los valores nutricionales o el costo unitario.'}
+                </p>
+              </div>
+            </div>
+
+            <button 
+              type="button" 
+              onClick={() => { setIsAdding(false); setEditingIngredient(null); setLastSavedMsg(null); }}
+              className="text-gray-400 hover:text-gray-700 p-1.5 rounded-full hover:bg-gray-200 transition cursor-pointer"
+              title="Cerrar y volver"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Mensaje de Confirmación al Guardar en Modo Continuo */}
+          {lastSavedMsg && (
+            <div className="mb-4 p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center justify-between gap-2 text-xs font-bold text-emerald-900 animate-fadeIn">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                <span>{lastSavedMsg}</span>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setLastSavedMsg(null)}
+                className="text-emerald-700 hover:text-emerald-950 p-1"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
           <div className="grid md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-              <input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-green-dark outline-none" required />
+              <label className="block text-xs font-bold text-gray-700 mb-1">Nombre del Insumo</label>
+              <input 
+                ref={nameInputRef}
+                type="text" 
+                value={formData.name} 
+                onChange={e => setFormData({...formData, name: e.target.value})} 
+                className="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-primary-green-dark outline-none bg-white text-sm font-semibold" 
+                placeholder="Ej: Frutilla, Zapallo Italiano, Contre..."
+                required 
+              />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Costo ($)</label>
-              <input type="number" value={formData.cost_per_unit} onChange={e => setFormData({...formData, cost_per_unit: Number(e.target.value)})} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-green-dark outline-none" required min="0" />
+              <label className="block text-xs font-bold text-gray-700 mb-1">Costo Unitario ($)</label>
+              <input 
+                type="number" 
+                value={formData.cost_per_unit} 
+                onChange={e => setFormData({...formData, cost_per_unit: Number(e.target.value)})} 
+                className="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-primary-green-dark outline-none bg-white text-sm font-semibold" 
+                required 
+                min="0" 
+              />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Unidad de medida</label>
-              <select value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-green-dark outline-none">
+              <label className="block text-xs font-bold text-gray-700 mb-1">Unidad de medida</label>
+              <select 
+                value={formData.unit} 
+                onChange={e => setFormData({...formData, unit: e.target.value})} 
+                className="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-primary-green-dark outline-none bg-white text-sm font-semibold"
+              >
                 <option value="kg">Kilo (Kg)</option>
                 <option value="litro">Litro (L)</option>
                 <option value="unidad">Unidad</option>
@@ -180,54 +281,92 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
             
             <div className="col-span-1 md:col-span-3 border-t pt-4 mt-2">
               <div className="flex justify-between items-center mb-3">
-                <h4 className="font-bold text-gray-700 text-sm">Valores Nutricionales (Por cada 100g / 100ml)</h4>
+                <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider">Valores Nutricionales (Por cada 100g / 100ml)</h4>
                 <button 
                   type="button" 
                   onClick={handleGenerateNutrition}
                   disabled={isGenerating}
-                  className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-indigo-100 transition font-medium disabled:opacity-50"
+                  className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-indigo-100 transition font-bold disabled:opacity-50 cursor-pointer"
                 >
                   {isGenerating ? <Loader size={14} className="animate-spin" /> : <Sparkles size={14} />} 
-                  {isGenerating ? "Pensando..." : "Autocompletar con IA"}
+                  {isGenerating ? "Consultando IA..." : "Autocompletar con IA"}
                 </button>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Kcal</label>
-                  <input type="number" step="0.1" value={formData.kcal_per_100g} onChange={e => setFormData({...formData, kcal_per_100g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none" min="0" />
+                  <input type="number" step="0.1" value={formData.kcal_per_100g} onChange={e => setFormData({...formData, kcal_per_100g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white" min="0" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Proteína (g)</label>
-                  <input type="number" step="0.1" value={formData.protein_g} onChange={e => setFormData({...formData, protein_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none" min="0" />
+                  <input type="number" step="0.1" value={formData.protein_g} onChange={e => setFormData({...formData, protein_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white" min="0" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Grasa (g)</label>
-                  <input type="number" step="0.1" value={formData.fat_g} onChange={e => setFormData({...formData, fat_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none" min="0" />
+                  <input type="number" step="0.1" value={formData.fat_g} onChange={e => setFormData({...formData, fat_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white" min="0" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Carbs (g)</label>
-                  <input type="number" step="0.1" value={formData.carbs_g} onChange={e => setFormData({...formData, carbs_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none" min="0" />
+                  <input type="number" step="0.1" value={formData.carbs_g} onChange={e => setFormData({...formData, carbs_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white" min="0" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Fibra (g)</label>
-                  <input type="number" step="0.1" value={formData.fiber_g} onChange={e => setFormData({...formData, fiber_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none" min="0" />
+                  <input type="number" step="0.1" value={formData.fiber_g} onChange={e => setFormData({...formData, fiber_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white" min="0" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Humedad (g)</label>
-                  <input type="number" step="0.1" value={formData.moisture_g} onChange={e => setFormData({...formData, moisture_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none" min="0" />
+                  <input type="number" step="0.1" value={formData.moisture_g} onChange={e => setFormData({...formData, moisture_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white" min="0" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Cenizas (g)</label>
-                  <input type="number" step="0.1" value={formData.ash_g} onChange={e => setFormData({...formData, ash_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none" min="0" />
+                  <input type="number" step="0.1" value={formData.ash_g} onChange={e => setFormData({...formData, ash_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white" min="0" />
                 </div>
               </div>
             </div>
           </div>
-          <div className="flex justify-end gap-3 mt-4">
-            <button type="button" onClick={() => { setIsAdding(false); setEditingIngredient(null); }} className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg">Cancelar</button>
-            <button type="submit" className="bg-primary-green-dark text-white px-6 py-2 rounded-lg hover:bg-opacity-90 flex items-center gap-2">
-              <Save size={18} /> Guardar
+
+          {/* Botones de Acción: Modo Continuo vs Salir */}
+          <div className="flex flex-wrap justify-between items-center gap-3 mt-6 pt-4 border-t border-gray-200">
+            <button 
+              type="button" 
+              onClick={() => { setIsAdding(false); setEditingIngredient(null); setLastSavedMsg(null); }} 
+              className="px-4 py-2 text-xs font-bold text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <ArrowLeft size={14} /> Volver a la Lista
             </button>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {isAdding ? (
+                <>
+                  <button 
+                    type="button" 
+                    onClick={(e) => handleSave(e, false)} 
+                    disabled={saving}
+                    className="px-4 py-2 text-xs font-bold text-stone-700 bg-white border border-stone-300 hover:bg-stone-50 rounded-xl transition shadow-xs cursor-pointer"
+                  >
+                    {saving ? 'Guardando...' : 'Guardar y Salir'}
+                  </button>
+
+                  <button 
+                    type="button" 
+                    onClick={(e) => handleSave(e, true)} 
+                    disabled={saving}
+                    className="bg-primary-green-dark hover:bg-opacity-90 text-white px-5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition cursor-pointer"
+                  >
+                    <Plus size={16} /> {saving ? 'Guardando...' : 'Guardar y Seguir Agregando'}
+                  </button>
+                </>
+              ) : (
+                <button 
+                  type="button" 
+                  onClick={(e) => handleSave(e, false)} 
+                  disabled={saving}
+                  className="bg-primary-green-dark hover:bg-opacity-90 text-white px-6 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition cursor-pointer"
+                >
+                  <Save size={16} /> {saving ? 'Guardando...' : 'Guardar Cambios'}
+                </button>
+              )}
+            </div>
           </div>
         </form>
       )}
