@@ -3,7 +3,8 @@ import {
   Package, BookOpen, Edit2, Plus, Trash2, X, Save, ShoppingCart, 
   MessageSquareHeart, Check, XCircle, LogOut, Key, ChefHat, BarChart, 
   Building2, CreditCard, Calculator, Send, Gift, UploadCloud, Upload,
-  Image as ImageIcon, Loader2, Sparkles, CheckCircle2, ExternalLink, Menu 
+  Image as ImageIcon, Loader2, Sparkles, CheckCircle2, ExternalLink, Menu,
+  Stethoscope, Video, FileText, CheckCheck
 } from 'lucide-react';
 import AdminLogin from './AdminLogin';
 import IngredientsManager from './IngredientsManager';
@@ -17,6 +18,8 @@ import SecurityManager from './SecurityManager';
 import CalculatorSettingsManager from './CalculatorSettingsManager';
 import TelegramSettingsManager from './TelegramSettingsManager';
 import PromotionsManager from './PromotionsManager';
+import KitchenProductionManager from './KitchenProductionManager';
+import PartnersManager from './PartnersManager';
 
 // Comprime y convierte una imagen a WebP en el navegador antes de enviarla
 const compressImageToWebP = (file, maxDim = 1200, quality = 0.82) => {
@@ -69,8 +72,10 @@ const compressImageToWebP = (file, maxDim = 1200, quality = 0.82) => {
 const NAV_TABS = [
   { id: 'orders', label: 'Pedidos', icon: ShoppingCart },
   { id: 'products', label: 'Productos', icon: Package },
-  { id: 'ingredients', label: 'Ingredientes', icon: ChefHat },
-  { id: 'blog', label: 'Blog SEO', icon: BookOpen },
+  { id: 'kitchen', label: 'Cocina & Lotes', icon: ChefHat },
+  { id: 'ingredients', label: 'Ingredientes', icon: Package },
+  { id: 'partners', label: 'Alianzas Vet & Pet', icon: Stethoscope },
+  { id: 'blog', label: 'Blog SEO IA', icon: BookOpen },
   { id: 'testimonials', label: 'Testimonios', icon: MessageSquareHeart },
   { id: 'finance', label: 'Finanzas', icon: BarChart },
   { id: 'retention', label: 'Retención', icon: MessageSquareHeart },
@@ -110,6 +115,17 @@ const AdminPanel = () => {
   const [uploadingTestimonialPhoto, setUploadingTestimonialPhoto] = useState(false);
   const testimonialFileInputRef = useRef(null);
 
+  // Estados Agente 2 SEO Engine
+  const [showAiBlogModal, setShowAiBlogModal] = useState(false);
+  const [generatingAiBlog, setGeneratingAiBlog] = useState(false);
+  const [viewingSocialScript, setViewingSocialScript] = useState(null);
+  const [aiBlogForm, setAiBlogForm] = useState({
+    topic: '',
+    target_keyword: '',
+    breed_focus: ''
+  });
+  const [generatedAiResult, setGeneratedAiResult] = useState(null);
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchData();
@@ -136,7 +152,7 @@ const AdminPanel = () => {
     try {
       const [prodRes, blogRes, orderRes, testRes, ingRes] = await Promise.all([
         fetch(`/api/products`), // public
-        fetch(`/api/blog`), // public
+        fetch(`/api/blog?include_drafts=true`), // admin con borradores
         fetchWithAuth(`/api/admin/orders`),
         fetchWithAuth(`/api/admin/testimonials`),
         fetchWithAuth(`/api/admin/ingredients`)
@@ -369,6 +385,50 @@ const AdminPanel = () => {
     }
   };
 
+  const handleGenerateAiBlog = async (e) => {
+    e.preventDefault();
+    if (!aiBlogForm.topic.trim()) return;
+    setGeneratingAiBlog(true);
+    setGeneratedAiResult(null);
+    try {
+      const res = await fetchWithAuth('/api/admin/blog/generate-ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(aiBlogForm)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setGeneratedAiResult(data);
+        fetchData();
+      } else {
+        alert(data.detail || 'Error al generar artículo con IA');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error de conexión al generar artículo');
+    } finally {
+      setGeneratingAiBlog(false);
+    }
+  };
+
+  const handlePublishDraft = async (post) => {
+    try {
+      const res = await fetchWithAuth(`/api/blog/${post.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...post, status: 'publicado' })
+      });
+      if (res.ok) {
+        alert('¡Artículo aprobado y publicado exitosamente en origencanino.cl!');
+        fetchData();
+      } else {
+        alert('Error al publicar artículo');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const [passwords, setPasswords] = useState({ old: '', new: '' });
   
   const handleChangePassword = async (e) => {
@@ -547,6 +607,16 @@ const AdminPanel = () => {
                   fetchWithAuth={fetchWithAuth} 
                 />
               )}
+
+              {/* --- KITCHEN TAB (CALCULADORAS INDUSTRIALES: BARF COGOTE & COCINADA CERDO) --- */}
+              {activeTab === 'kitchen' && (
+                <KitchenProductionManager />
+              )}
+
+              {/* --- PARTNERS TAB (AGENTE 1: ALIANZAS VET & PET B2B) --- */}
+              {activeTab === 'partners' && (
+                <PartnersManager fetchWithAuth={fetchWithAuth} />
+              )}
               {/* --- ORDERS TAB --- */}
               {activeTab === 'orders' && (
                 <DispatchManager 
@@ -630,50 +700,122 @@ const AdminPanel = () => {
               {/* --- BLOG TAB --- */}
               {activeTab === 'blog' && (
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-header text-2xl text-secondary-brown">Artículos del Blog ({blogPosts.length})</h3>
-                    <button 
-                      onClick={() => {
-                        setEditingPost({ title: '', excerpt: '', content: '', image: '', slug: '' });
-                        setIsAddingPost(true);
-                      }}
-                      className="flex items-center gap-2 bg-primary-green text-white px-4 py-2 rounded-lg font-bold hover:bg-primary-green-dark transition shadow-sm text-sm"
-                    >
-                      <Plus size={16} /> Nuevo
-                    </button>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-2">
+                    <div>
+                      <h3 className="font-header text-2xl text-secondary-brown font-bold">
+                        Artículos del Blog ({blogPosts.length})
+                      </h3>
+                      <p className="text-xs text-gray-500 font-body">
+                        Estrategia de contenidos SEO long-tail, Schema.org FAQ y guiones para redes sociales.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setAiBlogForm({ topic: '', target_keyword: '', breed_focus: '' });
+                          setGeneratedAiResult(null);
+                          setShowAiBlogModal(true);
+                        }}
+                        className="flex items-center gap-2 bg-stone-900 hover:bg-stone-800 text-white px-4 py-2 rounded-xl font-bold transition shadow-xs text-xs cursor-pointer"
+                      >
+                        <Sparkles size={15} className="text-amber-400" />
+                        Generar con IA (Agente SEO)
+                      </button>
+
+                      <button 
+                        onClick={() => {
+                          setEditingPost({ title: '', excerpt: '', content: '', image: '', slug: '', status: 'publicado' });
+                          setIsAddingPost(true);
+                        }}
+                        className="flex items-center gap-2 bg-primary-green text-white px-4 py-2 rounded-xl font-bold hover:bg-primary-green-dark transition shadow-xs text-xs cursor-pointer"
+                      >
+                        <Plus size={15} /> Redactar Manual
+                      </button>
+                    </div>
                   </div>
                   
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    {blogPosts.map((post) => (
-                      <div key={post.id} className="py-3 px-4 border-b border-gray-100 hover:bg-gray-50 transition flex flex-col md:flex-row justify-between md:items-center gap-4 last:border-0">
-                        <div className="flex items-center gap-4">
-                          <img src={post.image} alt={post.title} className="w-16 h-12 rounded-lg object-cover" />
-                          <div>
-                            <h4 className="font-bold text-sm text-secondary-brown">{post.title}</h4>
-                            <p className="text-xs text-gray-500 line-clamp-1">{post.excerpt}</p>
-                            <a href={`/blog/${post.slug}`} target="_blank" rel="noreferrer" className="text-xs text-primary-green hover:underline mt-1 inline-block">Ver post ↗</a>
+                  <div className="bg-white rounded-2xl shadow-xs border border-gray-200 overflow-hidden divide-y divide-gray-100">
+                    {blogPosts.map((post) => {
+                      const isDraft = post.status === 'borrador';
+
+                      return (
+                        <div key={post.id} className="p-4 hover:bg-gray-50/70 transition flex flex-col md:flex-row justify-between md:items-center gap-4">
+                          <div className="flex items-start sm:items-center gap-4">
+                            <img src={post.image} alt={post.title} className="w-20 h-16 rounded-xl object-cover shrink-0 border border-gray-100" />
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h4 className="font-bold text-sm text-secondary-brown">{post.title}</h4>
+                                {isDraft && (
+                                  <span className="bg-amber-100 text-amber-900 text-[10px] font-black uppercase px-2 py-0.5 rounded-full border border-amber-300 flex items-center gap-1">
+                                    <Sparkles size={11} /> Borrador IA (Auditoría Pendiente)
+                                  </span>
+                                )}
+                                {post.target_keyword && (
+                                  <span className="bg-stone-100 text-stone-600 text-[10px] font-medium px-2 py-0.5 rounded-full">
+                                    KW: {post.target_keyword}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500 line-clamp-1">{post.excerpt}</p>
+                              
+                              <div className="flex items-center gap-3 pt-0.5">
+                                <a 
+                                  href={`/blog/${post.slug}`} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className="text-xs text-primary-green font-semibold hover:underline inline-flex items-center gap-1"
+                                >
+                                  Ver post en vivo ↗
+                                </a>
+
+                                {post.social_script && (
+                                  <button
+                                    onClick={() => setViewingSocialScript(post.social_script)}
+                                    className="text-xs text-stone-600 hover:text-stone-900 font-semibold inline-flex items-center gap-1 bg-stone-100 hover:bg-stone-200 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                                  >
+                                    <Video size={12} className="text-red-500" />
+                                    Ver Guion TikTok/Reels
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+                            {isDraft && (
+                              <button
+                                onClick={() => handlePublishDraft(post)}
+                                className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs transition shadow-2xs cursor-pointer"
+                                title="Aprobar y publicar en el blog"
+                              >
+                                <CheckCheck size={14} />
+                                Aprobar & Publicar
+                              </button>
+                            )}
+
+                            <button 
+                              onClick={() => {
+                                setEditingPost(post);
+                                setIsAddingPost(false);
+                              }}
+                              className="p-2 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-xl font-semibold transition cursor-pointer"
+                              title="Editar artículo"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button 
+                              onClick={() => handleDeletePost(post.id)}
+                              className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl font-semibold transition cursor-pointer"
+                              title="Eliminar artículo"
+                            >
+                              <Trash2 size={16} />
+                            </button>
                           </div>
                         </div>
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => {
-                              setEditingPost(post);
-                              setIsAddingPost(false);
-                            }}
-                            className="flex items-center justify-center gap-1 text-primary-green hover:bg-green-50 px-3 py-1.5 rounded-lg font-semibold transition"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button 
-                            onClick={() => handleDeletePost(post.id)}
-                            className="flex items-center justify-center gap-1 text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg font-semibold transition"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {blogPosts.length === 0 && <p className="text-center text-gray-500 py-8 text-sm">Aún no hay artículos en el blog.</p>}
+                      );
+                    })}
+                    {blogPosts.length === 0 && <p className="text-center text-gray-500 py-10 text-xs">Aún no hay artículos en el blog.</p>}
                   </div>
                 </div>
               )}
@@ -1607,6 +1749,237 @@ const AdminPanel = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL: AGENTE 2 - GENERADOR DE ARTÍCULOS SEO CON IA --- */}
+      {showAiBlogModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-stone-200 my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+              <div className="flex items-center gap-2">
+                <span className="p-2 bg-amber-100 text-amber-900 rounded-xl">
+                  <Sparkles size={20} className="text-amber-600" />
+                </span>
+                <div>
+                  <h3 className="text-xl font-black font-header text-stone-800">
+                    Generador de Artículos Médicos & SEO (IA)
+                  </h3>
+                  <p className="text-xs text-stone-500 font-sans">
+                    Redacción clínica veterinaria, Schema.org FAQ y guion para redes sociales.
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowAiBlogModal(false)}
+                className="p-1.5 text-stone-400 hover:text-stone-700 bg-stone-100 rounded-full"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Presets de Temas de Alto Tráfico */}
+            {!generatedAiResult && (
+              <div className="my-4">
+                <label className="block text-[11px] font-black uppercase text-stone-500 mb-2">
+                  Temas sugeridos de alta conversión & búsqueda:
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { topic: "Alergias en la piel y dermatitis: Cómo el cerdo cocinado desinflama", kw: "alergias caninas comida natural" },
+                    { topic: "Guía médica de transición: De pellets a BARF crudo sin diarreas", kw: "transición dieta barf perro" },
+                    { topic: "Cálculos renales y oxalatos: Por qué cuidar el uso de betarraga", kw: "calculos oxalato perro dieta" },
+                    { topic: "Digestión y pH estomacal canino: La verdad sobre las bacterias y carne cruda", kw: "ph estomago perro barf" },
+                  ].map((preset, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setAiBlogForm({ ...aiBlogForm, topic: preset.topic, target_keyword: preset.kw })}
+                      className="text-left text-xs bg-stone-50 hover:bg-amber-50 hover:border-amber-300 border border-stone-200 p-2.5 rounded-xl transition-all text-stone-700 font-medium"
+                    >
+                      {preset.topic}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Formulario */}
+            {!generatedAiResult ? (
+              <form onSubmit={handleGenerateAiBlog} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 mb-1">Tema / Patología Canina *</label>
+                  <input
+                    type="text"
+                    required
+                    value={aiBlogForm.topic}
+                    onChange={(e) => setAiBlogForm({ ...aiBlogForm, topic: e.target.value })}
+                    placeholder="Ej: Gastritis crónica en Bulldogs y dieta cocinada"
+                    className="w-full px-3 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-800 focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-stone-700 mb-1">Keyword Principal SEO</label>
+                    <input
+                      type="text"
+                      value={aiBlogForm.target_keyword}
+                      onChange={(e) => setAiBlogForm({ ...aiBlogForm, target_keyword: e.target.value })}
+                      placeholder="Ej: dieta blanda para perros con gastritis"
+                      className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-800"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-stone-700 mb-1">Foco en Raza (Opcional)</label>
+                    <input
+                      type="text"
+                      value={aiBlogForm.breed_focus}
+                      onChange={(e) => setAiBlogForm({ ...aiBlogForm, breed_focus: e.target.value })}
+                      placeholder="Ej: Bulldog Francés, Golden Retriever"
+                      className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-800"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-xs text-amber-900">
+                  <div className="font-bold flex items-center gap-1.5 mb-1">
+                    <CheckCircle2 size={14} className="text-amber-700" /> Human-in-the-Loop Garantizado:
+                  </div>
+                  <p className="text-[11px] text-amber-800">
+                    El artículo se guardará automáticamente como <strong>Borrador</strong> para que puedas revisarlo, editarlo y aprobarlo antes de que sea visible públicamente en el sitio.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAiBlogModal(false)}
+                    className="px-4 py-2 text-xs font-bold text-stone-600 hover:text-stone-900"
+                  >
+                    Cancelar
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={generatingAiBlog}
+                    className="px-5 py-2.5 bg-stone-900 hover:bg-stone-800 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                  >
+                    {generatingAiBlog ? (
+                      <>
+                        <Loader2 size={15} className="animate-spin text-amber-400" />
+                        Redactando con LLaMA 3.3 70B...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={15} className="text-amber-400" />
+                        Generar Artículo Médico & Guion
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* Vista de Éxito y Resumen del Borrador Creado */
+              <div className="space-y-4 py-2">
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-emerald-900">
+                  <div className="flex items-center gap-2 font-black text-sm mb-1">
+                    <CheckCircle2 size={18} className="text-emerald-700" />
+                    ¡Borrador de Artículo Creado con Éxito!
+                  </div>
+                  <p className="text-xs text-emerald-800">
+                    El artículo se encuentra listo en tu lista de blogs en estado <strong>Borrador</strong>.
+                  </p>
+                </div>
+
+                <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 space-y-2 text-xs">
+                  <div>
+                    <span className="font-bold text-stone-700">Título H1:</span>
+                    <p className="font-bold text-stone-900 text-sm mt-0.5">{generatedAiResult.title}</p>
+                  </div>
+                  <div>
+                    <span className="font-bold text-stone-700">Meta Descripción SEO:</span>
+                    <p className="text-stone-600 italic mt-0.5">{generatedAiResult.meta_description}</p>
+                  </div>
+                  {generatedAiResult.schema_faq && generatedAiResult.schema_faq.length > 0 && (
+                    <div>
+                      <span className="font-bold text-stone-700">FAQs Estructuradas (Schema.org):</span>
+                      <ul className="list-disc list-inside mt-1 text-stone-600 space-y-0.5">
+                        {generatedAiResult.schema_faq.map((faq, idx) => (
+                          <li key={idx}><strong className="text-stone-800">{faq.question}</strong></li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  {generatedAiResult.social_script && (
+                    <button
+                      onClick={() => setViewingSocialScript(generatedAiResult.social_script)}
+                      className="flex items-center gap-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 px-3.5 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      <Video size={14} className="text-red-500" />
+                      Ver Guion Social TikTok/Reels
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      setGeneratedAiResult(null);
+                      setShowAiBlogModal(false);
+                    }}
+                    className="px-5 py-2 bg-stone-900 hover:bg-stone-800 text-white font-bold text-xs rounded-xl transition shadow-xs cursor-pointer ml-auto"
+                  >
+                    Cerrar y Ver en Lista
+                  </button>
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL: VISOR DE GUION SOCIAL (TIKTOK / REELS) --- */}
+      {viewingSocialScript && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-stone-200">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100 mb-3">
+              <div className="flex items-center gap-2">
+                <Video size={18} className="text-red-500" />
+                <h3 className="text-lg font-black font-header text-stone-800">
+                  Guion para Video Social (45 Segundos)
+                </h3>
+              </div>
+              <button 
+                onClick={() => setViewingSocialScript(null)}
+                className="p-1.5 text-stone-400 hover:text-stone-700 bg-stone-100 rounded-full"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="bg-stone-900 text-amber-300 font-mono text-xs p-4 rounded-2xl whitespace-pre-wrap max-h-96 overflow-y-auto leading-relaxed border border-stone-800">
+              {viewingSocialScript}
+            </div>
+
+            <div className="flex items-center justify-between pt-4">
+              <span className="text-[11px] text-stone-400">
+                Optimizado para enganchar en los primeros 3 segundos.
+              </span>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(viewingSocialScript);
+                  alert('¡Guion copiado al portapapeles!');
+                }}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-stone-900 font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+              >
+                Copiar Guion
+              </button>
+            </div>
           </div>
         </div>
       )}

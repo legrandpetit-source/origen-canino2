@@ -336,6 +336,54 @@ def init_database():
                 );
             """)
 
+            # 17. Tabla de Alianzas Estratégicas B2B (Agente Vet & Pet Scraper)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS partner_prospects (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    category TEXT NOT NULL DEFAULT 'veterinaria',
+                    commune TEXT NOT NULL,
+                    phone TEXT,
+                    email TEXT,
+                    address TEXT,
+                    google_rating NUMERIC(3,1) DEFAULT 0.0,
+                    reviews_count INTEGER DEFAULT 0,
+                    instagram TEXT,
+                    website TEXT,
+                    lead_score INTEGER DEFAULT 50,
+                    partnership_status TEXT DEFAULT 'prospecto',
+                    ambassador_code TEXT,
+                    commission_rate NUMERIC(4,2) DEFAULT 0.10,
+                    notes TEXT,
+                    contact_channel TEXT DEFAULT 'whatsapp',
+                    last_contacted_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
+            # 18. Tabla de Logs de Auditoría para Agentes Autónomos
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS agent_audit_logs (
+                    id SERIAL PRIMARY KEY,
+                    agent_name TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    target TEXT,
+                    details JSONB,
+                    status TEXT DEFAULT 'success',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
+            # Migraciones Blog SEO enriquecido
+            cursor.execute("""
+                ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS meta_title TEXT;
+                ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS meta_description TEXT;
+                ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS schema_faq JSONB;
+                ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS social_script TEXT;
+                ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS target_keyword TEXT;
+                ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'publicado';
+            """)
+
             cursor.execute("""
                 ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL;
             """)
