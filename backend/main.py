@@ -1653,9 +1653,17 @@ def create_ingredient(i: IngredientCreateUpdate, current_user: str = Depends(get
                 i.name, i.cost_per_unit, i.unit,
                 i.kcal_per_100g, i.protein_g, i.fat_g, i.fiber_g, i.moisture_g, i.ash_g, i.carbs_g
             ))
+            new_id = cursor.fetchone()["id"]
+
+            # Guardar en Historial de Precios
+            cursor.execute("""
+                INSERT INTO ingredient_price_history (ingredient_id, ingredient_name, price, unit, notes)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (new_id, i.name, i.cost_per_unit, i.unit, "Precio inicial de catálogo"))
+
             conn.commit()
             print("DEBUG create_ingredient: commit successful")
-            return {"success": True, "id": cursor.fetchone()["id"]}
+            return {"success": True, "id": new_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error creando ingrediente")
 
@@ -1665,6 +1673,11 @@ def update_ingredient(ingredient_id: int, i: IngredientCreateUpdate, current_use
         print(f"DEBUG update_ingredient ID {ingredient_id}: payload={i.model_dump()}")
         with get_connection() as conn:
             cursor = conn.cursor()
+            # Obtener precio anterior
+            cursor.execute("SELECT cost_per_unit, name FROM ingredients WHERE id = %s", (ingredient_id,))
+            prev = cursor.fetchone()
+            prev_price = prev["cost_per_unit"] if prev else None
+
             cursor.execute("""
                 UPDATE ingredients 
                 SET name = %s, cost_per_unit = %s, unit = %s,
@@ -1675,12 +1688,40 @@ def update_ingredient(ingredient_id: int, i: IngredientCreateUpdate, current_use
                 i.kcal_per_100g, i.protein_g, i.fat_g, i.fiber_g, i.moisture_g, i.ash_g, i.carbs_g,
                 ingredient_id
             ))
+
+            # Si el precio cambió, registrar en historial
+            if prev_price is not None and prev_price != i.cost_per_unit:
+                cursor.execute("""
+                    INSERT INTO ingredient_price_history (ingredient_id, ingredient_name, price, previous_price, unit, notes)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (ingredient_id, i.name, i.cost_per_unit, prev_price, i.unit, f"Cambio de ${prev_price} a ${i.cost_per_unit}"))
+
             conn.commit()
             print("DEBUG update_ingredient: commit successful")
             return {"success": True}
     except Exception as e:
         print(f"DEBUG update_ingredient: exception {e}")
         raise HTTPException(status_code=500, detail="Error actualizando ingrediente")
+
+@app.get("/api/admin/ingredients/history")
+def get_ingredient_price_history(ingredient_id: Optional[int] = None, current_user: str = Depends(get_current_admin)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        query = "SELECT * FROM ingredient_price_history WHERE 1=1"
+        params = []
+        if ingredient_id:
+            query += " AND ingredient_id = %s"
+            params.append(ingredient_id)
+        query += " ORDER BY created_at DESC LIMIT 100"
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+        result = []
+        for r in rows:
+            row_dict = dict(r)
+            if hasattr(row_dict.get("created_at"), 'isoformat'):
+                row_dict["created_at"] = row_dict["created_at"].isoformat()
+            result.append(row_dict)
+        return result
 
 @app.delete("/api/admin/ingredients/{ingredient_id}")
 def delete_ingredient(ingredient_id: int, current_user: str = Depends(get_current_admin)):

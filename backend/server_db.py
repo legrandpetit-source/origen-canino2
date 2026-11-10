@@ -390,6 +390,20 @@ def init_database():
                 );
             """)
 
+            # 20. Tabla de Historial de Precios de Materias Primas / Ingredientes
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS ingredient_price_history (
+                    id SERIAL PRIMARY KEY,
+                    ingredient_id INTEGER REFERENCES ingredients(id) ON DELETE CASCADE,
+                    ingredient_name TEXT NOT NULL,
+                    price INTEGER NOT NULL,
+                    previous_price INTEGER,
+                    unit TEXT NOT NULL,
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
             # Migraciones Blog SEO enriquecido
             cursor.execute("""
                 ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS meta_title TEXT;

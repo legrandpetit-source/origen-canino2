@@ -45,10 +45,18 @@ const KitchenProductionManager = ({ fetchWithAuth }) => {
 
   // --- PRECIOS E INSUMOS BARF ($ CLP) ---
   const [barfPvp, setBarfPvp] = useState(5000);
-  const [costCogoteKg, setCostCogoteKg] = useState(1200);
-  const [costPanaKg, setCostPanaKg] = useState(1800);
+  const [costCogoteKg, setCostCogoteKg] = useState(800); // Sincronizado con Maestro Ingredientes ($800)
+  const [costPanaKg, setCostPanaKg] = useState(1450);   // Sincronizado ($1.450)
   const [costContreKg, setCostContreKg] = useState(3200);
-  const [costVegKg, setCostVegKg] = useState(1100);
+  
+  // Desglose de Vegetales Reales (Actualizados con compra de hoy)
+  const [costZapalloCamoteKg, setCostZapalloCamoteKg] = useState(2700); // ¡Precio real de hoy $2.700!
+  const [costZanahoriaKg, setCostZanahoriaKg] = useState(1500);
+  const [costBetarragaKg, setCostBetarragaKg] = useState(1000);
+  const [costZapalloItalianoKg, setCostZapalloItalianoKg] = useState(1200);
+  const [costManzanaKg, setCostManzanaKg] = useState(1500);
+  const [costApioKg, setCostApioKg] = useState(1500);
+
   const [costEggUnit, setCostEggUnit] = useState(180);
   const [costAdditivesKg, setCostAdditivesKg] = useState(12000);
   const [costPackagingUnit, setCostPackagingUnit] = useState(250);
@@ -63,8 +71,7 @@ const KitchenProductionManager = ({ fetchWithAuth }) => {
   // --- PRECIOS E INSUMOS COCINADA ($ CLP) ---
   const [cookedPvp, setCookedPvp] = useState(8000);
   const [costCerdoKg, setCostCerdoKg] = useState(4200);
-  const [costCookedPanaKg, setCostCookedPanaKg] = useState(1800);
-  const [costCookedVegKg, setCostCookedVegKg] = useState(1100);
+  const [costCookedPanaKg, setCostCookedPanaKg] = useState(1450);
   const [costCalciumKg, setCostCalciumKg] = useState(2500);
   const [costCookedPackagingUnit, setCostCookedPackagingUnit] = useState(250);
 
@@ -126,7 +133,15 @@ const KitchenProductionManager = ({ fetchWithAuth }) => {
   const barfCostCogote = validCogote * costCogoteKg;
   const barfCostPana = barfPanaKg * costPanaKg;
   const barfCostContre = barfContreKg * costContreKg;
-  const barfCostVeg = barfTotalVegKg * costVegKg;
+
+  // Desglose Ponderado Real de Vegetales (Puré Cocido + Crudos Molidos)
+  const barfCostZapalloCamote = zapalloCamoteKg * costZapalloCamoteKg;
+  const barfCostZanahoria = zanahoriaKg * costZanahoriaKg;
+  const barfCostBetarraga = betarragaKg * costBetarragaKg;
+  const barfCostPureVeg = barfCostZapalloCamote + barfCostZanahoria + barfCostBetarraga;
+  const barfCostCrudosVeg = (zapalloItalianoKg * costZapalloItalianoKg) + (manzanaKg * costManzanaKg) + (talloApioKg * costApioKg);
+  const barfCostVeg = barfCostPureVeg + barfCostCrudosVeg;
+
   const barfCostEggs = barfHuevosUnidades * costEggUnit;
   const barfCostAdditives = ((curcumaGramos + pimientaGramos) / 1000) * costAdditivesKg;
   const barfCostPackaging = barfTotalMezcla * costPackagingUnit;
@@ -141,7 +156,8 @@ const KitchenProductionManager = ({ fetchWithAuth }) => {
   // 2. Costos Línea Cocinada
   const cookedCostCerdo = validCerdo * costCerdoKg;
   const cookedCostPana = cookedPanaKg * costCookedPanaKg;
-  const cookedCostVeg = cookedVegKg * costCookedVegKg;
+  const cookedAvgVegCost = (costZapalloCamoteKg + costZapalloItalianoKg + costZanahoriaKg) / 3;
+  const cookedCostVeg = cookedVegKg * cookedAvgVegCost;
   const cookedCostEggs = wholeEggsWithShell * costEggUnit;
   const cookedCostCalcium = (additionalEggShellPowderGrams / 1000) * costCalciumKg;
   const cookedCostPackaging = cookedTotalMezcla * costCookedPackagingUnit;
@@ -461,56 +477,162 @@ const KitchenProductionManager = ({ fetchWithAuth }) => {
 
         {/* Formulario Desplegable de Costos de Materias Primas */}
         {showCostSettings && (
-          <div className="bg-stone-50/80 border border-stone-200 p-4 rounded-2xl grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-            {activeLine === 'barf' ? (
-              <>
-                <div>
-                  <label className="block font-bold text-stone-700 mb-1">Cogote Pollo ($/kg):</label>
+          <div className="bg-stone-50/80 border border-stone-200 p-4 rounded-2xl space-y-3 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {activeLine === 'barf' ? (
+                <>
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">Cogote Pollo ($/kg):</label>
+                    <input
+                      type="number"
+                      value={costCogoteKg}
+                      onChange={(e) => setCostCogoteKg(Number(e.target.value) || 0)}
+                      className="w-full bg-white px-3 py-1.5 border border-stone-300 rounded-xl font-bold text-stone-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">Pana Pollo/Cerdo ($/kg):</label>
+                    <input
+                      type="number"
+                      value={costPanaKg}
+                      onChange={(e) => setCostPanaKg(Number(e.target.value) || 0)}
+                      className="w-full bg-white px-3 py-1.5 border border-stone-300 rounded-xl font-bold text-stone-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">Contre/Carne ($/kg):</label>
+                    <input
+                      type="number"
+                      value={costContreKg}
+                      onChange={(e) => setCostContreKg(Number(e.target.value) || 0)}
+                      className="w-full bg-white px-3 py-1.5 border border-stone-300 rounded-xl font-bold text-stone-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">Huevo Fresco ($/unid):</label>
+                    <input
+                      type="number"
+                      value={costEggUnit}
+                      onChange={(e) => setCostEggUnit(Number(e.target.value) || 0)}
+                      className="w-full bg-white px-3 py-1.5 border border-stone-300 rounded-xl font-bold text-stone-800"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">Cerdo sin Hueso ($/kg):</label>
+                    <input
+                      type="number"
+                      value={costCerdoKg}
+                      onChange={(e) => setCostCerdoKg(Number(e.target.value) || 0)}
+                      className="w-full bg-white px-3 py-1.5 border border-stone-300 rounded-xl font-bold text-stone-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">Pana de Cerdo ($/kg):</label>
+                    <input
+                      type="number"
+                      value={costCookedPanaKg}
+                      onChange={(e) => setCostCookedPanaKg(Number(e.target.value) || 0)}
+                      className="w-full bg-white px-3 py-1.5 border border-stone-300 rounded-xl font-bold text-stone-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">Harina Cáscara ($/kg):</label>
+                    <input
+                      type="number"
+                      value={costCalciumKg}
+                      onChange={(e) => setCostCalciumKg(Number(e.target.value) || 0)}
+                      className="w-full bg-white px-3 py-1.5 border border-stone-300 rounded-xl font-bold text-stone-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">Bolsa + Etiqueta ($/unid):</label>
+                    <input
+                      type="number"
+                      value={costCookedPackagingUnit}
+                      onChange={(e) => setCostCookedPackagingUnit(Number(e.target.value) || 0)}
+                      className="w-full bg-white px-3 py-1.5 border border-stone-300 rounded-xl font-bold text-stone-800"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Desglose Específico de Verduras con Alertas de Inflación */}
+            <div className="pt-2 border-t border-stone-200">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 block mb-2">
+                Desglose Específico de Verduras & Frutas (Precios de Compra en Feria / Lo Valledor):
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5">
+                <div className="p-2 bg-amber-50 rounded-xl border border-amber-300">
+                  <label className="block font-bold text-amber-900 text-[10px] mb-1">🎃 Zapallo Camote:</label>
                   <input
                     type="number"
-                    value={costCogoteKg}
-                    onChange={(e) => setCostCogoteKg(Number(e.target.value) || 0)}
-                    className="w-full bg-white px-3 py-1.5 border border-stone-300 rounded-xl font-bold text-stone-800"
+                    value={costZapalloCamoteKg}
+                    onChange={(e) => setCostZapalloCamoteKg(Number(e.target.value) || 0)}
+                    className="w-full bg-white px-2 py-1 border border-amber-400 rounded-lg font-black text-amber-900"
                   />
+                  <span className="text-[9px] text-amber-700 font-bold block mt-0.5">Hoy: $2.700/kg</span>
                 </div>
+
                 <div>
-                  <label className="block font-bold text-stone-700 mb-1">Pana Pollo/Cerdo ($/kg):</label>
+                  <label className="block font-bold text-stone-700 text-[10px] mb-1">🥕 Zanahoria ($/kg):</label>
                   <input
                     type="number"
-                    value={costPanaKg}
-                    onChange={(e) => setCostPanaKg(Number(e.target.value) || 0)}
-                    className="w-full bg-white px-3 py-1.5 border border-stone-300 rounded-xl font-bold text-stone-800"
+                    value={costZanahoriaKg}
+                    onChange={(e) => setCostZanahoriaKg(Number(e.target.value) || 0)}
+                    className="w-full bg-white px-2 py-1 border border-stone-300 rounded-lg font-bold"
                   />
                 </div>
+
                 <div>
-                  <label className="block font-bold text-stone-700 mb-1">Contre/Carne ($/kg):</label>
+                  <label className="block font-bold text-stone-700 text-[10px] mb-1">🟣 Betarraga ($/kg):</label>
                   <input
                     type="number"
-                    value={costContreKg}
-                    onChange={(e) => setCostContreKg(Number(e.target.value) || 0)}
-                    className="w-full bg-white px-3 py-1.5 border border-stone-300 rounded-xl font-bold text-stone-800"
+                    value={costBetarragaKg}
+                    onChange={(e) => setCostBetarragaKg(Number(e.target.value) || 0)}
+                    className="w-full bg-white px-2 py-1 border border-stone-300 rounded-lg font-bold"
                   />
                 </div>
+
                 <div>
-                  <label className="block font-bold text-stone-700 mb-1">Verduras Mix ($/kg):</label>
+                  <label className="block font-bold text-stone-700 text-[10px] mb-1">🥒 Zap. Italiano ($/kg):</label>
                   <input
                     type="number"
-                    value={costVegKg}
-                    onChange={(e) => setCostVegKg(Number(e.target.value) || 0)}
-                    className="w-full bg-white px-3 py-1.5 border border-stone-300 rounded-xl font-bold text-stone-800"
+                    value={costZapalloItalianoKg}
+                    onChange={(e) => setCostZapalloItalianoKg(Number(e.target.value) || 0)}
+                    className="w-full bg-white px-2 py-1 border border-stone-300 rounded-lg font-bold"
                   />
                 </div>
+
                 <div>
-                  <label className="block font-bold text-stone-700 mb-1">Huevo Fresco ($/unid):</label>
+                  <label className="block font-bold text-stone-700 text-[10px] mb-1">🍏 Manzana ($/kg):</label>
                   <input
                     type="number"
-                    value={costEggUnit}
-                    onChange={(e) => setCostEggUnit(Number(e.target.value) || 0)}
-                    className="w-full bg-white px-3 py-1.5 border border-stone-300 rounded-xl font-bold text-stone-800"
+                    value={costManzanaKg}
+                    onChange={(e) => setCostManzanaKg(Number(e.target.value) || 0)}
+                    className="w-full bg-white px-2 py-1 border border-stone-300 rounded-lg font-bold"
                   />
                 </div>
+
                 <div>
-                  <label className="block font-bold text-stone-700 mb-1">Aditivos ($/kg):</label>
+                  <label className="block font-bold text-stone-700 text-[10px] mb-1">🌿 Tallo Apio ($/kg):</label>
+                  <input
+                    type="number"
+                    value={costApioKg}
+                    onChange={(e) => setCostApioKg(Number(e.target.value) || 0)}
+                    className="w-full bg-white px-2 py-1 border border-stone-300 rounded-lg font-bold"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {activeLine === 'barf' && (
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-stone-200">
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Aditivos Cúrcuma/Pimienta ($/kg):</label>
                   <input
                     type="number"
                     value={costAdditivesKg}
@@ -519,7 +641,7 @@ const KitchenProductionManager = ({ fetchWithAuth }) => {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-stone-700 mb-1">Bolsa + Etiqueta ($/unid):</label>
+                  <label className="block font-bold text-stone-700 mb-1">Bolsa Sellada + Etiqueta ($/unid):</label>
                   <input
                     type="number"
                     value={costPackagingUnit}
@@ -527,55 +649,7 @@ const KitchenProductionManager = ({ fetchWithAuth }) => {
                     className="w-full bg-white px-3 py-1.5 border border-stone-300 rounded-xl font-bold text-stone-800"
                   />
                 </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <label className="block font-bold text-stone-700 mb-1">Cerdo sin Hueso ($/kg):</label>
-                  <input
-                    type="number"
-                    value={costCerdoKg}
-                    onChange={(e) => setCostCerdoKg(Number(e.target.value) || 0)}
-                    className="w-full bg-white px-3 py-1.5 border border-stone-300 rounded-xl font-bold text-stone-800"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-stone-700 mb-1">Pana de Cerdo ($/kg):</label>
-                  <input
-                    type="number"
-                    value={costCookedPanaKg}
-                    onChange={(e) => setCostCookedPanaKg(Number(e.target.value) || 0)}
-                    className="w-full bg-white px-3 py-1.5 border border-stone-300 rounded-xl font-bold text-stone-800"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-stone-700 mb-1">Verduras Vapor ($/kg):</label>
-                  <input
-                    type="number"
-                    value={costCookedVegKg}
-                    onChange={(e) => setCostCookedVegKg(Number(e.target.value) || 0)}
-                    className="w-full bg-white px-3 py-1.5 border border-stone-300 rounded-xl font-bold text-stone-800"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-stone-700 mb-1">Harina Cáscara ($/kg):</label>
-                  <input
-                    type="number"
-                    value={costCalciumKg}
-                    onChange={(e) => setCostCalciumKg(Number(e.target.value) || 0)}
-                    className="w-full bg-white px-3 py-1.5 border border-stone-300 rounded-xl font-bold text-stone-800"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-stone-700 mb-1">Bolsa + Etiqueta ($/unid):</label>
-                  <input
-                    type="number"
-                    value={costCookedPackagingUnit}
-                    onChange={(e) => setCostCookedPackagingUnit(Number(e.target.value) || 0)}
-                    className="w-full bg-white px-3 py-1.5 border border-stone-300 rounded-xl font-bold text-stone-800"
-                  />
-                </div>
-              </>
+              </div>
             )}
           </div>
         )}
