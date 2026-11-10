@@ -66,7 +66,9 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
         const savedName = formData.name;
         const savedCost = formData.cost_per_unit;
         const savedUnit = formData.unit;
-        fetchIngredients();
+        if (fetchIngredients) {
+          await fetchIngredients();
+        }
 
         if (keepOpen && isAdding) {
           // Mantener el formulario abierto para ingresar el siguiente insumo sin interrupción

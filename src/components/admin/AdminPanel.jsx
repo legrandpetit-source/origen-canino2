@@ -128,7 +128,7 @@ const AdminPanel = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      fetchData();
+      fetchData(true);
     }
   }, [isAuthenticated]);
 
@@ -147,8 +147,21 @@ const AdminPanel = () => {
     return res;
   };
 
-  const fetchData = async () => {
-    setLoading(true);
+  // Refrescar sólo ingredientes sin desmontar ni disparar loading global
+  const refreshIngredients = async () => {
+    try {
+      const res = await fetchWithAuth('/api/admin/ingredients');
+      if (res.ok) {
+        const ingData = await res.json();
+        setIngredients(ingData);
+      }
+    } catch (err) {
+      console.error('Error refreshing ingredients:', err);
+    }
+  };
+
+  const fetchData = async (showLoading = false) => {
+    if (showLoading) setLoading(true);
     try {
       const [prodRes, blogRes, orderRes, testRes, ingRes] = await Promise.all([
         fetch(`/api/products`), // public
@@ -171,7 +184,7 @@ const AdminPanel = () => {
     } catch (err) {
       console.error('Error fetching admin data:', err);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
@@ -603,7 +616,7 @@ const AdminPanel = () => {
               {activeTab === 'ingredients' && (
                 <IngredientsManager 
                   ingredients={ingredients} 
-                  fetchIngredients={fetchData} 
+                  fetchIngredients={refreshIngredients} 
                   fetchWithAuth={fetchWithAuth} 
                 />
               )}
@@ -613,7 +626,7 @@ const AdminPanel = () => {
                 <KitchenProductionManager 
                   fetchWithAuth={fetchWithAuth} 
                   ingredients={ingredients} 
-                  fetchIngredients={fetchData}
+                  fetchIngredients={refreshIngredients}
                   products={products}
                 />
               )}
