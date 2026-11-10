@@ -295,31 +295,31 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Kcal</label>
-                  <input type="number" step="0.1" value={formData.kcal_per_100g} onChange={e => setFormData({...formData, kcal_per_100g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white" min="0" />
+                  <input type="number" step="any" value={formData.kcal_per_100g} onChange={e => setFormData({...formData, kcal_per_100g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white font-mono" min="0" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Proteína (g)</label>
-                  <input type="number" step="0.1" value={formData.protein_g} onChange={e => setFormData({...formData, protein_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white" min="0" />
+                  <input type="number" step="any" value={formData.protein_g} onChange={e => setFormData({...formData, protein_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white font-mono" min="0" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Grasa (g)</label>
-                  <input type="number" step="0.1" value={formData.fat_g} onChange={e => setFormData({...formData, fat_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white" min="0" />
+                  <input type="number" step="any" value={formData.fat_g} onChange={e => setFormData({...formData, fat_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white font-mono" min="0" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Carbs (g)</label>
-                  <input type="number" step="0.1" value={formData.carbs_g} onChange={e => setFormData({...formData, carbs_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white" min="0" />
+                  <input type="number" step="any" value={formData.carbs_g} onChange={e => setFormData({...formData, carbs_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white font-mono" min="0" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Fibra (g)</label>
-                  <input type="number" step="0.1" value={formData.fiber_g} onChange={e => setFormData({...formData, fiber_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white" min="0" />
+                  <input type="number" step="any" value={formData.fiber_g} onChange={e => setFormData({...formData, fiber_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white font-mono" min="0" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Humedad (g)</label>
-                  <input type="number" step="0.1" value={formData.moisture_g} onChange={e => setFormData({...formData, moisture_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white" min="0" />
+                  <input type="number" step="any" value={formData.moisture_g} onChange={e => setFormData({...formData, moisture_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white font-mono" min="0" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Cenizas (g)</label>
-                  <input type="number" step="0.1" value={formData.ash_g} onChange={e => setFormData({...formData, ash_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white" min="0" />
+                  <input type="number" step="any" value={formData.ash_g} onChange={e => setFormData({...formData, ash_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white font-mono" min="0" />
                 </div>
               </div>
             </div>
