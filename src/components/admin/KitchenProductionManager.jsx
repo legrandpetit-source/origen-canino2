@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { 
   ChefHat, Scale, AlertTriangle, AlertCircle, CheckCircle2, 
   Printer, Info, Flame, Drumstick, Egg, Sparkles, RefreshCw,
-  FileText, Check, ShieldAlert
+  FileText, Check, ShieldAlert, Tag
 } from 'lucide-react';
+import ProductLabelGenerator from './ProductLabelGenerator';
 
 const KitchenProductionManager = () => {
   const [activeLine, setActiveLine] = useState('barf'); // 'barf' o 'cocinada'
+  const [showLabelModal, setShowLabelModal] = useState(false);
 
   // --- ESTADO LÍNEA 1: BARF CRUDA (BASE COGOTE) ---
   const [cogoteKg, setCogoteKg] = useState(100);
@@ -97,7 +99,16 @@ const KitchenProductionManager = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setShowLabelModal(true)}
+            className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-stone-900 px-4 py-2.5 rounded-2xl font-bold text-xs transition shadow-2xs cursor-pointer"
+            title="Generar e imprimir etiquetas de empaque con análisis garantizado AAFCO/SAG"
+          >
+            <Tag size={15} />
+            <span>Generar Etiquetas SAG / AAFCO</span>
+          </button>
+
           <button
             onClick={handlePrint}
             className="flex items-center gap-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 px-4 py-2.5 rounded-2xl font-bold text-xs transition cursor-pointer"
@@ -645,6 +656,14 @@ const KitchenProductionManager = () => {
           </div>
         </div>
       )}
+
+      {/* Modal Generador e Impresor de Etiquetas de Empaque */}
+      <ProductLabelGenerator
+        activeLine={activeLine}
+        totalKg={activeLine === 'barf' ? barfTotalMezcla : cookedTotalMezcla}
+        isOpen={showLabelModal}
+        onClose={() => setShowLabelModal(false)}
+      />
 
     </div>
   );
