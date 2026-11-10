@@ -578,7 +578,7 @@ def check_and_award_referral(cursor, order_id: int):
     """
     try:
         cursor.execute("""
-            SELECT o.id, o.customer_name, o.customer_email, o.referral_code, o.payment_status, o.customer_id
+            SELECT o.id, o.customer_name, o.customer_email, o.referral_code, o.coupon_code, o.payment_status, o.customer_id
             FROM orders o
             WHERE o.id = %s
         """, (order_id,))
@@ -587,6 +587,12 @@ def check_and_award_referral(cursor, order_id: int):
             return
 
         ref_code = o['referral_code'].strip().upper()
+        coupon_code = (o.get('coupon_code') or '').strip().upper()
+
+        # Regla de negocio estricta: Solo recompensar si el amigo canjeó voluntariamente el código como cupón
+        if ref_code != coupon_code:
+            print(f"Omitiendo recompensa de referido: el pedido #{order_id} no canjeó el cupón {ref_code} (cupón usado: '{coupon_code}').")
+            return
         
         # Verificar si ya se recompensó esta orden
         cursor.execute("SELECT id FROM referral_transactions WHERE order_id = %s AND transaction_type = 'reward_earned'", (order_id,))
@@ -2162,7 +2168,9 @@ def create_order(order: OrderCreate, req: Request):
                     cursor.execute("UPDATE customers SET wallet_balance = wallet_balance - %s WHERE id = %s", (wallet_discount, linked_customer_id))
 
             coupon_applied = order.coupon_code.strip().upper() if order.coupon_code else None
-            ref_applied = order.referral_code.strip().upper() if order.referral_code else None
+            raw_ref = order.referral_code.strip().upper() if order.referral_code else None
+            # Regla de integridad: el referido solo es válido si fue activamente canjeado como cupón
+            ref_applied = raw_ref if (raw_ref and raw_ref == coupon_applied) else None
 
             cursor.execute("""
                 INSERT INTO orders (

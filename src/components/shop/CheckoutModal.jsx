@@ -68,8 +68,8 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(null);
   const [copiedBankInfo, setCopiedBankInfo] = useState(false);
-  const [couponInput, setCouponInput] = useState(() => localStorage.getItem('origencanino_coupon_code') || '');
-  const [appliedCoupon, setAppliedCoupon] = useState(() => localStorage.getItem('origencanino_coupon_code') || '');
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState('');
   const [appliedCouponData, setAppliedCouponData] = useState(null);
   const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [couponError, setCouponError] = useState('');
@@ -86,6 +86,17 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
           }
         })
         .catch(err => console.error("Error cargando configuración bancaria:", err));
+    }
+  }, [isOpen]);
+
+  // Limpiar campos de cupón al cerrar o abrir el modal si no ha sido aplicado activamente
+  useEffect(() => {
+    if (!isOpen) {
+      setCouponInput('');
+      setAppliedCoupon('');
+      setAppliedCouponData(null);
+      setCouponError('');
+      setCouponSuccess('');
     }
   }, [isOpen]);
 
@@ -208,13 +219,11 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
       if (data.valid) {
         setAppliedCoupon(clean);
         setAppliedCouponData(data);
-        localStorage.setItem('origencanino_coupon_code', clean);
         setCouponSuccess(data.message || `¡Cupón ${clean} aplicado con éxito!`);
         setCouponError('');
       } else {
         setAppliedCoupon('');
         setAppliedCouponData(null);
-        localStorage.removeItem('origencanino_coupon_code');
         setCouponError(data.message || 'Código de cupón inválido o expirado.');
       }
     } catch (err) {
@@ -228,17 +237,16 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
     setAppliedCoupon('');
     setAppliedCouponData(null);
     setCouponInput('');
-    localStorage.removeItem('origencanino_coupon_code');
     setCouponSuccess('');
     setCouponError('');
   };
 
-  // Re-validar cupón automáticamente si cambia el subtotal
+  // Re-validar cupón automáticamente SOLO si el usuario ya lo aplicó voluntariamente y cambia el subtotal
   useEffect(() => {
     if (isOpen && appliedCoupon && total > 0) {
       validateAndApplyCoupon(appliedCoupon);
     }
-  }, [total, isOpen]);
+  }, [total]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -441,7 +449,7 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
         nfc_building_code: nfcCommunity ? nfcCommunity.slug : null,
         discount_amount: totalDiscount,
         coupon_code: appliedCoupon || null,
-        referral_code: appliedCouponData?.is_referral ? appliedCoupon : (sessionStorage.getItem('origencanino_referral_code') || null),
+        referral_code: (appliedCouponData?.is_referral && appliedCoupon) ? appliedCoupon : null,
         use_wallet_balance: useWalletBalance && walletDeduction > 0,
         items: items.map(item => ({
           id: item.id,

@@ -117,7 +117,7 @@ export default function FloatingFirstOrderPromo() {
     e.stopPropagation();
     try {
       navigator.clipboard.writeText(codeToUse);
-      localStorage.setItem('origencanino_coupon_code', codeToUse);
+      // Solo copiamos al portapapeles; el cliente debe ingresarlo voluntariamente en el checkout
       setCopied(true);
       setTimeout(() => setCopied(false), 3000);
     } catch (err) {
@@ -126,7 +126,6 @@ export default function FloatingFirstOrderPromo() {
   };
 
   const handleScrollToCatalog = () => {
-    localStorage.setItem('origencanino_coupon_code', codeToUse);
     const catalogElement = document.getElementById('catalogo') || document.getElementById('productos');
     if (catalogElement) {
       catalogElement.scrollIntoView({ behavior: 'smooth' });

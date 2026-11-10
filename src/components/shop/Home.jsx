@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, Sparkles, X, Calculator, ArrowRight, HeartPulse, Bone, Gift } from 'lucide-react';
+import { Building2, Sparkles, X, Calculator, ArrowRight, HeartPulse, Bone, Gift, Copy, Check } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import Especialidades from './Especialidades';
 import Blog from './Blog';
@@ -24,7 +24,19 @@ const Home = () => {
   const [nfcBannerOpen, setNfcBannerOpen] = useState(true);
   const [referralBanner, setReferralBanner] = useState(null);
   const [referralBannerOpen, setReferralBannerOpen] = useState(true);
+  const [copiedRefCode, setCopiedRefCode] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all'); // 'all', 'barf', 'cocinada', 'snack'
+
+  const handleCopyRefCode = (code) => {
+    if (!code) return;
+    try {
+      navigator.clipboard.writeText(code);
+      setCopiedRefCode(true);
+      setTimeout(() => setCopiedRefCode(false), 2500);
+    } catch (err) {
+      console.error("Error al copiar código de referido:", err);
+    }
+  };
 
   useEffect(() => {
     // Detectar si el usuario ingresó por un tag NFC de condominio/edificio (?nfc=slug)
@@ -51,8 +63,7 @@ const Home = () => {
           if (data && data.valid) {
             setReferralBanner(data);
             setReferralBannerOpen(true);
-            sessionStorage.setItem('origencanino_referral_code', data.referral_code);
-            localStorage.setItem('origencanino_coupon_code', data.referral_code);
+            // Sin auto-inyección silenciosa: el usuario debe copiar o ingresar el código voluntariamente
           }
         })
         .catch(err => console.error("Error validando referido:", err));
@@ -162,12 +173,33 @@ const Home = () => {
                   <p className="font-header font-bold text-base flex items-center gap-2">
                     ¡Tu amigo {referralBanner.referrer_name}{referralBanner.dog_name ? ` y ${referralBanner.dog_name}` : ''} te regaló un descuento especial! 🐾
                   </p>
-                  <p className="text-xs text-white/90">
-                    Código: <span className="font-mono font-bold bg-white/20 px-2 py-0.5 rounded-md">{referralBanner.referral_code}</span>
-                    {" • "}
+                  <p className="text-xs text-white/90 flex flex-wrap items-center gap-1.5 mt-0.5">
+                    <span>Código:</span>
+                    <span className="font-mono font-bold bg-white/20 px-2.5 py-0.5 rounded-md inline-flex items-center gap-1.5 border border-white/20">
+                      <span>{referralBanner.referral_code}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyRefCode(referralBanner.referral_code)}
+                        className="text-white hover:text-amber-200 transition p-0.5 rounded hover:bg-white/20 cursor-pointer inline-flex items-center"
+                        title={copiedRefCode ? "¡Código copiado!" : "Copiar código de referido"}
+                      >
+                        {copiedRefCode ? (
+                          <Check size={14} className="text-amber-300" />
+                        ) : (
+                          <Copy size={13} />
+                        )}
+                      </button>
+                    </span>
+                    {copiedRefCode && (
+                      <span className="text-[10px] font-extrabold text-amber-200 bg-black/40 px-2 py-0.5 rounded-full">
+                        ¡Copiado!
+                      </span>
+                    )}
+                    <span>•</span>
                     <strong className="text-amber-300 font-bold text-xs bg-black/20 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
                       <Sparkles size={11} /> {referralBanner.discount_percent}% de Descuento Exclusivo
-                    </strong> para tu primer pedido.
+                    </strong>
+                    <span>para tu primer pedido.</span>
                   </p>
                 </div>
               </div>
