@@ -149,18 +149,22 @@ export default function FloatingFirstOrderPromo() {
       <div className="fixed bottom-5 right-4 md:right-6 z-40 max-w-sm pointer-events-auto">
         <AnimatePresence mode="wait">
           {isMinimized ? (
-            /* Minimized Chip Naranjo */
+            /* Minimized Chip Naranjo (Arrastrable con dedo o mouse) */
             <motion.button
               key="minimized"
+              drag
+              dragMomentum={false}
+              dragElastic={0.08}
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
+              whileTap={{ scale: 0.95 }}
               onClick={() => setIsMinimized(false)}
-              className="flex items-center gap-2 bg-[#db994b] hover:bg-[#c58235] text-white px-4 py-2.5 rounded-full shadow-2xl border-2 border-white transition transform hover:scale-105 font-body cursor-pointer"
-              title="Ver descuento de bienvenida"
+              className="flex items-center gap-2 bg-[#db994b] hover:bg-[#c58235] text-white px-4 py-2.5 rounded-full shadow-2xl border-2 border-white transition transform font-body cursor-grab active:cursor-grabbing select-none touch-none"
+              title="Toca para abrir o arrastra con el dedo para mover de lugar"
             >
-              <Sparkles size={16} className="text-white animate-spin-slow" />
-              <span className="font-extrabold text-xs tracking-wider">
+              <Sparkles size={16} className="text-white animate-spin-slow pointer-events-none shrink-0" />
+              <span className="font-extrabold text-xs tracking-wider pointer-events-none whitespace-nowrap">
                 {promo.percent}% OFF 1RA COMPRA
               </span>
             </motion.button>
