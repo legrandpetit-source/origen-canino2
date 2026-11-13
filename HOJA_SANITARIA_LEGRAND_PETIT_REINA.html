@@ -6,11 +6,11 @@
   <style>
     @page {
       size: letter portrait;
-      margin: 0.8cm 1.1cm;
+      margin: 0.55cm 1.0cm 0.5cm 1.0cm;
       @bottom-center {
         content: "Página 1 de 1 • Registro Sanitario Legrand Petit • Ley 21.020";
         font-family: 'Georgia', serif;
-        font-size: 7.5pt;
+        font-size: 7.2pt;
         color: #777777;
       }
     }
@@ -19,8 +19,8 @@
     }
     body {
       font-family: 'Georgia', 'Times New Roman', serif;
-      font-size: 8.4pt;
-      line-height: 1.25;
+      font-size: 8.2pt;
+      line-height: 1.2;
       color: #1a1a1a;
       background-color: #ffffff;
       margin: 0;
@@ -30,11 +30,11 @@
     .header {
       text-align: center;
       border-bottom: 2px solid #2d3748;
-      padding-bottom: 4px;
-      margin-bottom: 6px;
+      padding-bottom: 2px;
+      margin-bottom: 4px;
     }
     .header-badge {
-      font-size: 7.5pt;
+      font-size: 7.2pt;
       letter-spacing: 2px;
       text-transform: uppercase;
       font-weight: bold;
@@ -42,7 +42,7 @@
       margin-bottom: 1px;
     }
     .header h1 {
-      font-size: 14pt;
+      font-size: 13.5pt;
       font-weight: bold;
       letter-spacing: 3px;
       margin: 0;
@@ -50,7 +50,7 @@
       color: #1a202c;
     }
     .header .subtitle {
-      font-size: 8.5pt;
+      font-size: 8pt;
       color: #4a5568;
       margin-top: 1px;
       font-style: italic;
@@ -59,47 +59,45 @@
       background-color: #f7fafc;
       border: 1px solid #e2e8f0;
       border-left: 4px solid #2b6cb0;
-      padding: 4px 8px;
-      margin-bottom: 6px;
+      padding: 3px 6px;
+      margin-bottom: 4px;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
     .doc-banner-title {
-      font-size: 9pt;
+      font-size: 8.5pt;
       font-weight: bold;
       color: #2b6cb0;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
     .doc-banner-id {
-      font-size: 8pt;
+      font-size: 7.8pt;
       color: #4a5568;
       font-weight: bold;
     }
 
     /* Tabla de Identificación del Ejemplar */
     .section-title {
-      font-size: 8.5pt;
+      font-size: 8.2pt;
       font-weight: bold;
       text-transform: uppercase;
-      letter-spacing: 0.8px;
+      letter-spacing: 0.6px;
       color: #2d3748;
       border-bottom: 1px solid #cbd5e0;
-      padding-bottom: 2px;
-      margin-top: 5px;
-      margin-bottom: 3px;
-      display: flex;
-      align-items: center;
+      padding-bottom: 1px;
+      margin-top: 3px;
+      margin-bottom: 2px;
     }
     .grid-info {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 6px;
-      font-size: 8pt;
+      margin-bottom: 4px;
+      font-size: 7.8pt;
     }
     .grid-info td {
-      padding: 2.5px 4px;
+      padding: 2px 4px;
       border: 0.5px solid #e2e8f0;
       vertical-align: middle;
     }
@@ -127,37 +125,41 @@
     table.clinical-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 6px;
-      font-size: 7.8pt;
+      margin-bottom: 4px;
+      font-size: 7.6pt;
     }
     table.clinical-table th {
       background-color: #edf2f7;
       color: #2d3748;
       font-weight: bold;
       text-transform: uppercase;
-      font-size: 7.2pt;
+      font-size: 7pt;
       letter-spacing: 0.3px;
       border: 0.5px solid #cbd5e0;
-      padding: 3px 4px;
+      padding: 2.5px 3px;
       text-align: center;
     }
     table.clinical-table td {
       border: 0.5px solid #cbd5e0;
-      padding: 3px 4px;
+      padding: 2.5px 3px;
       vertical-align: middle;
     }
+    .vaccine-table td {
+      padding: 3px 4px;
+    }
     .sticker-box {
-      border: 1px dashed #a0aec0;
-      background-color: #fafaf9;
-      height: 38px;
+      border: 1.5px dashed #94a3b8;
+      background-color: #fbfbfb;
+      height: 72px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       text-align: center;
       font-size: 6.8pt;
-      color: #718096;
-      border-radius: 2px;
+      color: #64748b;
+      border-radius: 3px;
+      margin: 1px 0;
     }
     .badge-applied {
       display: inline-block;
@@ -187,11 +189,11 @@
       background-color: #f7fee7;
       border: 0.5px solid #d9f99d;
       border-left: 3px solid #65a30d;
-      padding: 4px 6px;
-      margin-bottom: 6px;
-      font-size: 7.4pt;
+      padding: 3px 5px;
+      margin-bottom: 4px;
+      font-size: 7.1pt;
       color: #365314;
-      line-height: 1.25;
+      line-height: 1.2;
     }
     .protocol-box strong {
       color: #1a2e05;
@@ -201,7 +203,7 @@
     .signatures-table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 10px;
+      margin-top: 6px;
     }
     .signatures-table td {
       width: 33.33%;
@@ -278,15 +280,15 @@
 
   <!-- 2. Programa Oficial de Vacunación -->
   <div class="section-title">2. Programa Oficial de Vacunación (Inmunización Preventiva)</div>
-  <table class="clinical-table">
+  <table class="clinical-table vaccine-table">
     <thead>
       <tr>
-        <th style="width: 8%;">Dosis</th>
-        <th style="width: 14%;">F. Aplicación</th>
-        <th style="width: 11%;">Edad</th>
-        <th style="width: 32%;">Vacuna / Antígenos</th>
-        <th style="width: 25%;">Sticker de Vacuna / Firma y Timbre Médico</th>
-        <th style="width: 10%;">Estado</th>
+        <th style="width: 7%;">Dosis</th>
+        <th style="width: 13%;">F. Aplicación</th>
+        <th style="width: 10%;">Edad</th>
+        <th style="width: 27%;">Vacuna / Antígenos</th>
+        <th style="width: 35%;">Sticker de Vacuna / Firma y Timbre Médico</th>
+        <th style="width: 8%;">Estado</th>
       </tr>
     </thead>
     <tbody>
@@ -300,8 +302,8 @@
         </td>
         <td>
           <div class="sticker-box">
-            <span>[ Espacio Adhesivo / Sticker ]</span>
-            <span>Firma Médico Veterinario</span>
+            <span style="font-size: 6.5pt; color: #64748b; font-weight: 500;">[ Pegar Sticker de Vacuna Aquí ]</span>
+            <span style="margin-top: 14px; font-size: 6pt; color: #94a3b8; border-top: 0.5px dashed #cbd5e0; width: 85%; padding-top: 2px;">Firma y Timbre Médico Veterinario</span>
           </div>
         </td>
         <td style="text-align: center;"><span class="badge-applied">Aplicada</span></td>
@@ -316,8 +318,8 @@
         </td>
         <td>
           <div class="sticker-box">
-            <span>[ Espacio Adhesivo / Sticker ]</span>
-            <span>Firma Médico Veterinario</span>
+            <span style="font-size: 6.5pt; color: #64748b; font-weight: 500;">[ Pegar Sticker de Vacuna Aquí ]</span>
+            <span style="margin-top: 14px; font-size: 6pt; color: #94a3b8; border-top: 0.5px dashed #cbd5e0; width: 85%; padding-top: 2px;">Firma y Timbre Médico Veterinario</span>
           </div>
         </td>
         <td style="text-align: center;"><span class="badge-applied">Aplicada</span></td>
@@ -332,8 +334,8 @@
         </td>
         <td>
           <div class="sticker-box">
-            <span>[ Espacio Adhesivo / Sticker ]</span>
-            <span>Firma Médico Veterinario</span>
+            <span style="font-size: 6.5pt; color: #64748b; font-weight: 500;">[ Pegar Sticker de Vacuna Aquí ]</span>
+            <span style="margin-top: 14px; font-size: 6pt; color: #94a3b8; border-top: 0.5px dashed #cbd5e0; width: 85%; padding-top: 2px;">Firma y Timbre Médico Veterinario</span>
           </div>
         </td>
         <td style="text-align: center;"><span class="badge-applied">Aplicada</span></td>
@@ -348,7 +350,8 @@
         </td>
         <td>
           <div class="sticker-box" style="border-color: #facc15; background-color: #fefce8;">
-            <span>[ Control Anual 2027 ]</span>
+            <span style="font-size: 6.5pt; color: #b45309; font-weight: 500;">[ Espacio Sticker / Control Anual 2027 ]</span>
+            <span style="margin-top: 14px; font-size: 6pt; color: #d97706; border-top: 0.5px dashed #fde047; width: 85%; padding-top: 2px;">Firma y Timbre Médico Veterinario</span>
           </div>
         </td>
         <td style="text-align: center;"><span class="badge-scheduled">Programada</span></td>
