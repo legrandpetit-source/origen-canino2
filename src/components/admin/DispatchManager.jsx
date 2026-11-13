@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Truck, Package, MapPin, Building2, CheckCircle2, CreditCard, Landmark, Trash2, CheckSquare, Square, AlertCircle, Eye, ExternalLink, X, FileText } from 'lucide-react';
+import { Truck, Package, MapPin, Building2, CheckCircle2, CreditCard, Landmark, Trash2, CheckSquare, Square, AlertCircle, Eye, ExternalLink, X, FileText, XCircle } from 'lucide-react';
 
 const DispatchManager = ({ orders, handleUpdateOrderStatus, handleDeleteOrder, handleBulkDeleteOrders }) => {
   const [filterCity, setFilterCity] = useState('ALL');
@@ -32,8 +32,35 @@ const DispatchManager = ({ orders, handleUpdateOrderStatus, handleDeleteOrder, h
   };
 
   const handleValidateTransfer = (orderId) => {
-    if (window.confirm(`¿Confirmas que recibiste la transferencia para el pedido #${orderId}? Se marcará como PAGADO.`)) {
-      handleUpdateOrderStatus(orderId, { payment_status: 'Pagado' });
+    if (window.confirm(`¿Confirmas que recibiste la transferencia para el pedido #${orderId}? Se marcará como PAGADO y pasará a PREPARACIÓN.`)) {
+      handleUpdateOrderStatus(orderId, { payment_status: 'Pagado', delivery_status: 'Preparación' });
+    }
+  };
+
+  const handleRejectTransfer = (order) => {
+    const reason = window.prompt(
+      `Indica el motivo de rechazo para la transferencia del Pedido #${order.id} (opcional):\n` +
+      `Ej: Monto no coincide, Comprobante ilegible, No figura en cartola bancaria`,
+      "Monto o datos no coinciden con cartola bancaria"
+    );
+    if (reason === null) return; // Cancelado por el admin
+
+    if (window.confirm(`¿Seguro que deseas RECHAZAR la transferencia del pedido #${order.id}?`)) {
+      handleUpdateOrderStatus(order.id, { 
+        payment_status: 'Rechazado (Transferencia)',
+        delivery_status: 'Cancelado'
+      });
+
+      // Opción de contactar al cliente por WhatsApp inmediatamente
+      if (order.customer_phone && window.confirm("¿Deseas abrir WhatsApp para notificar al cliente el motivo del rechazo?")) {
+        const cleanPhone = order.customer_phone.replace(/\+/g, '').replace(/ /g, '');
+        const msg = encodeURIComponent(
+          `Hola ${order.customer_name}, te escribimos de Origen Canino 🐶 respecto a tu pedido #${order.id}.\n\n` +
+          `No pudimos validar tu transferencia bancaria debido a: "${reason}".\n\n` +
+          `Por favor contáctanos por este medio o reenvíanos tu comprobante para coordinar el despacho. ¡Muchas gracias!`
+        );
+        window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank');
+      }
     }
   };
 
@@ -308,13 +335,24 @@ const DispatchManager = ({ orders, handleUpdateOrderStatus, handleDeleteOrder, h
                               )}
                             </div>
                             {order.payment_status !== 'Pagado' && (
-                              <button
-                                type="button"
-                                onClick={() => handleValidateTransfer(order.id)}
-                                className="bg-green-600 hover:bg-green-700 text-white font-bold text-[11px] px-2.5 py-1 rounded-md transition shadow-xs flex items-center gap-1 cursor-pointer"
-                              >
-                                <CheckCircle2 size={13} /> Validar Transferencia
-                              </button>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRejectTransfer(order)}
+                                  className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-[11px] px-2 py-1 rounded-md transition shadow-xs flex items-center gap-1 cursor-pointer"
+                                  title="Rechazar transferencia o comprobante no válido"
+                                >
+                                  <XCircle size={12} /> Rechazar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleValidateTransfer(order.id)}
+                                  className="bg-green-600 hover:bg-green-700 text-white font-bold text-[11px] px-2.5 py-1 rounded-md transition shadow-xs flex items-center gap-1 cursor-pointer"
+                                  title="Aprobar pago y pasar a preparación"
+                                >
+                                  <CheckCircle2 size={13} /> Aprobar
+                                </button>
+                              </div>
                             )}
                           </div>
                         )}
@@ -460,7 +498,7 @@ const DispatchManager = ({ orders, handleUpdateOrderStatus, handleDeleteOrder, h
             </div>
 
             {/* Footer con Acciones */}
-            <div className="p-3 border-t bg-white flex items-center justify-between gap-2">
+            <div className="p-3 border-t bg-white flex flex-wrap items-center justify-between gap-2">
               <button
                 type="button"
                 onClick={() => setViewingReceiptOrder(null)}
@@ -469,16 +507,30 @@ const DispatchManager = ({ orders, handleUpdateOrderStatus, handleDeleteOrder, h
                 Cerrar
               </button>
               {viewingReceiptOrder.payment_status !== 'Pagado' && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleValidateTransfer(viewingReceiptOrder.id);
-                    setViewingReceiptOrder(null);
-                  }}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 cursor-pointer"
-                >
-                  <CheckCircle2 size={15} /> Validar y Aprobar Transferencia
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const o = viewingReceiptOrder;
+                      setViewingReceiptOrder(null);
+                      handleRejectTransfer(o);
+                    }}
+                    className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <XCircle size={15} /> Rechazar Comprobante
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const id = viewingReceiptOrder.id;
+                      setViewingReceiptOrder(null);
+                      handleValidateTransfer(id);
+                    }}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <CheckCircle2 size={15} /> Validar y Aprobar Transferencia
+                  </button>
+                </div>
               )}
             </div>
           </div>
