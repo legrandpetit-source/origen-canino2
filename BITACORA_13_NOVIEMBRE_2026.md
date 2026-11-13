@@ -90,5 +90,47 @@ Durante el flujo de pago con Mercado Pago:
 
 ---
 
+## 5. BLINDAJE DE FLUJO DE TRANSFERENCIA BANCARIA Y GESTIÓN DE COMPROBANTES
+
+### A. Problemática Detectada
+En el checkout (`CheckoutModal.jsx`), al seleccionar **Transferencia Bancaria**, el botón *"Confirmar Pedido por Transferencia"* permanecía activo y permitía enviar la orden inmediatamente, sin obligar al usuario a indicar su banco de origen, ingresar el número de comprobante, ni adjuntar la evidencia del pago. Esto provocaba que ingresaran solicitudes sin verificación previa ni respaldo visual.
+
+### B. Implementaciones Realizadas
+
+1. **Selección Estricta de Banco Emisor:**
+   - Se reemplazó el campo de texto libre por un selector (`<select>`) con las principales entidades bancarias de Chile:
+     - Banco de Chile / Edwards, Banco Santander, BancoEstado (Cuenta RUT / Corriente), BCI, Scotiabank, Banco Itaú, Banco Falabella, Banco Security, Banco BICE, Banco Consorcio, Banco Internacional, Tenpo, Mach, Mercado Pago, Coopeuch y opción "Otro Banco" (con input dinámico emergente).
+2. **Número de Comprobante / Operación Obligatorio:**
+   - Validación estricta que exige al menos 3 caracteres alfanuméricos.
+3. **Subida Segura de Comprobantes de Pago (`POST /api/orders/upload-receipt`):**
+   - Componente de subida de archivos con drag-and-drop o selector directo.
+   - Validación de formato MIME: sólo imágenes genuinas (`image/png`, `image/jpeg`, `image/webp`), con límite de tamaño hasta 10 MB.
+   - Procesamiento y sanitización en backend con **Pillow (`PIL.Image`)**:
+     - Corrección automática de orientación mediante metadatos EXIF (`ImageOps.exif_transpose`).
+     - Conversión a RGB y redimensionado de seguridad proporcional (máx 1600x1600 px) para preservar nitidez de lectura y reducir consumo de ancho de banda.
+     - Compresión ultraliviana en formato WebP con nombrado aleatorio seguro (`receipt_{uuid}.webp`) en `/app/uploads/receipts/`.
+4. **Gating Estricto del Botón de Confirmación:**
+   - El botón *"Confirmar Pedido por Transferencia"* permanece deshabilitado (`disabled`) hasta que los 3 requisitos estén satisfechos: banco seleccionado, número de operación ingresado y comprobante adjunto.
+   - Se despliega una caja de advertencia en color ámbar explicando con precisión los datos pendientes.
+5. **Panel de Despacho y Administración (`DispatchManager.jsx`):**
+   - Incorporación del botón con icono de ojo **"Ver Comprobante"** en cada fila de pedido por transferencia.
+   - Modal de inspección de alta resolución:
+     - Resumen completo: Banco Emisor, N° Operación, Total, Estado actual.
+     - Visor de la captura del comprobante con enlace para abrir en tamaño original en pestaña nueva.
+     - Botón de acción directa **"Validar y Aprobar Transferencia"** que marca la orden como `Pagado` y avanza a `Preparación` en un clic.
+6. **Notificación en Telegram:**
+   - El mensaje automático a Telegram para transferencias incluye la URL directa del comprobante (`https://origencanino.cl/uploads/receipts/...`) para auditoría rápida en el celular de Patricio.
+7. **Migración en Base de Datos:**
+   - Ejecutado en PostgreSQL de Hetzner: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS transfer_receipt_url TEXT;`.
+
+---
+
+## 6. ACTUALIZACIÓN SOBRE PEDIDO #5 (EDUARDO PUTZ)
+- Mientras se avanzaba en este desarrollo, Eduardo Putz concretó exitosamente el pago de su Pedido #5 ($54.500 CLP por 11x BARF Cruda para Reina) mediante **Mercado Pago** (`mercadopago_payment_id: 188359042057`).
+- Los webhooks fueron recibidos y procesados correctamente, el estado cambió a `Pagado` / `Preparación` y las alertas de Telegram se emitieron sin contratiempos.
+
+---
+
 **Firmado y auditado por:**  
 Patricio Padilla Legrand Petit & Antigravity Multi-Agent System
+

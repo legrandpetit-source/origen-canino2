@@ -37,7 +37,7 @@ app = FastAPI(title="Origen Canino API")
 # Mount uploads directory
 # Asegurarnos de que el directorio de subidas exista y sincronizar assets predeterminados
 os.makedirs("uploads", exist_ok=True)
-for _sub in ["products", "testimonials", "blog", "dogs"]:
+for _sub in ["products", "testimonials", "blog", "dogs", "receipts"]:
     os.makedirs(os.path.join("uploads", _sub), exist_ok=True)
 
 # Auto-seed static assets into uploads if missing (prevents broken images on container rebuild)
@@ -290,6 +290,7 @@ class OrderCreate(BaseModel):
     payment_method: Optional[str] = "transferencia"
     transfer_bank: Optional[str] = None
     transfer_receipt_number: Optional[str] = None
+    transfer_receipt_url: Optional[str] = None
     nfc_building_code: Optional[str] = None
     discount_amount: Optional[int] = 0
     coupon_code: Optional[str] = None
@@ -2687,6 +2688,59 @@ def submit_contact(msg: ContactMessage):
 # --- Orders Endpoints ---
 MIN_PURCHASE_AMOUNT = 30000
 
+@app.post("/api/orders/upload-receipt")
+async def upload_transfer_receipt(file: UploadFile = File(...), req: Request = None):
+    try:
+        if req:
+            ip = get_client_ip(req)
+            if rate_limiter.is_rate_limited(f"upload_receipt_{ip}", max_requests=15, window_seconds=300):
+                raise HTTPException(status_code=429, detail="Has superado el límite de subida de comprobantes. Espera unos minutos.")
+
+        if not file.content_type or not file.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="El comprobante debe ser una imagen válida (PNG, JPG, WEBP).")
+
+        MAX_UPLOAD_SIZE = 10 * 1024 * 1024
+        content = await file.read(MAX_UPLOAD_SIZE + 1)
+        if not content:
+            raise HTTPException(status_code=400, detail="El archivo está vacío.")
+        if len(content) > MAX_UPLOAD_SIZE:
+            raise HTTPException(status_code=413, detail="El comprobante no debe superar los 10 MB.")
+
+        Image.MAX_IMAGE_PIXELS = 30_000_000
+        image = Image.open(io.BytesIO(content))
+
+        try:
+            image = ImageOps.exif_transpose(image)
+        except Exception:
+            pass
+
+        if image.mode in ("P", "LA"):
+            image = image.convert("RGBA")
+        elif image.mode != "RGB":
+            image = image.convert("RGB")
+
+        # Redimensionar si es muy grande manteniendo nitidez para lectura de datos bancarios (máx 1600x1600)
+        max_dim = 1600
+        image.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+
+        filename = f"receipt_{uuid.uuid4().hex}.webp"
+        upload_dir = os.path.join("uploads", "receipts")
+        os.makedirs(upload_dir, exist_ok=True)
+        filepath = os.path.join(upload_dir, filename)
+
+        image.save(filepath, "WEBP", quality=85, method=4)
+
+        return {
+            "success": True,
+            "receipt_url": f"/uploads/receipts/{filename}",
+            "filename": filename
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("Error uploading transfer receipt:", e)
+        raise HTTPException(status_code=500, detail=f"Error al procesar el comprobante: {str(e)}")
+
 @app.post("/api/orders")
 def create_order(order: OrderCreate, req: Request):
     ip = get_client_ip(req)
@@ -2721,6 +2775,14 @@ def create_order(order: OrderCreate, req: Request):
 
     initial_payment_status = "Pendiente (Mercado Pago)" if order.payment_method == "mercadopago" else "Pendiente (Transferencia)"
     initial_delivery_status = "Esperando Pago" if order.payment_method == "mercadopago" else "Esperando Comprobante"
+
+    if order.payment_method == "transferencia":
+        if not order.transfer_bank or not order.transfer_bank.strip():
+            raise HTTPException(status_code=400, detail="Debe indicar el banco emisor de la transferencia.")
+        if not order.transfer_receipt_number or not order.transfer_receipt_number.strip():
+            raise HTTPException(status_code=400, detail="Debe ingresar el número de operación o comprobante de la transferencia.")
+        if not order.transfer_receipt_url or not order.transfer_receipt_url.strip():
+            raise HTTPException(status_code=400, detail="Debe adjuntar la imagen del comprobante de transferencia bancaria.")
 
     try:
         with get_connection() as conn:
@@ -2776,17 +2838,18 @@ def create_order(order: OrderCreate, req: Request):
                     customer_name, customer_email, customer_phone, customer_address, 
                     customer_city, customer_region, subtotal, shipping_cost, total, 
                     is_subscription, dog_name, dog_weight, dog_age, payment_method, 
-                    transfer_bank, transfer_receipt_number, nfc_building_code, 
+                    transfer_bank, transfer_receipt_number, transfer_receipt_url, nfc_building_code, 
                     discount_amount, coupon_code, payment_status, delivery_status, customer_id,
                     referral_code, wallet_discount
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
                 RETURNING id
             """, (
                 order.customer_name, order.customer_email, order.customer_phone, order.customer_address, 
                 order.customer_city, order.customer_region, subtotal, shipping_cost, total, 
                 int(order.is_subscription), order.dog_name, order.dog_weight, order.dog_age,
                 order.payment_method or 'transferencia', order.transfer_bank, order.transfer_receipt_number,
+                order.transfer_receipt_url,
                 order.nfc_building_code, discount, coupon_applied, initial_payment_status, initial_delivery_status, linked_customer_id,
                 ref_applied, wallet_discount
             ))
@@ -2859,6 +2922,8 @@ def create_order(order: OrderCreate, req: Request):
                 msg += f"📞 Teléfono: {order.customer_phone}\n"
                 msg += f"📍 Dirección: {order.customer_address}, {order.customer_city}\n"
                 msg += f"🏦 Banco: {order.transfer_bank or 'Sin registrar'} | N° Operación: {order.transfer_receipt_number or 'Pendiente'}\n"
+                if order.transfer_receipt_url:
+                    msg += f"📎 Comprobante: https://origencanino.cl{order.transfer_receipt_url}\n"
 
                 if order.nfc_building_code:
                     msg += f"🏢 Tag NFC Comunidad: {order.nfc_building_code} (Descuento: -${discount:,})\n"

@@ -1,8 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, ArrowLeft, CreditCard, Landmark, Sparkles, Building2, ShieldCheck, Copy, Check, UserCheck, Dog, RefreshCw, Info, Gift, Tag, Mail, Lock, User, Phone, MapPin, Eye, EyeOff, ArrowRight, Wallet } from 'lucide-react';
+import { X, CheckCircle, ArrowLeft, CreditCard, Landmark, Sparkles, Building2, ShieldCheck, Copy, Check, UserCheck, Dog, RefreshCw, Info, Gift, Tag, Mail, Lock, User, Phone, MapPin, Eye, EyeOff, ArrowRight, Wallet, UploadCloud, Trash2 } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useCustomer } from '../../context/CustomerContext';
+
+const CHILEAN_BANKS = [
+  'Banco de Chile / Edwards',
+  'Banco Santander',
+  'BancoEstado (Cuenta RUT / Corriente)',
+  'BCI (Banco de Crédito e Inversiones)',
+  'Scotiabank Chile',
+  'Banco Itaú',
+  'Banco Falabella',
+  'Banco Security',
+  'Banco BICE',
+  'Banco Consorcio',
+  'Banco Internacional',
+  'Tenpo Prepago',
+  'Mach (BCI)',
+  'Mercado Pago',
+  'Coopeuch',
+  'Otro Banco'
+];
 
 const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
   const { 
@@ -74,6 +93,52 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
   const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [couponError, setCouponError] = useState('');
   const [couponSuccess, setCouponSuccess] = useState('');
+
+  // Estado para validación estricta de Transferencia Bancaria
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [receiptPreview, setReceiptPreview] = useState(null);
+  const [receiptError, setReceiptError] = useState('');
+  const [selectedBank, setSelectedBank] = useState('');
+  const [customBank, setCustomBank] = useState('');
+
+  const handleReceiptFileChange = (e) => {
+    const file = e.target.files?.[0];
+    setReceiptError('');
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setReceiptError('El comprobante debe ser una imagen (PNG, JPG, WEBP).');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setReceiptError('La imagen no debe superar los 10 MB.');
+      return;
+    }
+
+    setReceiptFile(file);
+    if (receiptPreview) {
+      URL.revokeObjectURL(receiptPreview);
+    }
+    setReceiptPreview(URL.createObjectURL(file));
+  };
+
+  const handleRemoveReceipt = () => {
+    if (receiptPreview) {
+      URL.revokeObjectURL(receiptPreview);
+    }
+    setReceiptFile(null);
+    setReceiptPreview(null);
+    setReceiptError('');
+  };
+
+  const effectiveBank = selectedBank === 'Otro Banco' ? customBank.trim() : selectedBank.trim();
+  const isTransferValid = 
+    paymentMethod !== 'transferencia' || (
+      effectiveBank.length > 0 &&
+      (formData.transfer_receipt_number || '').trim().length >= 3 &&
+      receiptFile !== null
+    );
 
   // Cargar datos de transferencia bancaria actualizados desde el backend
   useEffect(() => {
@@ -429,9 +494,40 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
       handleOpenRegisterStep(formData.customer_email);
       return;
     }
+
+    // Validación estricta para transferencia bancaria
+    if (paymentMethod === 'transferencia') {
+      if (!effectiveBank) {
+        alert("Por favor selecciona o ingresa tu Banco Emisor.");
+        return;
+      }
+      if (!formData.transfer_receipt_number || formData.transfer_receipt_number.trim().length < 3) {
+        alert("Por favor ingresa el N° de comprobante u operación bancaria.");
+        return;
+      }
+      if (!receiptFile) {
+        alert("Por favor adjunta la captura o imagen del comprobante de transferencia bancaria.");
+        return;
+      }
+    }
     
     setIsSubmitting(true);
     try {
+      let uploadedReceiptUrl = null;
+      if (paymentMethod === 'transferencia' && receiptFile) {
+        const uploadData = new FormData();
+        uploadData.append('file', receiptFile);
+        const upRes = await fetch('/api/orders/upload-receipt', {
+          method: 'POST',
+          body: uploadData
+        });
+        const upJson = await upRes.json();
+        if (!upRes.ok || !upJson.success) {
+          throw new Error(upJson.detail || "Error al subir el comprobante de transferencia.");
+        }
+        uploadedReceiptUrl = upJson.receipt_url;
+      }
+
       const orderData = {
         customer_name: formData.customer_name,
         customer_email: formData.customer_email,
@@ -444,8 +540,9 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
         dog_weight: formData.dog_weight ? parseFloat(formData.dog_weight) : null,
         dog_age: formData.dog_age,
         payment_method: paymentMethod,
-        transfer_bank: paymentMethod === 'transferencia' ? formData.transfer_bank : null,
-        transfer_receipt_number: paymentMethod === 'transferencia' ? formData.transfer_receipt_number : null,
+        transfer_bank: paymentMethod === 'transferencia' ? effectiveBank : null,
+        transfer_receipt_number: paymentMethod === 'transferencia' ? formData.transfer_receipt_number.trim() : null,
+        transfer_receipt_url: uploadedReceiptUrl,
         nfc_building_code: nfcCommunity ? nfcCommunity.slug : null,
         discount_amount: totalDiscount,
         coupon_code: appliedCoupon || null,
@@ -1176,28 +1273,101 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                           <div className="col-span-2"><span className="text-gray-500">Email comprobante:</span> <strong>{bankSettings.bank_email}</strong></div>
                         </div>
 
-                        <div className="pt-2 border-t grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-gray-600 font-semibold mb-1">Tu Banco Emisor (Opcional)</label>
-                            <input 
-                              type="text" 
-                              name="transfer_bank" 
-                              value={formData.transfer_bank} 
-                              onChange={handleChange} 
-                              placeholder="Ej: Banco de Chile, BCI, Santander" 
-                              className="w-full bg-white border p-2 rounded-lg text-xs outline-none" 
-                            />
+                        <div className="pt-3 border-t space-y-3">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-gray-700 font-bold mb-1">
+                                Tu Banco Emisor <span className="text-red-500">*</span>
+                              </label>
+                              <select 
+                                value={selectedBank} 
+                                onChange={(e) => setSelectedBank(e.target.value)} 
+                                className="w-full bg-white border border-gray-300 p-2 rounded-lg text-xs font-medium text-gray-800 outline-none focus:ring-2 focus:ring-secondary-orange"
+                              >
+                                <option value="">-- Selecciona tu Banco --</option>
+                                {CHILEAN_BANKS.map((b) => (
+                                  <option key={b} value={b}>{b}</option>
+                                ))}
+                              </select>
+                              {selectedBank === 'Otro Banco' && (
+                                <input
+                                  type="text"
+                                  value={customBank}
+                                  onChange={(e) => setCustomBank(e.target.value)}
+                                  placeholder="Escribe el nombre de tu banco"
+                                  className="w-full mt-2 bg-white border border-gray-300 p-2 rounded-lg text-xs outline-none focus:ring-2 focus:ring-secondary-orange"
+                                />
+                              )}
+                            </div>
+
+                            <div>
+                              <label className="block text-gray-700 font-bold mb-1">
+                                N° Comprobante / Operación <span className="text-red-500">*</span>
+                              </label>
+                              <input 
+                                type="text" 
+                                name="transfer_receipt_number" 
+                                value={formData.transfer_receipt_number} 
+                                onChange={handleChange} 
+                                placeholder="Ej: 987654321" 
+                                className="w-full bg-white border border-gray-300 p-2 rounded-lg text-xs outline-none focus:ring-2 focus:ring-secondary-orange" 
+                              />
+                            </div>
                           </div>
+
+                          {/* Adjuntar Imagen del Comprobante (Obligatorio) */}
                           <div>
-                            <label className="block text-gray-600 font-semibold mb-1">N° Comprobante / Operación</label>
-                            <input 
-                              type="text" 
-                              name="transfer_receipt_number" 
-                              value={formData.transfer_receipt_number} 
-                              onChange={handleChange} 
-                              placeholder="Ej: 987654321" 
-                              className="w-full bg-white border p-2 rounded-lg text-xs outline-none" 
-                            />
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="block text-gray-700 font-bold">
+                                Comprobante de Transferencia <span className="text-red-500">*</span>
+                              </label>
+                              <span className="text-[10px] text-gray-500">Máx 10 MB (PNG, JPG, WEBP)</span>
+                            </div>
+
+                            {!receiptPreview ? (
+                              <label className="flex flex-col items-center justify-center border-2 border-dashed border-amber-300 hover:border-secondary-orange rounded-xl p-3 bg-amber-50/60 hover:bg-amber-50 cursor-pointer transition">
+                                <UploadCloud size={24} className="text-secondary-orange mb-1" />
+                                <span className="text-xs font-bold text-gray-700">Subir imagen o captura del comprobante</span>
+                                <span className="text-[10px] text-gray-500">Haz clic aquí para seleccionar el archivo</span>
+                                <input 
+                                  type="file" 
+                                  accept="image/png, image/jpeg, image/webp" 
+                                  onChange={handleReceiptFileChange}
+                                  className="hidden" 
+                                />
+                              </label>
+                            ) : (
+                              <div className="flex items-center justify-between bg-white border border-green-300 rounded-xl p-2 shadow-xs">
+                                <div className="flex items-center gap-2.5 overflow-hidden">
+                                  <img 
+                                    src={receiptPreview} 
+                                    alt="Vista previa comprobante" 
+                                    className="w-12 h-12 object-cover rounded-lg border border-gray-200 shrink-0"
+                                  />
+                                  <div className="text-left truncate">
+                                    <p className="text-xs font-bold text-gray-800 truncate flex items-center gap-1">
+                                      <CheckCircle size={13} className="text-green-600 shrink-0" />
+                                      {receiptFile?.name || 'comprobante.webp'}
+                                    </p>
+                                    <p className="text-[10px] text-gray-500">
+                                      {receiptFile ? (receiptFile.size / 1024).toFixed(0) : 0} KB • Listo para enviar
+                                    </p>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={handleRemoveReceipt}
+                                  className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition cursor-pointer"
+                                  title="Quitar comprobante"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            )}
+
+                            {receiptError && (
+                              <p className="text-[11px] text-red-600 mt-1 font-semibold">{receiptError}</p>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1365,11 +1535,21 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
                     </div>
                   </div>
 
+                  {/* Aviso si faltan datos de transferencia */}
+                  {paymentMethod === 'transferencia' && !isTransferValid && (
+                    <div className="text-[11px] bg-amber-50 border border-amber-200 text-amber-900 p-2.5 rounded-xl flex items-center gap-2">
+                      <Info size={16} className="shrink-0 text-amber-600" />
+                      <span>
+                        Para confirmar tu pedido, debes <strong>seleccionar tu banco</strong>, ingresar el <strong>N° de operación</strong> y adjuntar la <strong>captura del comprobante</strong>.
+                      </span>
+                    </div>
+                  )}
+
                   {/* Botón de Envío Dinámico según Método */}
                   <button 
                     type="submit" 
-                    disabled={isSubmitting}
-                    className="w-full bg-secondary-orange text-white font-bold py-3.5 rounded-xl hover:bg-[#d65d21] transition shadow-lg flex justify-center items-center gap-2 disabled:opacity-50 text-base cursor-pointer"
+                    disabled={isSubmitting || (paymentMethod === 'transferencia' && !isTransferValid)}
+                    className="w-full bg-secondary-orange text-white font-bold py-3.5 rounded-xl hover:bg-[#d65d21] transition shadow-lg flex justify-center items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed text-base cursor-pointer"
                   >
                     {isSubmitting ? (
                       'Procesando pedido...'

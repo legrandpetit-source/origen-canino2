@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Truck, Package, MapPin, Building2, CheckCircle2, CreditCard, Landmark, Trash2, CheckSquare, Square, AlertCircle } from 'lucide-react';
+import { Truck, Package, MapPin, Building2, CheckCircle2, CreditCard, Landmark, Trash2, CheckSquare, Square, AlertCircle, Eye, ExternalLink, X, FileText } from 'lucide-react';
 
 const DispatchManager = ({ orders, handleUpdateOrderStatus, handleDeleteOrder, handleBulkDeleteOrders }) => {
   const [filterCity, setFilterCity] = useState('ALL');
   const [filterBuilding, setFilterBuilding] = useState('ALL');
   const [selectedOrderIds, setSelectedOrderIds] = useState([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [viewingReceiptOrder, setViewingReceiptOrder] = useState(null);
 
   // Group orders by city
   const groupedOrders = orders.reduce((acc, order) => {
@@ -291,10 +292,20 @@ const DispatchManager = ({ orders, handleUpdateOrderStatus, handleDeleteOrder, h
                         {/* Si es transferencia, mostrar banco y comprobante con opción de validar */}
                         {order.payment_method === 'transferencia' && (
                           <div className="text-xs bg-amber-50/70 border border-amber-200/60 p-2 rounded-lg text-amber-900 flex flex-wrap items-center justify-between gap-2 mt-1">
-                            <div>
+                            <div className="flex flex-wrap items-center gap-2">
                               <span>Banco Emisor: <strong>{order.transfer_bank || 'No especificado'}</strong></span>
-                              <span className="mx-2">•</span>
+                              <span>•</span>
                               <span>N° Comprobante: <strong>{order.transfer_receipt_number || 'Sin N°'}</strong></span>
+                              {order.transfer_receipt_url && (
+                                <button
+                                  type="button"
+                                  onClick={() => setViewingReceiptOrder(order)}
+                                  className="ml-1 inline-flex items-center gap-1 bg-amber-200/80 hover:bg-amber-300 text-amber-900 font-bold px-2 py-0.5 rounded text-[11px] transition cursor-pointer"
+                                  title="Ver captura del comprobante"
+                                >
+                                  <Eye size={12} /> Ver Comprobante
+                                </button>
+                              )}
                             </div>
                             {order.payment_status !== 'Pagado' && (
                               <button
@@ -372,6 +383,105 @@ const DispatchManager = ({ orders, handleUpdateOrderStatus, handleDeleteOrder, h
       {orders.length === 0 && (
         <div className="text-center p-8 bg-gray-50 rounded-xl border border-gray-200">
           <p className="text-gray-500 text-lg">No hay pedidos registrados.</p>
+        </div>
+      )}
+
+      {/* Modal de Inspección y Validación de Comprobante */}
+      {viewingReceiptOrder && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-gray-200">
+            {/* Header del Modal */}
+            <div className="p-4 border-b flex items-center justify-between bg-stone-50">
+              <div className="flex items-center gap-2">
+                <FileText className="text-secondary-brown" size={20} />
+                <div>
+                  <h3 className="font-bold text-gray-900 text-sm">
+                    Comprobante de Transferencia • Pedido #{viewingReceiptOrder.id}
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    {viewingReceiptOrder.customer_name} ({viewingReceiptOrder.customer_phone})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingReceiptOrder(null)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-200 transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Datos Resumen del Pedido */}
+            <div className="p-3 bg-amber-50/60 border-b border-amber-200/60 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-gray-700">
+              <div>
+                <span className="text-gray-500 block text-[10px] uppercase font-bold">Banco Emisor</span>
+                <span className="font-bold text-gray-900">{viewingReceiptOrder.transfer_bank || 'No indicado'}</span>
+              </div>
+              <div>
+                <span className="text-gray-500 block text-[10px] uppercase font-bold">N° Operación</span>
+                <span className="font-bold text-gray-900">{viewingReceiptOrder.transfer_receipt_number || 'Sin N°'}</span>
+              </div>
+              <div>
+                <span className="text-gray-500 block text-[10px] uppercase font-bold">Total</span>
+                <span className="font-bold text-primary-green-dark">${viewingReceiptOrder.total?.toLocaleString('es-CL')}</span>
+              </div>
+              <div>
+                <span className="text-gray-500 block text-[10px] uppercase font-bold">Estado Pago</span>
+                <span className={`font-bold ${viewingReceiptOrder.payment_status === 'Pagado' ? 'text-green-700' : 'text-amber-700'}`}>
+                  {viewingReceiptOrder.payment_status}
+                </span>
+              </div>
+            </div>
+
+            {/* Visor de Imagen */}
+            <div className="p-4 overflow-y-auto flex-1 flex flex-col items-center justify-center bg-stone-100 min-h-[250px]">
+              {viewingReceiptOrder.transfer_receipt_url ? (
+                <div className="space-y-2 text-center w-full">
+                  <img
+                    src={viewingReceiptOrder.transfer_receipt_url}
+                    alt="Comprobante"
+                    className="max-h-[55vh] max-w-full mx-auto object-contain rounded-xl border border-gray-300 shadow-sm bg-white"
+                  />
+                  <div>
+                    <a
+                      href={viewingReceiptOrder.transfer_receipt_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-primary-green font-bold hover:underline mt-1"
+                    >
+                      <ExternalLink size={13} /> Abrir comprobante en tamaño original
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">Este pedido no tiene comprobante adjunto registrado.</p>
+              )}
+            </div>
+
+            {/* Footer con Acciones */}
+            <div className="p-3 border-t bg-white flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setViewingReceiptOrder(null)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-xl text-xs font-semibold cursor-pointer"
+              >
+                Cerrar
+              </button>
+              {viewingReceiptOrder.payment_status !== 'Pagado' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleValidateTransfer(viewingReceiptOrder.id);
+                    setViewingReceiptOrder(null);
+                  }}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+                >
+                  <CheckCircle2 size={15} /> Validar y Aprobar Transferencia
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

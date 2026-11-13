@@ -204,6 +204,7 @@ def init_database():
                 ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'transferencia';
                 ALTER TABLE orders ADD COLUMN IF NOT EXISTS transfer_bank TEXT;
                 ALTER TABLE orders ADD COLUMN IF NOT EXISTS transfer_receipt_number TEXT;
+                ALTER TABLE orders ADD COLUMN IF NOT EXISTS transfer_receipt_url TEXT;
                 ALTER TABLE orders ADD COLUMN IF NOT EXISTS mercadopago_preference_id TEXT;
                 ALTER TABLE orders ADD COLUMN IF NOT EXISTS mercadopago_payment_id TEXT;
                 ALTER TABLE orders ADD COLUMN IF NOT EXISTS nfc_building_code TEXT;
