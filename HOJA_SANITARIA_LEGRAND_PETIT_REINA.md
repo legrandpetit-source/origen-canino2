@@ -15,13 +15,13 @@
 | Parámetro | Detalle Oficial |
 | :--- | :--- |
 | **Nombre Oficial:** | **Legrand Petit Reina Elegida** (*"Reina"*) |
-| **Especie y Raza:** | Canino • **Pug (Carlino)** |
+| **Especie y Raza:** | Canino • **Bulldog Francés** |
 | **Sexo:** | **Hembra** |
 | **Fecha de Nacimiento:** | **24 de Abril de 2026** |
 | **N° de Microchip Oficial:** | **`991003003617500`** |
 | **Acreditación de Origen:** | Declaración de Origen KCC (Con Papeles) |
-| **Padre (Sire):** | **Von Karykar Kingo** |
-| **Madre (Dam):** | **Legrand Petit Izumi** |
+| **Padre (Sire):** | **Von CarYCar Kingo** |
+| **Madre (Dam):** | **Legrand Pett Izumi** |
 | **Criador Responsable:** | **Patricio Padilla** (Legrand Petit • Algarrobo) |
 | **Tutor Receptor:** | **Eduardo Ignacio Pultz de la Fuente** (R.U.T. 16.661.916-5) |
 
@@ -57,7 +57,7 @@
 
 | Control | Fecha Programada | Edad Estimada | Producto | Vía y Pauta | Estado |
 | :---: | :---: | :---: | :--- | :--- | :---: |
-| **5ª Dosis** | **23 / Septiembre / 2026** | 5 Meses | **Drontal Plus Perros** | 1 comp. según rango de peso | *PROGRAMADA* |
+| **5ª Dosis** | **23 / Septiembre / 2026** | 5 Meses | **Drontal Plus Perros** | 1 comp. según rango de peso | **AL DÍA** |
 | **6ª Dosis** | **23 / Diciembre / 2026** | 8 Meses | **Drontal Plus Perros** | 1 comp. según rango de peso | *PROGRAMADA* |
 | **7ª Dosis** | **23 / Marzo / 2027** | 11 Meses | **Drontal Plus Perros** | 1 comp. según rango de peso | *PROGRAMADA* |
 | **8ª Dosis** | **23 / Junio / 2027** | 14 Meses | **Drontal Plus Perros** | 1 comp. según rango de peso | *PROGRAMADA* |
@@ -67,7 +67,7 @@
 ## 4. DIRECTRICES TÉCNICAS Y RECOMENDACIONES CLÍNICAS OFICIALES
 
 1. **Nutrición Biológicamente Apropiada (100% Natural):**  
-   Reina se encuentra adaptada a alimentación natural biológicamente apropiada (dieta BARF / cocinada natural) formulada por **Origen Canino** ([https://origencanino.cl](https://origencanino.cl)). Con el fin de preservar su microbiota intestinal, densidad ósea, masa muscular y sistema inmunológico, **se proscribe estrictamente el suministro de alimentos ultraprocesados** (croquetas comerciales o pellets industriales cargados de almidón y carbohidratos refinados).
+   Reina ha recibido desde su destete alimentación biológicamente adecuada (dieta BARF / cocinada natural) formulada por **Origen Canino** ([https://origencanino.cl](https://origencanino.cl)). Con el fin de preservar su microbiota intestinal, salud ósea, masa muscular, vitalidad del pelaje y óptimo sistema inmunológico, **se sugiere enfáticamente evitar el suministro de alimentos ultraprocesados** (croquetas comerciales o pellets industriales cargados de almidón, harinas y carbohidratos refinados).
 
 2. **Criterio Médico sobre Esterilización / Castración Temprana:**  
    Patricio Padilla y Legrand Petit fundamentan técnicamente que **no se recomienda la esterilización temprana** para Reina. Dicha directriz se basa en evidencia clínica y veterinaria actualizada para proteger los estrógenos y hormonas gonadales durante su etapa de desarrollo activo, fundamentales para el correcto cierre de las placas epifisarias de crecimiento, desarrollo articular armónico, prevención de roturas de ligamento cruzado craneal o displasias, y óptimo equilibrio endocrino. Cualquier intervención quirúrgica futura deberá postergarse hasta su madurez física completa y evaluarse prudencialmente.
@@ -82,8 +82,8 @@
 <br><br>
 
 ________________________________________ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ________________________________________  
-**PATRICIO PADILLA** &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; **MÉDICO VETERINARIO**  
-R.U.T. 14.554.502-1 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Firma, Timbre y N° Colegiatura  
+**PATRICIO PADILLA** &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; **DR. JORGE CASTRO**  
+R.U.T. 14.554.502-1 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Médico Veterinario  
 **Criador Legrand Petit** &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; **Responsable Sanitario**
 
 <br>
@@ -92,3 +92,4 @@ ________________________________________
 **EDUARDO IGNACIO PULTZ DE LA FUENTE**  
 R.U.T. 16.661.916-5  
 **Tutor Receptor de Reina**
+
