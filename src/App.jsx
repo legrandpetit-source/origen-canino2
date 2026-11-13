@@ -10,6 +10,7 @@ import CartDrawer from './components/shop/CartDrawer';
 import AdminPanel from './components/admin/AdminPanel';
 import CustomerPortal from './components/customer/CustomerPortal';
 import CustomerAuthModal from './components/customer/CustomerAuthModal';
+import PaymentStatusModal from './components/shop/PaymentStatusModal';
 import TopBanner from './components/shop/TopBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -28,6 +29,7 @@ function App() {
                     <Navbar />
                     <CartDrawer />
                     <CustomerAuthModal />
+                    <PaymentStatusModal />
                     <main className="flex-grow">
                       <Outlet />
                     </main>

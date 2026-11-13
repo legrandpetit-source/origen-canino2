@@ -33,7 +33,10 @@ import {
   Wallet,
   ExternalLink,
   Download,
-  ArrowUpRight
+  ArrowUpRight,
+  CreditCard,
+  Landmark,
+  X
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useCustomer } from '../../context/CustomerContext';
@@ -77,6 +80,26 @@ const CustomerPortal = () => {
     photo_url: ''
   });
   const [savingDog, setSavingDog] = useState(false);
+
+  // Pay pending order modal state
+  const [payModalOrder, setPayModalOrder] = useState(null);
+  const [bankSettings, setBankSettings] = useState(null);
+  const [showBankDetails, setShowBankDetails] = useState(false);
+  const [copiedBank, setCopiedBank] = useState(false);
+  const [isRetryingMP, setIsRetryingMP] = useState(false);
+
+  // Helper de parseo seguro de fechas para evitar "Invalid Date"
+  const formatOrderDate = (dateVal) => {
+    if (!dateVal) return 'Reciente';
+    if (typeof dateVal === 'string' && dateVal.includes('/')) {
+      return dateVal.split(' ')[0];
+    }
+    const d = new Date(dateVal);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+    return String(dateVal).split('T')[0];
+  };
 
   // Feedback notification
   const [feedback, setFeedback] = useState(null);
@@ -200,6 +223,53 @@ const CustomerPortal = () => {
 
     notify('success', `¡Productos del Pedido #${order.id} añadidos al carrito!`);
     setIsCartOpen(true);
+  };
+
+  // Handle Open Pay Pending Order Modal
+  const handleOpenPayModal = (order) => {
+    setPayModalOrder(order);
+    setShowBankDetails(false);
+    if (!bankSettings) {
+      fetch('/api/settings/bank-transfer')
+        .then(res => res.json())
+        .then(data => setBankSettings(data))
+        .catch(err => console.error("Error fetching bank info:", err));
+    }
+  };
+
+  const handleExecuteMP = async (orderId) => {
+    setIsRetryingMP(true);
+    notify('info', 'Conectando con Mercado Pago para completar tu pago...');
+    try {
+      const res = await fetch('/api/payments/mercadopago/create-preference', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: orderId })
+      });
+      const data = await res.json();
+      if (res.ok && data.init_point) {
+        window.location.href = data.init_point;
+      } else {
+        notify('error', data.detail || 'No fue posible abrir Mercado Pago. Puedes pagar por transferencia bancaria.');
+        setShowBankDetails(true);
+      }
+    } catch (err) {
+      console.error("Error connecting with MP:", err);
+      notify('error', 'Error conectando con Mercado Pago.');
+      setShowBankDetails(true);
+    } finally {
+      setIsRetryingMP(false);
+    }
+  };
+
+  const handleCopyBankInfo = () => {
+    if (!bankSettings) return;
+    const text = `DATOS DE TRANSFERENCIA - ORIGEN CANINO\nBanco: ${bankSettings.bank_name || 'Mercado Pago'}\nTipo: ${bankSettings.bank_account_type || 'Cuenta Vista'}\nN° Cuenta: ${bankSettings.bank_account_number || ''}\nRUT: ${bankSettings.bank_rut || ''}\nTitular: ${bankSettings.bank_owner || 'ELABORACIÓN DE ALIMENTOS PREPARADOS PARA ANIMALES PATRICIO PADILLA E.I.R.L.'}\nEmail: ${bankSettings.bank_email || 'pagos@origencanino.cl'}\nAsunto: Pedido #${payModalOrder?.id || ''}`;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedBank(true);
+      setTimeout(() => setCopiedBank(false), 2500);
+      notify('success', '¡Datos bancarios copiados al portapapeles!');
+    });
   };
 
   // Handle Save Profile
@@ -774,12 +844,19 @@ const CustomerPortal = () => {
                     <div className="text-xs text-stone-500 flex flex-wrap items-center gap-3">
                       <span className="flex items-center gap-1">
                         <Calendar size={13} className="text-primary-green" />
-                        {new Date(o.created_at).toLocaleDateString('es-CL', {
-                          day: '2-digit', month: 'short', year: 'numeric'
-                        })}
+                        {formatOrderDate(o.created_at)}
                       </span>
                       <span>•</span>
-                      <span>Estado: <strong className="text-secondary-brown">{o.delivery_status || 'Preparación'}</strong></span>
+                      <span>
+                        Estado de Entrega:{' '}
+                        {o.payment_status?.toLowerCase().includes('pagado') ? (
+                          <strong className="text-secondary-brown">{o.delivery_status || 'Preparación'}</strong>
+                        ) : (
+                          <strong className="text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                            {o.delivery_status === 'Esperando Pago' ? 'Esperando Pago' : (o.delivery_status || 'Pendiente de Pago')}
+                          </strong>
+                        )}
+                      </span>
                       {o.dog_name && <span>• Perro: <strong>{o.dog_name}</strong></span>}
                     </div>
 
@@ -797,18 +874,34 @@ const CustomerPortal = () => {
                     )}
                   </div>
 
-                  <div className="flex flex-col items-start md:items-end gap-3 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0">
+                  <div className="flex flex-col items-start md:items-end gap-2.5 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0">
                     <p className="font-sans text-2xl font-extrabold text-secondary-brown">
                       ${o.total?.toLocaleString('es-CL')}
                     </p>
                     
-                    <button
-                      onClick={() => handleRepeatOrder(o)}
-                      className="w-full md:w-auto bg-primary-green text-white font-bold px-5 py-2.5 rounded-2xl hover:bg-primary-green-dark transition shadow-xs flex items-center justify-center gap-2 text-xs md:text-sm cursor-pointer"
-                    >
-                      <RotateCcw size={15} />
-                      Repetir este Pedido
-                    </button>
+                    <div className="flex flex-col sm:flex-row md:flex-col gap-2 w-full md:w-auto">
+                      {!o.payment_status?.toLowerCase().includes('pagado') && (
+                        <button
+                          onClick={() => handleOpenPayModal(o)}
+                          className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold px-5 py-2.5 rounded-2xl transition shadow-xs flex items-center justify-center gap-2 text-xs md:text-sm cursor-pointer"
+                        >
+                          <CreditCard size={15} />
+                          Completar Pago Ahora
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => handleRepeatOrder(o)}
+                        className={`w-full font-bold px-5 py-2.5 rounded-2xl transition shadow-xs flex items-center justify-center gap-2 text-xs md:text-sm cursor-pointer ${
+                          !o.payment_status?.toLowerCase().includes('pagado')
+                            ? 'bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-300'
+                            : 'bg-primary-green text-white hover:bg-primary-green-dark'
+                        }`}
+                      >
+                        <RotateCcw size={15} />
+                        Repetir este Pedido
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))
@@ -1122,6 +1215,89 @@ const CustomerPortal = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Pago de Pedido Pendiente */}
+        {payModalOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 md:p-8 shadow-2xl border border-stone-200 relative text-secondary-brown space-y-5">
+              <button
+                onClick={() => setPayModalOrder(null)}
+                className="absolute top-5 right-5 text-stone-400 hover:text-stone-700 p-2 rounded-full hover:bg-stone-100 transition cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="text-center space-y-1">
+                <span className="text-[11px] font-bold tracking-wider uppercase text-amber-700 bg-amber-100 px-3 py-1 rounded-full inline-block">
+                  Pago Pendiente
+                </span>
+                <h3 className="font-header text-2xl font-bold">
+                  Pedido #{payModalOrder.id}
+                </h3>
+                <p className="text-2xl font-extrabold text-primary-green pt-1">
+                  ${payModalOrder.total?.toLocaleString('es-CL')}
+                </p>
+                <p className="text-stone-500 text-xs">
+                  Selecciona tu forma de pago preferida para comenzar la preparación.
+                </p>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <button
+                  onClick={() => handleExecuteMP(payModalOrder.id)}
+                  disabled={isRetryingMP}
+                  className="w-full bg-primary-green hover:bg-primary-green-dark text-white font-bold py-3 px-4 rounded-2xl shadow-sm transition flex items-center justify-center gap-2 cursor-pointer text-xs md:text-sm"
+                >
+                  <CreditCard size={18} />
+                  {isRetryingMP ? 'Conectando...' : 'Pagar con Mercado Pago (Tarjetas)'}
+                </button>
+
+                <button
+                  onClick={() => setShowBankDetails(!showBankDetails)}
+                  className="w-full bg-stone-100 hover:bg-stone-200 text-secondary-brown font-bold py-3 px-4 rounded-2xl transition flex items-center justify-center gap-2 cursor-pointer text-xs md:text-sm border border-stone-300/70"
+                >
+                  <Landmark size={18} className="text-amber-700" />
+                  {showBankDetails ? 'Ocultar Datos Bancarios' : 'Pagar vía Transferencia Bancaria'}
+                </button>
+
+                {showBankDetails && bankSettings && (
+                  <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 text-xs space-y-2 text-stone-700">
+                    <p className="font-bold text-amber-900 border-b border-amber-200 pb-1 flex justify-between">
+                      <span>Datos para Transferir:</span>
+                      <span className="font-mono text-[10px]">#{payModalOrder.id}</span>
+                    </p>
+                    <div className="space-y-1 font-mono text-[11px]">
+                      <p><strong>Banco:</strong> {bankSettings.bank_name || 'Mercado Pago'}</p>
+                      <p><strong>Tipo:</strong> {bankSettings.bank_account_type || 'Cuenta Vista'}</p>
+                      <p><strong>N° Cuenta:</strong> {bankSettings.bank_account_number}</p>
+                      <p><strong>RUT:</strong> {bankSettings.bank_rut}</p>
+                      <p><strong>Titular:</strong> {bankSettings.bank_owner}</p>
+                      <p><strong>Email:</strong> {bankSettings.bank_email}</p>
+                    </div>
+                    <div className="pt-2 flex gap-2">
+                      <button
+                        onClick={handleCopyBankInfo}
+                        className="flex-1 bg-white hover:bg-stone-50 border border-stone-300 text-secondary-brown font-bold py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5 text-xs shadow-2xs cursor-pointer"
+                      >
+                        {copiedBank ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                        {copiedBank ? '¡Copiado!' : 'Copiar Datos'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          const text = encodeURIComponent(`Hola Patricio, adjunto comprobante de transferencia para el Pedido #${payModalOrder.id} por $${payModalOrder.total?.toLocaleString('es-CL')} 🐶`);
+                          window.open(`https://wa.me/56991404679?text=${text}`, '_blank');
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-xl transition text-xs shadow-2xs cursor-pointer"
+                      >
+                        WhatsApp
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}

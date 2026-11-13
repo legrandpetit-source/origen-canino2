@@ -1378,7 +1378,7 @@ def get_customer_orders(customer_id: int = Depends(get_current_customer)):
         
         for o in orders:
             if isinstance(o.get("created_at"), datetime):
-                o["created_at"] = o["created_at"].strftime("%d/%m/%Y %H:%M")
+                o["created_at"] = o["created_at"].isoformat()
             cursor.execute("""
                 SELECT oi.product_id, oi.product_name, oi.quantity, oi.price_at_purchase as price, p.weight 
                 FROM order_items oi 
@@ -2720,6 +2720,7 @@ def create_order(order: OrderCreate, req: Request):
     total = subtotal_after_discount + shipping_cost
 
     initial_payment_status = "Pendiente (Mercado Pago)" if order.payment_method == "mercadopago" else "Pendiente (Transferencia)"
+    initial_delivery_status = "Esperando Pago" if order.payment_method == "mercadopago" else "Esperando Comprobante"
 
     try:
         with get_connection() as conn:
@@ -2776,17 +2777,17 @@ def create_order(order: OrderCreate, req: Request):
                     customer_city, customer_region, subtotal, shipping_cost, total, 
                     is_subscription, dog_name, dog_weight, dog_age, payment_method, 
                     transfer_bank, transfer_receipt_number, nfc_building_code, 
-                    discount_amount, coupon_code, payment_status, customer_id,
+                    discount_amount, coupon_code, payment_status, delivery_status, customer_id,
                     referral_code, wallet_discount
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
                 RETURNING id
             """, (
                 order.customer_name, order.customer_email, order.customer_phone, order.customer_address, 
                 order.customer_city, order.customer_region, subtotal, shipping_cost, total, 
                 int(order.is_subscription), order.dog_name, order.dog_weight, order.dog_age,
                 order.payment_method or 'transferencia', order.transfer_bank, order.transfer_receipt_number,
-                order.nfc_building_code, discount, coupon_applied, initial_payment_status, linked_customer_id,
+                order.nfc_building_code, discount, coupon_applied, initial_payment_status, initial_delivery_status, linked_customer_id,
                 ref_applied, wallet_discount
             ))
             
@@ -2841,12 +2842,12 @@ def create_order(order: OrderCreate, req: Request):
             # Manejo de estados y alertas de Telegram según método de pago:
             # 1. MERCADO PAGO: No notificar como venta hasta que el webhook confirme el pago real aprobado
             if order.payment_method == 'mercadopago':
-                cursor.execute("UPDATE orders SET payment_status = 'Iniciado (Esperando Pago)' WHERE id = %s", (order_id,))
+                cursor.execute("UPDATE orders SET payment_status = 'Iniciado (Esperando Pago)', delivery_status = 'Esperando Pago' WHERE id = %s", (order_id,))
                 conn.commit()
-                # NOTA: NO enviamos notificación a Telegram aquí. Se enviará únicamente cuando Mercado Pago confirme el pago aprobado.
+                # NOTA: NO enviamos notificación a Telegram aquí. Se enviará únicamente cuando Mercado Pago confirme el pago aprobado o notifique fallo.
             else:
                 # 2. TRANSFERENCIA BANCARIA: Notificar como solicitud pendiente de validar comprobante
-                cursor.execute("UPDATE orders SET payment_status = 'Pendiente de Transferencia' WHERE id = %s", (order_id,))
+                cursor.execute("UPDATE orders SET payment_status = 'Pendiente de Transferencia', delivery_status = 'Esperando Comprobante' WHERE id = %s", (order_id,))
                 conn.commit()
 
                 msg = f"📋 ¡Nueva Solicitud de Pedido por Transferencia! (#{order_id})\n\n"
@@ -2964,6 +2965,50 @@ def create_mp_preference(payload: dict):
         print("[MercadoPago Error]:", e)
         raise HTTPException(status_code=502, detail=f"Error comunicando con Mercado Pago: {str(e)}")
 
+@app.post("/api/payments/mercadopago/notify-failure")
+def notify_mp_payment_failure(payload: dict):
+    order_id = payload.get("order_id")
+    if not order_id:
+        return {"success": False, "message": "order_id requerido"}
+    
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM orders WHERE id = %s", (order_id,))
+            order = cursor.fetchone()
+            if not order:
+                return {"success": False, "message": "Orden no encontrada"}
+            
+            # Solo actualizar y notificar si no fue pagado previamente
+            current_status = (order.get("payment_status") or "").lower()
+            if "pagado" not in current_status:
+                cursor.execute("""
+                    UPDATE orders 
+                    SET delivery_status = 'Esperando Pago'
+                    WHERE id = %s
+                """, (order_id,))
+                conn.commit()
+                
+                # Notificación proactiva a Telegram para asistencia comercial inmediata
+                msg = f"⚠️ *ALERTA: INTENTO DE PAGO NO COMPLETADO (Mercado Pago)*\n\n"
+                msg += f"📦 *Pedido #{order_id}* — Monto: *${int(order.get('total', 0)):,} CLP*\n"
+                msg += f"👤 Cliente: {order.get('customer_name')}\n"
+                msg += f"📞 Teléfono: {order.get('customer_phone')}\n"
+                msg += f"📍 Comuna: {order.get('customer_city')}\n"
+                if order.get('dog_name'):
+                    msg += f"🐶 Perro: {order.get('dog_name')}\n"
+                msg += f"✉️ Email: {order.get('customer_email')}\n\n"
+                msg += "El cliente regresó de Mercado Pago sin concretar el pago (error en tarjeta, cancelación o cierre). Su orden quedó guardada como *'Esperando Pago'*.\n\n"
+                clean_phone = re.sub(r'[^0-9]', '', str(order.get('customer_phone') or ''))
+                if clean_phone:
+                    msg += f"👉 *Escríbele por WhatsApp:* https://wa.me/{clean_phone}"
+                notify_telegram(msg)
+                
+        return {"success": True, "message": "Fallo registrado y alerta enviada a Telegram"}
+    except Exception as e:
+        print("[Notify Failure Error]:", e)
+        return {"success": False, "error": str(e)}
+
 @app.post("/api/webhooks/mercadopago")
 async def mercadopago_webhook(request: Request):
     try:
@@ -3002,7 +3047,7 @@ async def mercadopago_webhook(request: Request):
                         cursor = conn.cursor()
                         cursor.execute("""
                             UPDATE orders 
-                            SET payment_status = 'Pagado', mercadopago_payment_id = %s
+                            SET payment_status = 'Pagado', delivery_status = 'Preparación', mercadopago_payment_id = %s
                             WHERE id = %s
                         """, (str(data_id), order_id))
                         check_and_award_referral(cursor, order_id)
@@ -3043,6 +3088,33 @@ async def mercadopago_webhook(request: Request):
                         msg += f"💰 Monto: ${int(paid_amount):,}\nID Pago MP: {data_id}"
 
                     notify_telegram(msg)
+                elif status in ["rejected", "cancelled"] and ext_ref:
+                    try:
+                        order_id = int(ext_ref)
+                        with get_connection() as conn:
+                            cursor = conn.cursor()
+                            cursor.execute("""
+                                UPDATE orders 
+                                SET payment_status = 'Pago Rechazado (Mercado Pago)', delivery_status = 'Esperando Pago'
+                                WHERE id = %s AND payment_status != 'Pagado'
+                            """, (order_id,))
+                            cursor.execute("SELECT * FROM orders WHERE id = %s", (order_id,))
+                            full_order = cursor.fetchone()
+                            conn.commit()
+
+                        msg = f"❌ *PAGO RECHAZADO EN MERCADO PAGO* (#{order_id})\n\n"
+                        if full_order:
+                            msg += f"👤 Cliente: {full_order.get('customer_name')}\n"
+                            msg += f"📞 Teléfono: {full_order.get('customer_phone')}\n"
+                            msg += f"💰 Monto: ${int(full_order.get('total', 0)):,} CLP\n"
+                            if full_order.get('dog_name'):
+                                msg += f"🐶 Perro: {full_order.get('dog_name')}\n"
+                        msg += f"🆔 Transacción MP: {data_id}\n"
+                        msg += f"Detalle: {p_data.get('status_detail', 'Rechazado por el emisor o tarjeta')}\n\n"
+                        msg += "El pedido quedó como 'Esperando Pago'. Contáctalo para ofrecerle pago por transferencia."
+                        notify_telegram(msg)
+                    except Exception as _e_rej:
+                        print("[MP Rejection handling error]:", _e_rej)
             except Exception as e:
                 print("[MP Webhook Error]:", e)
                 
@@ -3681,6 +3753,8 @@ def update_order(order_id: int, update_data: OrderStatusUpdate, current_user: st
             if update_data.payment_status is not None:
                 updates.append("payment_status = %s")
                 params.append(update_data.payment_status)
+                if update_data.payment_status == 'Pagado' and update_data.delivery_status is None:
+                    updates.append("delivery_status = 'Preparación'")
             if update_data.delivery_status is not None:
                 updates.append("delivery_status = %s")
                 params.append(update_data.delivery_status)
