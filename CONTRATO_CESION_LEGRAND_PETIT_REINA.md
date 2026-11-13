@@ -54,6 +54,14 @@ Para que Reina esté siempre protegida y alcance su máximo potencial de desarro
 
 ---
 
+### QUINTA: DESTINO, PROTECCIÓN Y COLABORACIÓN EN CASO DE CAMBIOS DE VIDA
+La vida da muchas vueltas, pero la seguridad y estabilidad de Reina siempre debe estar resguardada:
+1. **Prohibición de Venta o Regalo Desconocido:** Reina no podrá ser vendida, cedida ni entregada a terceras personas de forma arbitraria o sin consentimiento.
+2. **Aprobación Previa de Nueva Familia:** Si en algún momento futuro se evaluara la opción de donarla o entregarla a otra persona de confianza, dicha decisión **deberá contar previamente con el visto bueno y aprobación de Patricio Padilla**, y esa nueva persona deberá suscribir este mismo acuerdo de cuidado y respeto.
+3. **Búsqueda Conjunta de Hogar y Custodia Responsable:** Si por motivos de fuerza mayor (salud, viaje o situación económica imprevista) Eduardo se viera en la imposibilidad justificada de seguir cuidando a Reina, **Eduardo y Patricio se comprometen a buscar de común acuerdo un excelente nuevo hogar para ella**. Mientras ese nuevo hogar definitivo se concreta, **Eduardo se mantendrá a cargo de su custodia, cuidado y gastos**, asegurando que la perrita no sufra transiciones abruptas ni estrés.
+
+---
+
 ### SEXTA: COMUNICACIÓN DE AMIGOS Y REGISTRO (LEY 21.020)
 1. **Registro Oficial:** El microchip N° **991003003617500** quedará debidamente registrado conforme a la Ley N° 21.020 de Tenencia Responsable bajo la titularidad de Eduardo.
 2. **Vínculo Cercano:** Como a Patricio le importa sinceramente el crecimiento de Reina, mantendrán una comunicación cercana y periódica para compartir fotos, videos y saber cómo va creciendo este nuevo miembro de la familia.

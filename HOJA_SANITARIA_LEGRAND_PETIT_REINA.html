@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Hoja Sanitaria Oficial - Legrand Petit Reina Elegida</title>
+  <style>
+    @page {
+      size: letter portrait;
+      margin: 0.8cm 1.1cm;
+      @bottom-center {
+        content: "Página 1 de 1 • Registro Sanitario Legrand Petit • Ley 21.020";
+        font-family: 'Georgia', serif;
+        font-size: 7.5pt;
+        color: #777777;
+      }
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Georgia', 'Times New Roman', serif;
+      font-size: 8.4pt;
+      line-height: 1.25;
+      color: #1a1a1a;
+      background-color: #ffffff;
+      margin: 0;
+      padding: 0;
+    }
+    /* Cabecera Principal */
+    .header {
+      text-align: center;
+      border-bottom: 2px solid #2d3748;
+      padding-bottom: 4px;
+      margin-bottom: 6px;
+    }
+    .header-badge {
+      font-size: 7.5pt;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      font-weight: bold;
+      color: #718096;
+      margin-bottom: 1px;
+    }
+    .header h1 {
+      font-size: 14pt;
+      font-weight: bold;
+      letter-spacing: 3px;
+      margin: 0;
+      text-transform: uppercase;
+      color: #1a202c;
+    }
+    .header .subtitle {
+      font-size: 8.5pt;
+      color: #4a5568;
+      margin-top: 1px;
+      font-style: italic;
+    }
+    .doc-banner {
+      background-color: #f7fafc;
+      border: 1px solid #e2e8f0;
+      border-left: 4px solid #2b6cb0;
+      padding: 4px 8px;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .doc-banner-title {
+      font-size: 9pt;
+      font-weight: bold;
+      color: #2b6cb0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .doc-banner-id {
+      font-size: 8pt;
+      color: #4a5568;
+      font-weight: bold;
+    }
+
+    /* Tabla de Identificación del Ejemplar */
+    .section-title {
+      font-size: 8.5pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #2d3748;
+      border-bottom: 1px solid #cbd5e0;
+      padding-bottom: 2px;
+      margin-top: 5px;
+      margin-bottom: 3px;
+      display: flex;
+      align-items: center;
+    }
+    .grid-info {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 6px;
+      font-size: 8pt;
+    }
+    .grid-info td {
+      padding: 2.5px 4px;
+      border: 0.5px solid #e2e8f0;
+      vertical-align: middle;
+    }
+    .grid-info td.lbl {
+      background-color: #f8fafc;
+      font-weight: bold;
+      color: #4a5568;
+      width: 17%;
+    }
+    .grid-info td.val {
+      color: #1a202c;
+      width: 33%;
+    }
+    .chip-highlight {
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      color: #c53030;
+      background-color: #fff5f5;
+      padding: 1px 4px;
+      border-radius: 2px;
+      border: 0.5px solid #feb2b2;
+    }
+
+    /* Tablas Clínicas (Vacunas y Desparasitaciones) */
+    table.clinical-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 6px;
+      font-size: 7.8pt;
+    }
+    table.clinical-table th {
+      background-color: #edf2f7;
+      color: #2d3748;
+      font-weight: bold;
+      text-transform: uppercase;
+      font-size: 7.2pt;
+      letter-spacing: 0.3px;
+      border: 0.5px solid #cbd5e0;
+      padding: 3px 4px;
+      text-align: center;
+    }
+    table.clinical-table td {
+      border: 0.5px solid #cbd5e0;
+      padding: 3px 4px;
+      vertical-align: middle;
+    }
+    .sticker-box {
+      border: 1px dashed #a0aec0;
+      background-color: #fafaf9;
+      height: 38px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-size: 6.8pt;
+      color: #718096;
+      border-radius: 2px;
+    }
+    .badge-applied {
+      display: inline-block;
+      background-color: #def7ec;
+      color: #03543f;
+      font-weight: bold;
+      font-size: 6.8pt;
+      padding: 1px 4px;
+      border-radius: 2px;
+      border: 0.5px solid #31c48d;
+      text-transform: uppercase;
+    }
+    .badge-scheduled {
+      display: inline-block;
+      background-color: #fef08a;
+      color: #713f12;
+      font-weight: bold;
+      font-size: 6.8pt;
+      padding: 1px 4px;
+      border-radius: 2px;
+      border: 0.5px solid #facc15;
+      text-transform: uppercase;
+    }
+
+    /* Recuadro de Indicaciones Veterinarias y Éticas */
+    .protocol-box {
+      background-color: #f7fee7;
+      border: 0.5px solid #d9f99d;
+      border-left: 3px solid #65a30d;
+      padding: 4px 6px;
+      margin-bottom: 6px;
+      font-size: 7.4pt;
+      color: #365314;
+      line-height: 1.25;
+    }
+    .protocol-box strong {
+      color: #1a2e05;
+    }
+
+    /* Firmas */
+    .signatures-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    .signatures-table td {
+      width: 33.33%;
+      text-align: center;
+      vertical-align: top;
+      padding: 0 8px;
+    }
+    .sig-line {
+      border-top: 1px solid #1a202c;
+      margin-bottom: 2px;
+      width: 85%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .sig-name {
+      font-weight: bold;
+      font-size: 7.8pt;
+      color: #1a202c;
+    }
+    .sig-role {
+      font-size: 7pt;
+      color: #4a5568;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Encabezado Oficial -->
+  <div class="header">
+    <div class="header-badge">CRIANZA FAMILIAR ÉTICA • LEY N° 21.020 DE TENENCIA RESPONSABLE</div>
+    <h1>LEGRAND PETIT</h1>
+    <div class="subtitle">Criadero Registrado • Algarrobo & Santiago de Chile</div>
+  </div>
+
+  <div class="doc-banner">
+    <div class="doc-banner-title">📋 Registro y Certificado Sanitario Oficial de Vacunación y Desparasitación</div>
+    <div class="doc-banner-id">Ficha Médica: LP-2026-REINA</div>
+  </div>
+
+  <!-- 1. Individualización y Filiación -->
+  <div class="section-title">1. Individualización del Ejemplar y Filiación Genealógica</div>
+  <table class="grid-info">
+    <tr>
+      <td class="lbl">Nombre Oficial:</td>
+      <td class="val"><strong>Legrand Petit Reina Elegida</strong> ("Reina")</td>
+      <td class="lbl">Raza y Especie:</td>
+      <td class="val">Pug (Carlino) • Canino</td>
+    </tr>
+    <tr>
+      <td class="lbl">Sexo:</td>
+      <td class="val"><strong>Hembra</strong></td>
+      <td class="lbl">F. Nacimiento:</td>
+      <td class="val"><strong>24 de Abril de 2026</strong></td>
+    </tr>
+    <tr>
+      <td class="lbl">Microchip Oficial:</td>
+      <td class="val"><span class="chip-highlight">991003003617500</span></td>
+      <td class="lbl">Acreditación:</td>
+      <td class="val">Declaración de Origen KCC (Con Papeles)</td>
+    </tr>
+    <tr>
+      <td class="lbl">Padre (Sire):</td>
+      <td class="val"><strong>Von Karykar Kingo</strong></td>
+      <td class="lbl">Madre (Dam):</td>
+      <td class="val"><strong>Legrand Petit Izumi</strong></td>
+    </tr>
+    <tr>
+      <td class="lbl">Criador Responsable:</td>
+      <td class="val"><strong>Patricio Padilla</strong> (Legrand Petit)</td>
+      <td class="lbl">Tutor Receptor:</td>
+      <td class="val"><strong>Eduardo Ignacio Pultz de la Fuente</strong></td>
+    </tr>
+  </table>
+
+  <!-- 2. Programa Oficial de Vacunación -->
+  <div class="section-title">2. Programa Oficial de Vacunación (Inmunización Preventiva)</div>
+  <table class="clinical-table">
+    <thead>
+      <tr>
+        <th style="width: 8%;">Dosis</th>
+        <th style="width: 14%;">F. Aplicación</th>
+        <th style="width: 11%;">Edad</th>
+        <th style="width: 32%;">Vacuna / Antígenos</th>
+        <th style="width: 25%;">Sticker de Vacuna / Firma y Timbre Médico</th>
+        <th style="width: 10%;">Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="text-align: center; font-weight: bold;">1ª Dosis</td>
+        <td style="text-align: center; font-weight: bold;">24 / Mayo / 2026</td>
+        <td style="text-align: center;">30 Días</td>
+        <td>
+          <strong>Séxtuple Puppy / Primovacunación</strong><br>
+          <span style="font-size: 6.8pt; color: #4a5568;">Parvovirus, Distemper, Adenovirus canino tipo 1 y 2.</span>
+        </td>
+        <td>
+          <div class="sticker-box">
+            <span>[ Espacio Adhesivo / Sticker ]</span>
+            <span>Firma Médico Veterinario</span>
+          </div>
+        </td>
+        <td style="text-align: center;"><span class="badge-applied">Aplicada</span></td>
+      </tr>
+      <tr>
+        <td style="text-align: center; font-weight: bold;">2ª Dosis</td>
+        <td style="text-align: center; font-weight: bold;">14 / Junio / 2026</td>
+        <td style="text-align: center;">51 Días (+21d)</td>
+        <td>
+          <strong>Refuerzo Séxtuple / Óctuple</strong><br>
+          <span style="font-size: 6.8pt; color: #4a5568;">Parvovirus, Distemper, Hepatitis, Parainfluenza, Leptospira.</span>
+        </td>
+        <td>
+          <div class="sticker-box">
+            <span>[ Espacio Adhesivo / Sticker ]</span>
+            <span>Firma Médico Veterinario</span>
+          </div>
+        </td>
+        <td style="text-align: center;"><span class="badge-applied">Aplicada</span></td>
+      </tr>
+      <tr>
+        <td style="text-align: center; font-weight: bold;">3ª Dosis</td>
+        <td style="text-align: center; font-weight: bold;">05 / Julio / 2026</td>
+        <td style="text-align: center;">72 Días (+21d)</td>
+        <td>
+          <strong>Refuerzo Óctuple + Antirrábica</strong><br>
+          <span style="font-size: 6.8pt; color: #4a5568;">Inmunización completa de cachorro + Vacuna Antirrábica oficial.</span>
+        </td>
+        <td>
+          <div class="sticker-box">
+            <span>[ Espacio Adhesivo / Sticker ]</span>
+            <span>Firma Médico Veterinario</span>
+          </div>
+        </td>
+        <td style="text-align: center;"><span class="badge-applied">Aplicada</span></td>
+      </tr>
+      <tr style="background-color: #fafaf9;">
+        <td style="text-align: center; font-weight: bold; color: #713f12;">Anual</td>
+        <td style="text-align: center; font-weight: bold; color: #713f12;">Abril / 2027</td>
+        <td style="text-align: center; color: #713f12;">12 Meses</td>
+        <td>
+          <strong>Refuerzo Anual Obligatorio</strong><br>
+          <span style="font-size: 6.8pt; color: #713f12;">Óctuple / KC + Vacuna Antirrábica anual según normativa sanitaria.</span>
+        </td>
+        <td>
+          <div class="sticker-box" style="border-color: #facc15; background-color: #fefce8;">
+            <span>[ Control Anual 2027 ]</span>
+          </div>
+        </td>
+        <td style="text-align: center;"><span class="badge-scheduled">Programada</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 3. Programa Oficial de Desparasitación -->
+  <div class="section-title">3. Programa de Desparasitación Interna (Pauta Cachorro y Mantención)</div>
+  <table class="clinical-table">
+    <thead>
+      <tr>
+        <th style="width: 8%;">Etapa</th>
+        <th style="width: 14%;">F. Aplicación</th>
+        <th style="width: 11%;">Edad</th>
+        <th style="width: 25%;">Antiparasitario / Principio</th>
+        <th style="width: 17%;">Vía y Dosificación</th>
+        <th style="width: 15%;">Responsable / Control</th>
+        <th style="width: 10%;">Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="text-align: center; font-weight: bold;">1ª Dosis</td>
+        <td style="text-align: center; font-weight: bold;">09 / Mayo / 2026</td>
+        <td style="text-align: center;">15 Días</td>
+        <td><strong>Drontal Puppy</strong> (Febantel / Pirantel)</td>
+        <td>Suspensión oral (1 ml / kg)</td>
+        <td style="text-align: center;">Criador Legrand Petit</td>
+        <td style="text-align: center;"><span class="badge-applied">Al Día</span></td>
+      </tr>
+      <tr>
+        <td style="text-align: center; font-weight: bold;">2ª Dosis</td>
+        <td style="text-align: center; font-weight: bold;">24 / Mayo / 2026</td>
+        <td style="text-align: center;">30 Días</td>
+        <td><strong>Drontal Puppy</strong> (Febantel / Pirantel)</td>
+        <td>Suspensión oral (1 ml / kg)</td>
+        <td style="text-align: center;">Criador Legrand Petit</td>
+        <td style="text-align: center;"><span class="badge-applied">Al Día</span></td>
+      </tr>
+      <tr>
+        <td style="text-align: center; font-weight: bold;">3ª Dosis</td>
+        <td style="text-align: center; font-weight: bold;">08 / Junio / 2026</td>
+        <td style="text-align: center;">45 Días</td>
+        <td><strong>Drontal Puppy</strong> (Febantel / Pirantel)</td>
+        <td>Suspensión oral (1 ml / kg)</td>
+        <td style="text-align: center;">Criador Legrand Petit</td>
+        <td style="text-align: center;"><span class="badge-applied">Al Día</span></td>
+      </tr>
+      <tr>
+        <td style="text-align: center; font-weight: bold;">4ª Dosis</td>
+        <td style="text-align: center; font-weight: bold;">23 / Junio / 2026</td>
+        <td style="text-align: center;">60 Días</td>
+        <td><strong>Drontal Puppy</strong> (Febantel / Pirantel)</td>
+        <td>Suspensión oral (1 ml / kg)</td>
+        <td style="text-align: center;">Criador Legrand Petit</td>
+        <td style="text-align: center;"><span class="badge-applied">Al Día</span></td>
+      </tr>
+      <!-- Pauta Trimestral de por vida -->
+      <tr style="background-color: #fafaf9;">
+        <td style="text-align: center; font-weight: bold; color: #713f12;">Mantención</td>
+        <td style="text-align: center; font-weight: bold; color: #713f12;">23 / Septiembre / 2026</td>
+        <td style="text-align: center; color: #713f12;">5 Meses</td>
+        <td><strong>Drontal Plus Perros</strong> (Comprimido)</td>
+        <td>Oral s/peso (Praziquantel/Pirantel)</td>
+        <td style="text-align: center;">Tutor / Control Vet</td>
+        <td style="text-align: center;"><span class="badge-scheduled">Programada</span></td>
+      </tr>
+      <tr style="background-color: #fafaf9;">
+        <td style="text-align: center; font-weight: bold; color: #713f12;">Mantención</td>
+        <td style="text-align: center; font-weight: bold; color: #713f12;">23 / Diciembre / 2026</td>
+        <td style="text-align: center; color: #713f12;">8 Meses</td>
+        <td><strong>Drontal Plus Perros</strong> (Comprimido)</td>
+        <td>Oral s/peso (cada 3 meses)</td>
+        <td style="text-align: center;">Tutor / Control Vet</td>
+        <td style="text-align: center;"><span class="badge-scheduled">Programada</span></td>
+      </tr>
+      <tr style="background-color: #fafaf9;">
+        <td style="text-align: center; font-weight: bold; color: #713f12;">Mantención</td>
+        <td style="text-align: center; font-weight: bold; color: #713f12;">23 / Marzo / 2027</td>
+        <td style="text-align: center; color: #713f12;">11 Meses</td>
+        <td><strong>Drontal Plus Perros</strong> (Comprimido)</td>
+        <td>Oral s/peso (cada 3 meses)</td>
+        <td style="text-align: center;">Tutor / Control Vet</td>
+        <td style="text-align: center;"><span class="badge-scheduled">Programada</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 4. Protocolo Clínico y Nutricional Oficial -->
+  <div class="protocol-box">
+    <strong>DIRECTRICES TÉCNICAS Y RECOMENDACIONES CLÍNICAS OFICIALES LEGRAND PETIT:</strong><br>
+    • <strong>Nutrición Biológicamente Apropiada:</strong> Reina se encuentra adaptada a alimentación 100% natural BARF / cocinada natural (<strong>Origen Canino</strong> / <em>origencanino.cl</em>). Se proscribe estrictamente el suministro de alimentos ultraprocesados (croquetas comerciales o pellets industriales) para preservar su microbiota, inmunidad y óptima digestión.<br>
+    • <strong>Recomendación Médica de No Esterilización Temprana:</strong> Por fundamento ortopédico y endocrino (protección del cierre de placas epifisarias óseas y prevención de roturas de ligamento cruzado craneal o displasias), se prescribe no realizar esterilización en edades tempranas.<br>
+    • <strong>Acompañamiento Vitalicio:</strong> Ante procedimientos quirúrgicos, sedaciones o tratamientos prolongados, consultar previamente a Patricio Padilla (Legrand Petit).
+  </div>
+
+  <!-- 5. Firmas y Validaciones Oficiales -->
+  <table class="signatures-table">
+    <tr>
+      <td>
+        <div class="sig-line"></div>
+        <div class="sig-name">PATRICIO PADILLA</div>
+        <div class="sig-role">Criador Legrand Petit<br>R.U.T. 14.554.502-1</div>
+      </td>
+      <td>
+        <div class="sig-line"></div>
+        <div class="sig-name">MÉDICO VETERINARIO</div>
+        <div class="sig-role">Firma, Timbre y N° Colegio Médico<br>Responsable Sanitario</div>
+      </td>
+      <td>
+        <div class="sig-line"></div>
+        <div class="sig-name">EDUARDO IGNACIO PULTZ</div>
+        <div class="sig-role">Tutor Receptor de Reina<br>R.U.T. 16.661.916-5</div>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
