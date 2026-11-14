@@ -131,6 +131,103 @@ En el checkout (`CheckoutModal.jsx`), al seleccionar **Transferencia Bancaria**,
 
 ---
 
+## 7. MÓDULO DE RECHAZO DE TRANSFERENCIA BANCARIA Y RECUPERACIÓN VÍA WHATSAPP
+
+Para cerrar el ciclo de auditoría de pagos en el panel administrativo (`src/components/admin/DispatchManager.jsx`), se construyó el flujo de **Rechazo de Transferencias**:
+
+### A. Funcionalidad y Reglas de Negocio
+1. **Doble Punto de Control:** El administrador dispone del botón rojo **"Rechazar"** tanto en la fila del pedido en la tabla de despachos como dentro del modal de inspección en alta resolución del comprobante.
+2. **Modal de Rechazo con Motivos Tipificados:**
+   - Despliega selector con los 4 casos más comunes en transferencias en Chile:
+     - *"Monto no coincide con el total del pedido"*
+     - *"Comprobante ilegible / borroso"*
+     - *"Transferencia no recibida en cartola bancaria"*
+     - *"Motivo personalizado"* (con campo de texto libre para detalle clínico o comercial).
+3. **Actualización de Estados en Base de Datos:**
+   - `payment_status = 'Rechazado (Transferencia)'`
+   - `delivery_status = 'Cancelado'`
+4. **Notificación Directa y Automática al WhatsApp del Cliente:**
+   - El sistema abre de forma inmediata un enlace `https://wa.me/{telefono}?text=...` con un mensaje cordial y profesional pre-redactado:
+     ```
+     Hola Eduardo Putz, te escribimos de Origen Canino respecto a tu Pedido #7. 
+     Tuvimos un inconveniente al validar tu comprobante de transferencia bancaria.
+     Motivo: Monto no coincide con el total del pedido.
+     Por favor, si puedes responder a este mensaje enviándonos el comprobante correcto o confirmando los datos de la transferencia para procesar tu despacho. ¡Muchas gracias!
+     ```
+   - **Beneficio Comercial:** Elimina el roce con el cliente, previene la pérdida de pedidos legítimos y permite corregir errores de digitación o de monto en minutos sin fricciones.
+
+### B. Pruebas y Despliegue en Producción
+- Validado con el **Pedido de Prueba #7** ($35.000 CLP, 7 unidades, Banco de Chile).
+- Subido comprobante de prueba WebP, inspeccionado en el modal y aprobado/rechazado de punta a punta.
+- Desplegado en producción en el servidor Hetzner VPS (`167.233.122.18`) mediante commit sincronizado a Coolify.
+
+---
+
+## 8. FORMALIZACIÓN LEGAL CANINA Y TRAZABILIDAD SANITARIA (LEGRAND PETIT)
+
+En paralelo al e-commerce, se estructuró, normalizó y compiló la documentación oficial para dos ejemplares de alta alcurnia del criadero **Legrand Petit**:
+
+### 8.1. Contrato de Cesión y Tenencia Responsable — Legrand Petit Reina Elegida
+- **Ejemplar:** Pug (Carlina hembra nacida el 24/04/2026, Microchip `991003003617500`).
+- **Tutor Receptor:** Don Eduardo Ignacio Pultz de la Fuente (R.U.T. 16.661.916-5).
+- **Criador:** Don Patricio Padilla (R.U.T. 14.554.502-1, Legrand Petit).
+- **Cláusulas Formalizadas (Marco Ley N° 21.020):**
+  - **Primera:** Individualización oficial, aporte por crianza responsable ($900.000 CLP), cartilla sanitaria, Declaración de Origen KCC ("con papeles") y ración de inicio BARF Origen Canino.
+  - **Segunda:** Propósito de compañía familiar exclusiva, proscripción absoluta de explotación o reproducción comercial y no aislamiento.
+  - **Tercera:** Nutrición biológicamente apropiada 100% natural obligatoria (Tasty Barf / Origen Canino) y exclusión total de ultraprocesados industriales.
+  - **Cuarta:** Fundamento veterinario de **No Esterilización Temprana** (preservación de placas epifisarias de crecimiento óseo, ligamento cruzado y densidad articular) y acompañamiento médico vitalicio con Patricio Padilla.
+  - **Quinta:** Destino, custodia responsable y prohibición de venta o cesión arbitraria.
+  - **Sexta y Séptima:** Inscripción oficial del microchip en el Registro Nacional de Mascotas, buena fe y resguardo final.
+- **Compilación Tipográfica:**
+  - Se eliminó un salto de página artificial que dejaba un vacío en blanco en la primera carilla.
+  - Recompilado con motor **Google Chrome / Skia**, generando un documento PDF de 2 páginas perfectamente equilibrado (88 KB), homogéneo con los contratos de Momo Casanova y Reymundo.
+
+### 8.2. Hoja Sanitaria Oficial — Legrand Petit Reina Elegida
+- **Formato:** Certificado clínico oficial en **1 carilla exacta** de alta resolución (WeasyPrint).
+- **R.U.T. Veterinario Oficial:** Se incorporó formalmente el R.U.T. del Médico Veterinario Responsable **Dr. Jorge Castro (`12.244.287-K`)**.
+- **Ergonomía de Stickers de Vacunación:**
+  - A solicitud de Patricio, se rediseñó la columna de stickers: ancho ampliado al **35% de la página** (~6.8 cm de ancho útil) y altura duplicada a **72px (~1.9 cm de alto)**.
+  - Incorpora guía visual punteada interior `[ Pegar Sticker de Vacuna Aquí ]` y línea inferior para `Firma y Timbre Médico Veterinario`.
+- **Esquema Clínico:** 4 dosis de vacunas (3 de cachorro aplicadas + refuerzo anual programado) y 7 dosis de desparasitación (4 de cachorro con Drontal Puppy al día + mantención trimestral Drontal Plus al día).
+
+### 8.3. Hoja Sanitaria Oficial — Legrand Petit Momo Casanova (Campeón Chileno)
+- **Trazabilidad de Ejemplar Adulto (3 Años):**
+  - Nacimiento: 06 de Noviembre de 2023.
+  - Raza y Sexo: Bulldog Francés macho reproductor activo.
+  - Microchip ISO: `991003002668233` (Pedigree KCC de Campeón Chileno).
+  - Filiación Genealógica: Padre **Legrand Petit Monito Canelo** y Madre **Legrand Petit Matilde**.
+  - Tutor / Custodio: **Sergio Francisco San Martín Campos** (R.U.T. 15.954.230-0).
+  - Criador Propietario: **Patricio Padilla** (R.U.T. 14.554.502-1).
+  - Médico Veterinario: **Dr. Jorge Castro** (R.U.T. 12.244.287-K).
+- **Calendario Completo de Vacunación (Página 1):**
+  - 3 dosis de cachorro (Puppy DP a los 30d, Séxtuple/Óctuple a los 51d, Óctuple + Antirrábica a los 72d).
+  - 3 refuerzos anuales de adulto: 2024, 2025 y el **reciente de 2026 aplicado por Patricio** (06/Nov/2026) marcados como **APLICADA**.
+  - Refuerzo Noviembre 2027 marcado como **PROGRAMADA**.
+  - Recuadros amplios adaptados para stickers físicos de vacunas y timbres.
+- **Calendario Completo de Desparasitación (Página 2):**
+  - 4 dosis de cachorro con Drontal Puppy suspensión oral cada 15 días (Nov 2023 - Ene 2024) **Al Día**.
+  - 11 controles trimestrales correlativos de adulto con Drontal Plus comprimidos (desde Abril 2024 hasta el **05 de Octubre de 2026** previo a hoy) todos marcados **AL DÍA**.
+  - Control de mantención Enero 2027 como **PROGRAMADA**.
+  - Directrices clínicas de preservación genital (no castración por estatus de semental activo y Campeón Chileno) y alimentación natural BARF Origen Canino.
+  - Bloque oficial de firmas para Patricio Padilla, Dr. Jorge Castro y Sergio San Martín.
+
+---
+
+## 9. ORGANIZACIÓN Y ESTANDARIZACIÓN DE ARCHIVOS EN ESCRITORIO
+
+Para facilitar la manipulación física, revisión e impresión en el día a día de Patricio, todos los documentos fueron sincronizados y estandarizados en la carpeta:  
+**`/home/patricio/Escritorio/contratos/`**
+
+- `Contrato_Cesion_Momo_Casanova.pdf` & `Contrato_Cesion_Momo_Casanova.html`
+- `Hoja_Sanitaria_Momo_Casanova.pdf` & `Hoja_Sanitaria_Momo_Casanova.html`
+- `Contrato_Cesion_Reymundo.pdf` & `Contrato_Cesion_Reymundo.html`
+- `Contrato_Cesion_Reina.pdf` & `Contrato_Cesion_Reina.html`
+- `Hoja_Sanitaria_Reina.pdf` & `Hoja_Sanitaria_Reina.html`
+
+Todos los cambios, plantillas y fuentes quedaron respaldados en el repositorio Git (`https://github.com/legrandpetit-source/origen-canino2.git`, rama `main`).
+
+---
+
 **Firmado y auditado por:**  
 Patricio Padilla Legrand Petit & Antigravity Multi-Agent System
 
