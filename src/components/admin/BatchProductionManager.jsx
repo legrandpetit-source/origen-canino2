@@ -19,7 +19,13 @@ const BatchProductionManager = ({ products = [], ingredients = [] }) => {
   const [fechaElab, setFechaElab] = useState(() => new Date().toISOString().slice(0, 10));
   const [pesoCrudoKg, setPesoCrudoKg] = useState('20');
   const [stockInicialKg, setStockInicialKg] = useState('20');
-  const [extraCostClp, setExtraCostClp] = useState('0');
+  const [indirectCosts, setIndirectCosts] = useState({
+    luz_clp: 0,
+    gas_clp: 0,
+    agua_clp: 0,
+    envases_clp: 0,
+    mano_obra_clp: 0,
+  });
   const [batchNotas, setBatchNotas] = useState('');
   const [formulaRows, setFormulaRows] = useState([]);
   const [waitlistForCreated, setWaitlistForCreated] = useState([]);
@@ -133,6 +139,64 @@ const BatchProductionManager = ({ products = [], ingredients = [] }) => {
     ? (((rawGramsNum - packGramsNum) / rawGramsNum) * 100).toFixed(1)
     : '0.0';
 
+  const handleCopyLastBatchRecipe = () => {
+    if (!selectedProductId) return;
+    const prevBatch = batches.find((b) => String(b.producto_id) === String(selectedProductId));
+    if (!prevBatch || !prevBatch.ingredientes?.length) {
+      showToast('No hay un lote anterior para este menú; usando receta plantilla.');
+      return;
+    }
+    const rawG = (parseFloat(pesoCrudoKg) || 20) * 1000;
+    setFormulaRows(
+      prevBatch.ingredientes.map((i) => ({
+        ingrediente_id: i.ingrediente_id || '',
+        nombre_ingrediente: i.nombre_ingrediente,
+        porcentaje_formula: Number(i.porcentaje_formula || 0),
+        cantidad_gramos: Math.round((rawG * Number(i.porcentaje_formula || 0)) / 100),
+        costo_unitario_clp: Number(i.costo_unitario_clp || 0),
+      }))
+    );
+    showToast(`Receta copiada desde lote ${prevBatch.codigo_lote}.`);
+  };
+
+  // Simulación Nutricional y Financiera en Vivo
+  const ingMap = Object.fromEntries(ingredients.map((i) => [String(i.id), i]));
+  const concentrationFactor =
+    rawGramsNum > packGramsNum && packGramsNum > 0
+      ? Math.min(1.45, rawGramsNum / packGramsNum)
+      : 1.0;
+
+  const liveNutrition = formulaRows.reduce(
+    (acc, r) => {
+      const dbIng = ingMap[String(r.ingrediente_id)] || {};
+      const w = (parseFloat(r.porcentaje_formula) || 0) / 100;
+      acc.proteina += Number(dbIng.protein_g || 0) * w * concentrationFactor;
+      acc.grasa += Number(dbIng.fat_g || 0) * w * concentrationFactor;
+      acc.fibra += Number(dbIng.fiber_g || 0) * w * concentrationFactor;
+      acc.humedad += Number(dbIng.moisture_g || 0) * w;
+      acc.cenizas += Number(dbIng.ash_g || 0) * w * concentrationFactor;
+      acc.carbs += Number(dbIng.carbs_g || 0) * w * concentrationFactor;
+      acc.kcal += Number(dbIng.kcal_per_100g || 0) * w * concentrationFactor;
+      return acc;
+    },
+    { proteina: 0, grasa: 0, fibra: 0, humedad: 0, cenizas: 0, carbs: 0, kcal: 0 }
+  );
+
+  const ingredientsCostClp = Math.round(
+    formulaRows.reduce(
+      (sum, r) => sum + (Number(r.cantidad_gramos || 0) / 1000) * Number(r.costo_unitario_clp || 0),
+      0
+    )
+  );
+  const indirectTotalClp = Object.values(indirectCosts).reduce((s, v) => s + (parseInt(v || 0, 10) || 0), 0);
+  const totalBatchCostClp = ingredientsCostClp + indirectTotalClp;
+  const stockKgNum = packGramsNum / 1000;
+  const costPerKgClp = stockKgNum > 0 ? Math.round(totalBatchCostClp / stockKgNum) : 0;
+  const selectedProd = products.find((p) => String(p.id) === String(selectedProductId));
+  const pvpPerKgClp = selectedProd ? Number(selectedProd.price || 0) : 0;
+  const marginPerKgClp = pvpPerKgClp - costPerKgClp;
+  const marginPctLive = pvpPerKgClp > 0 ? ((marginPerKgClp / pvpPerKgClp) * 100).toFixed(1) : '0.0';
+
   const handleCreateBatch = async (e) => {
     e.preventDefault();
     if (!selectedProductId || formulaRows.length === 0) {
@@ -153,7 +217,8 @@ const BatchProductionManager = ({ products = [], ingredients = [] }) => {
           fecha_elaboracion: fechaElab,
           peso_crudo_total_gramos: rawGramsNum,
           stock_inicial_gramos: packGramsNum,
-          extra_cost_clp: parseInt(extraCostClp || '0', 10),
+          extra_cost_clp: indirectTotalClp,
+          indirect_costs: indirectCosts,
           notas: batchNotas || null,
           ingredientes: formulaRows.map((r) => ({
             ingrediente_id: r.ingrediente_id ? Number(r.ingrediente_id) : null,
@@ -313,20 +378,32 @@ const BatchProductionManager = ({ products = [], ingredients = [] }) => {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div className="md:col-span-2">
                 <label className="text-xs font-bold text-stone-600 block mb-1">Producto / Menú</label>
-                <select
-                  value={selectedProductId}
-                  onChange={(e) => handleSelectProductForBatch(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-stone-300 text-sm bg-white"
-                  required
-                >
-                  <option value="">-- Seleccionar Menú --</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.weight})</option>
-                  ))}
-                </select>
+                <div className="flex gap-2">
+                  <select
+                    value={selectedProductId}
+                    onChange={(e) => handleSelectProductForBatch(e.target.value)}
+                    className="flex-1 px-3 py-2.5 rounded-xl border border-stone-300 text-sm bg-white"
+                    required
+                  >
+                    <option value="">-- Seleccionar Menú --</option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.weight})</option>
+                    ))}
+                  </select>
+                  {selectedProductId && (
+                    <button
+                      type="button"
+                      onClick={handleCopyLastBatchRecipe}
+                      className="px-3 py-2 rounded-xl border border-stone-300 text-xs font-bold text-stone-700 hover:bg-stone-100 shrink-0"
+                      title="Copiar ingredientes y precios del último lote de este menú"
+                    >
+                      Copiar Último Lote
+                    </button>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="text-xs font-bold text-stone-600 block mb-1">Línea</label>
@@ -349,14 +426,32 @@ const BatchProductionManager = ({ products = [], ingredients = [] }) => {
                   required
                 />
               </div>
-              <div>
-                <label className="text-xs font-bold text-stone-600 block mb-1">Costo Extra Cocina (CLP)</label>
-                <input
-                  type="number"
-                  value={extraCostClp}
-                  onChange={(e) => setExtraCostClp(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-stone-300 text-sm"
-                />
+            </div>
+
+            {/* Desglose de Costos Indirectos de Cocina */}
+            <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200 space-y-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-stone-600 block">
+                Costos Indirectos del Lote (CLP) — Total: ${indirectTotalClp.toLocaleString('es-CL')}
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                {[
+                  { key: 'luz_clp', label: 'Luz / Electricidad' },
+                  { key: 'gas_clp', label: 'Gas (Cocción)' },
+                  { key: 'agua_clp', label: 'Agua / Aseo' },
+                  { key: 'envases_clp', label: 'Envases y Etiquetas' },
+                  { key: 'mano_obra_clp', label: 'Mano de Obra / Otros' },
+                ].map((field) => (
+                  <div key={field.key}>
+                    <label className="text-[11px] font-semibold text-stone-500 block mb-1">{field.label}</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={indirectCosts[field.key]}
+                      onChange={(e) => setIndirectCosts({ ...indirectCosts, [field.key]: parseInt(e.target.value || '0', 10) })}
+                      className="w-full px-2.5 py-2 rounded-xl border border-stone-300 text-xs bg-white font-mono"
+                    />
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -454,8 +549,19 @@ const BatchProductionManager = ({ products = [], ingredients = [] }) => {
                     <div className="col-span-2 text-xs font-mono text-right text-stone-700">
                       {row.cantidad_gramos} g
                     </div>
-                    <div className="col-span-2 text-xs font-mono text-right text-stone-500">
-                      ${row.costo_unitario_clp || 0}
+                    <div className="col-span-2">
+                      <input
+                        type="number"
+                        min="0"
+                        value={row.costo_unitario_clp || 0}
+                        onChange={(e) => {
+                          const copy = [...formulaRows];
+                          copy[idx].costo_unitario_clp = parseInt(e.target.value || '0', 10);
+                          setFormulaRows(copy);
+                        }}
+                        className="w-full px-2 py-1.5 rounded-lg border border-stone-300 text-xs text-right font-mono bg-white"
+                        title="Costo CLP por Kg de esta semana"
+                      />
                     </div>
                     <div className="col-span-1 text-right">
                       <button
@@ -470,6 +576,81 @@ const BatchProductionManager = ({ products = [], ingredients = [] }) => {
                 ))}
               </div>
             </div>
+
+            {/* Simulación en Vivo: Nutrición y Rentabilidad del Lote */}
+            {formulaRows.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 bg-emerald-50/50 border border-emerald-200 rounded-2xl p-4">
+                <div>
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-emerald-900 mb-2">
+                    Tabla Nutricional Recalculada en Vivo (por 100g)
+                  </h4>
+                  <div className="grid grid-cols-4 gap-2 text-xs">
+                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
+                      <span className="text-[10px] text-stone-500 block">Energía</span>
+                      <strong className="font-mono">{Math.round(liveNutrition.kcal)} kcal</strong>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
+                      <span className="text-[10px] text-stone-500 block">Proteína</span>
+                      <strong className="font-mono">{liveNutrition.proteina.toFixed(1)}%</strong>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
+                      <span className="text-[10px] text-stone-500 block">Grasa</span>
+                      <strong className="font-mono">{liveNutrition.grasa.toFixed(1)}%</strong>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
+                      <span className="text-[10px] text-stone-500 block">Fibra</span>
+                      <strong className="font-mono">{liveNutrition.fibra.toFixed(1)}%</strong>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
+                      <span className="text-[10px] text-stone-500 block">Humedad</span>
+                      <strong className="font-mono">{liveNutrition.humedad.toFixed(1)}%</strong>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
+                      <span className="text-[10px] text-stone-500 block">Cenizas</span>
+                      <strong className="font-mono">{liveNutrition.cenizas.toFixed(1)}%</strong>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
+                      <span className="text-[10px] text-stone-500 block">Carbohidratos</span>
+                      <strong className="font-mono">{liveNutrition.carbs.toFixed(1)}%</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-emerald-900 mb-2">
+                    Rentabilidad Real del Lote (Ingredientes + Indirectos)
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
+                      <span className="text-[10px] text-stone-500 block">Ingredientes</span>
+                      <strong className="font-mono">${ingredientsCostClp.toLocaleString('es-CL')}</strong>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
+                      <span className="text-[10px] text-stone-500 block">Indirectos (Luz/Gas...)</span>
+                      <strong className="font-mono">${indirectTotalClp.toLocaleString('es-CL')}</strong>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
+                      <span className="text-[10px] text-stone-500 block">Costo Total Lote</span>
+                      <strong className="font-mono text-secondary-brown">${totalBatchCostClp.toLocaleString('es-CL')}</strong>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
+                      <span className="text-[10px] text-stone-500 block">Costo Real / Kg</span>
+                      <strong className="font-mono">${costPerKgClp.toLocaleString('es-CL')}/kg</strong>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
+                      <span className="text-[10px] text-stone-500 block">PVP Menú</span>
+                      <strong className="font-mono">${pvpPerKgClp.toLocaleString('es-CL')}</strong>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
+                      <span className="text-[10px] text-stone-500 block">Margen Bruto</span>
+                      <strong className={`font-mono ${marginPerKgClp >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                        ${marginPerKgClp.toLocaleString('es-CL')} ({marginPctLive}%)
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"

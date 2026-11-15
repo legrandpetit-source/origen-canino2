@@ -32,6 +32,7 @@ class BatchCreateRequest(BaseModel):
     peso_crudo_total_gramos: int = 0
     stock_inicial_gramos: int
     extra_cost_clp: int = 0
+    indirect_costs: Optional[Dict[str, int]] = None
     kitchen_cost_id: Optional[int] = None
     notas: Optional[str] = None
     ingredientes: List[BatchIngredientInput]
@@ -161,7 +162,7 @@ def create_batch_router(get_current_admin) -> APIRouter:
 
         with get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, name FROM products WHERE id = %s", (payload.producto_id,))
+            cursor.execute("SELECT id, name, price, weight FROM products WHERE id = %s", (payload.producto_id,))
             prod = cursor.fetchone()
             if not prod:
                 raise HTTPException(status_code=404, detail="Producto no encontrado.")
@@ -169,9 +170,46 @@ def create_batch_router(get_current_admin) -> APIRouter:
             codigo_lote = batch_service.generate_batch_code(cursor, fecha_elab)
             ing_dicts = [i.model_dump() for i in payload.ingredientes]
             peso_crudo = payload.peso_crudo_total_gramos or payload.stock_inicial_gramos
+            indirect_dict = payload.indirect_costs or {}
+            indirect_sum = sum(int(v or 0) for v in indirect_dict.values())
+            effective_extra_cost = indirect_sum if indirect_sum > 0 else int(payload.extra_cost_clp or 0)
+
             snapshot_items, nutrition, total_cost_clp = batch_service.compute_batch_nutrition_and_cost(
-                cursor, ing_dicts, peso_crudo, payload.stock_inicial_gramos, payload.extra_cost_clp
+                cursor, ing_dicts, peso_crudo, payload.stock_inicial_gramos, effective_extra_cost
             )
+
+            # Registrar automáticamente en kitchen_cost_history para alimentar Finanzas y Cocina
+            stock_kg = payload.stock_inicial_gramos / 1000.0
+            unit_g = batch_service.parse_weight_grams(prod.get("weight"))
+            pvp_per_kg = int(round(int(prod["price"]) / (unit_g / 1000.0))) if unit_g > 0 else int(prod["price"])
+            cost_per_kg = int(round(total_cost_clp / stock_kg)) if stock_kg > 0 else total_cost_clp
+            margin_clp = pvp_per_kg - cost_per_kg
+            margin_pct = round((margin_clp / pvp_per_kg) * 100.0, 2) if pvp_per_kg > 0 else 0.0
+
+            kitchen_cost_id = payload.kitchen_cost_id
+            if kitchen_cost_id is None:
+                cursor.execute(
+                    """
+                    INSERT INTO kitchen_cost_history (
+                        production_line, batch_total_kg, cost_per_kg, pvp_price,
+                        gross_margin_percent, gross_margin_clp, raw_costs, provider_notes
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                    """,
+                    (
+                        payload.linea_produccion.lower(),
+                        round(stock_kg, 2),
+                        cost_per_kg,
+                        pvp_per_kg,
+                        margin_pct,
+                        margin_clp,
+                        json.dumps({"indirect_costs": indirect_dict, "codigo_lote": codigo_lote}),
+                        payload.notas or f"Lote {codigo_lote} ({prod['name']})",
+                    ),
+                )
+                kc_row = cursor.fetchone()
+                kitchen_cost_id = kc_row["id"] if kc_row else None
 
             cursor.execute(
                 """
@@ -179,9 +217,9 @@ def create_batch_router(get_current_admin) -> APIRouter:
                     codigo_lote, producto_id, linea_produccion, semana_fabricacion,
                     fecha_elaboracion, fecha_consumo_preferente, peso_crudo_total_gramos,
                     stock_inicial_gramos, stock_disponible_gramos, costo_total_batch_clp,
-                    kitchen_cost_id, notas, estado
+                    kitchen_cost_id, indirect_costs_json, notas, estado
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'ACTIVO')
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'ACTIVO')
                 RETURNING id
                 """,
                 (
@@ -195,7 +233,8 @@ def create_batch_router(get_current_admin) -> APIRouter:
                     payload.stock_inicial_gramos,
                     payload.stock_inicial_gramos,
                     total_cost_clp,
-                    payload.kitchen_cost_id,
+                    kitchen_cost_id,
+                    json.dumps(indirect_dict),
                     payload.notas,
                 ),
             )

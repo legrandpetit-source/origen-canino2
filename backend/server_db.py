@@ -437,10 +437,12 @@ def init_database():
                     stock_disponible_gramos INTEGER NOT NULL,
                     costo_total_batch_clp INTEGER DEFAULT 0,
                     kitchen_cost_id INTEGER REFERENCES kitchen_cost_history(id) ON DELETE SET NULL,
+                    indirect_costs_json JSONB,
                     notas TEXT,
                     estado TEXT NOT NULL DEFAULT 'ACTIVO',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
+                ALTER TABLE batch_produccion ADD COLUMN IF NOT EXISTS indirect_costs_json JSONB;
                 CREATE INDEX IF NOT EXISTS idx_batch_fifo
                     ON batch_produccion (producto_id, estado, fecha_elaboracion);
             """)
