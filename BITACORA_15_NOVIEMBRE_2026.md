@@ -22,6 +22,8 @@
    - [ ] **Certificado digital vigente** del representante legal *(a obtener mañana al firmar)*.
    - [ ] **Habilitación de Boleta Electrónica (Tipo 39) + folios CAF** y elección/alta de proveedor intermediario DTE (**SimpleAPI**, **OpenFactura/Haulmer**, **Lioren** o **Bsale**) *(a solicitar mañana en reunión con el contador)*.
 2. **Correo Corporativo (SMTP):**
-   - [ ] Verificar si ya existe casilla corporativa (`contacto@origencanino.cl` / `boletas@origencanino.cl`) y obtener credenciales SMTP (`host`, `puerto`, `usuario`, `clave`), o crear una nueva.
+   - [x] Casillas corporativas existentes: `pagos@origencanino.cl` (recomendada como remitente oficial de boletas) y `hola@origencanino.cl`.
+   - [ ] Obtener credenciales SMTP de `pagos@origencanino.cl` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`) desde el proveedor de correo/hosting.
 3. **Arranque Técnico (Fase 1):**
    - Con los puntos anteriores definidos, comenzar la implementación en `backend/server_db.py`, `backend/dte_service.py`, `backend/main.py` y `src/components/admin/DispatchManager.jsx`.
+
