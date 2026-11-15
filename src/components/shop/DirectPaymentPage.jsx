@@ -122,6 +122,11 @@ const DirectPaymentPage = () => {
   }
 
   const isAlreadyPaid = linkData?.status === 'pagado' || Boolean(paidMessage);
+  const itemsSubtotal = (linkData?.items_json || []).reduce(
+    (sum, it) => sum + Number(it.price || 0) * Number(it.quantity || 0),
+    0
+  );
+  const shippingCost = Math.max(0, Number(linkData?.total_clp || 0) - itemsSubtotal);
 
   return (
     <div className="max-w-2xl mx-auto py-10 px-4 sm:px-6">
@@ -129,7 +134,7 @@ const DirectPaymentPage = () => {
         <div className="flex items-start justify-between gap-4 border-b border-stone-100 pb-4">
           <div>
             <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-900 px-3 py-1 rounded-full mb-2">
-              <Lock size={12} /> Link Directo de Pago · Precio Lista
+              <Lock size={12} /> Link Directo de Pago
             </span>
             <h1 className="font-header text-2xl sm:text-3xl font-extrabold text-secondary-brown">
               Hola {linkData?.customer_name || 'Cliente'}
@@ -143,10 +148,10 @@ const DirectPaymentPage = () => {
           <ShoppingBag className="text-primary-green shrink-0" size={32} />
         </div>
 
-        {/* Detalle bloqueado sin descuentos */}
+        {/* Detalle de productos y envío */}
         <div className="bg-[#FAF7F2] rounded-2xl p-4 sm:p-5 border border-[#EFE8DE] space-y-3">
           <h2 className="font-header font-bold text-sm uppercase tracking-wider text-stone-500">
-            Detalle de Productos (Sin descuentos)
+            Detalle de Productos
           </h2>
           {(linkData?.items_json || []).map((it, idx) => (
             <div key={idx} className="flex items-center justify-between text-base border-b border-stone-200/60 pb-2 last:border-0 last:pb-0">
@@ -159,6 +164,18 @@ const DirectPaymentPage = () => {
               </span>
             </div>
           ))}
+          <div className="pt-2 border-t border-stone-200 space-y-1.5 text-sm text-stone-700">
+            <div className="flex items-center justify-between">
+              <span>Subtotal Productos</span>
+              <span className="font-mono font-semibold">${itemsSubtotal.toLocaleString('es-CL')}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Envío / Despacho</span>
+              <span className="font-mono font-semibold">
+                {shippingCost > 0 ? `$${shippingCost.toLocaleString('es-CL')}` : 'Gratis'}
+              </span>
+            </div>
+          </div>
           <div className="pt-3 border-t border-stone-300 flex items-center justify-between text-xl font-extrabold text-secondary-brown">
             <span>Total a Pagar</span>
             <span>${Number(linkData?.total_clp || 0).toLocaleString('es-CL')} CLP</span>

@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { Truck, Package, MapPin, Building2, CheckCircle2, CreditCard, Landmark, Trash2, CheckSquare, Square, AlertCircle, Eye, ExternalLink, X, FileText, XCircle } from 'lucide-react';
+import { Truck, Package, MapPin, Building2, CheckCircle2, CreditCard, Landmark, Trash2, CheckSquare, Square, AlertCircle, Eye, ExternalLink, X, FileText, XCircle, Link2 } from 'lucide-react';
+import DirectPaymentLinksPanel from './DirectPaymentLinksPanel';
 
-const DispatchManager = ({ orders, handleUpdateOrderStatus, handleDeleteOrder, handleBulkDeleteOrders }) => {
+const DispatchManager = ({ orders, products = [], handleUpdateOrderStatus, handleDeleteOrder, handleBulkDeleteOrders }) => {
+  const [ordersSubTab, setOrdersSubTab] = useState('dispatch');
+  const [prefillOrder, setPrefillOrder] = useState(null);
   const [filterCity, setFilterCity] = useState('ALL');
   const [filterBuilding, setFilterBuilding] = useState('ALL');
   const [selectedOrderIds, setSelectedOrderIds] = useState([]);
@@ -123,6 +126,36 @@ const DispatchManager = ({ orders, handleUpdateOrderStatus, handleDeleteOrder, h
 
   return (
     <div className="space-y-4">
+      {/* Sub-navegación de Pedidos: Logística vs Links de Pago Directo */}
+      <div className="flex flex-wrap gap-2 bg-white p-2 rounded-xl border border-gray-200">
+        <button
+          type="button"
+          onClick={() => setOrdersSubTab('dispatch')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition ${
+            ordersSubTab === 'dispatch' ? 'bg-primary-green text-white shadow-xs' : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          <Truck size={16} /> Logística y Despacho ({orders.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setOrdersSubTab('payment_links')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition ${
+            ordersSubTab === 'payment_links' ? 'bg-primary-green text-white shadow-xs' : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          <Link2 size={16} /> Links de Pago Directo (Cobranza / Asistidos)
+        </button>
+      </div>
+
+      {ordersSubTab === 'payment_links' ? (
+        <DirectPaymentLinksPanel
+          products={products}
+          prefillOrder={prefillOrder}
+          onClearPrefill={() => setPrefillOrder(null)}
+        />
+      ) : (
+        <>
       {/* Barra de Filtros y Control Superior */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 rounded-xl border border-gray-200 gap-3">
         <div className="flex items-center gap-3">
@@ -535,6 +568,8 @@ const DispatchManager = ({ orders, handleUpdateOrderStatus, handleDeleteOrder, h
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

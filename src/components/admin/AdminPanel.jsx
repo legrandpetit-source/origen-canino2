@@ -4,7 +4,7 @@ import {
   MessageSquareHeart, Check, XCircle, LogOut, Key, ChefHat, BarChart, 
   Building2, CreditCard, Calculator, Send, Gift, UploadCloud, Upload,
   Image as ImageIcon, Loader2, Sparkles, CheckCircle2, ExternalLink, Menu,
-  Stethoscope, Video, FileText, CheckCheck
+  Stethoscope, Video, FileText, CheckCheck, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import AdminLogin from './AdminLogin';
 import IngredientsManager from './IngredientsManager';
@@ -71,28 +71,40 @@ const compressImageToWebP = (file, maxDim = 1200, quality = 0.82) => {
 };
 
 const NAV_TABS = [
-  { id: 'orders', label: 'Pedidos', icon: ShoppingCart },
-  { id: 'products', label: 'Productos', icon: Package },
-  { id: 'kitchen', label: 'Cocina & Lotes', icon: ChefHat },
-  { id: 'batches', label: 'Lotes FIFO & Cobros', icon: Package },
-  { id: 'ingredients', label: 'Ingredientes', icon: Package },
-  { id: 'partners', label: 'Alianzas Vet & Pet', icon: Stethoscope },
-  { id: 'blog', label: 'Blog SEO IA', icon: BookOpen },
-  { id: 'testimonials', label: 'Testimonios', icon: MessageSquareHeart },
-  { id: 'finance', label: 'Finanzas', icon: BarChart },
-  { id: 'retention', label: 'Retención', icon: MessageSquareHeart },
-  { id: 'nfc', label: 'Puntos NFC (Edificios)', icon: Building2 },
-  { id: 'promotions', label: 'Promociones & 1ra Compra', icon: Gift },
-  { id: 'calculator', label: 'Calculadora de Raciones', icon: Calculator },
-  { id: 'payments', label: 'Pagos & Mercado Pago', icon: CreditCard },
-  { id: 'telegram', label: 'Bot Telegram', icon: Send },
-  { id: 'settings', label: 'Seguridad', icon: Key },
+  // 1. Ventas y Pedidos
+  { id: 'orders', label: 'Pedidos & Cobros', icon: ShoppingCart, group: 'Ventas y Pedidos' },
+  { id: 'products', label: 'Productos', icon: Package, group: 'Ventas y Pedidos' },
+  { id: 'finance', label: 'Finanzas', icon: BarChart, group: 'Ventas y Pedidos' },
+  // 2. Producción e Inventario
+  { id: 'kitchen', label: 'Cocina & Costos', icon: ChefHat, group: 'Producción e Inventario' },
+  { id: 'batches', label: 'Lotes FIFO & Demanda', icon: Package, group: 'Producción e Inventario' },
+  { id: 'ingredients', label: 'Ingredientes', icon: Package, group: 'Producción e Inventario' },
+  // 3. Marketing y Clientes
+  { id: 'partners', label: 'Alianzas Vet & Pet', icon: Stethoscope, group: 'Marketing y Clientes' },
+  { id: 'promotions', label: 'Promociones & 1ra Compra', icon: Gift, group: 'Marketing y Clientes' },
+  { id: 'retention', label: 'Retención', icon: MessageSquareHeart, group: 'Marketing y Clientes' },
+  { id: 'nfc', label: 'Puntos NFC (Edificios)', icon: Building2, group: 'Marketing y Clientes' },
+  { id: 'testimonials', label: 'Testimonios', icon: MessageSquareHeart, group: 'Marketing y Clientes' },
+  { id: 'blog', label: 'Blog SEO IA', icon: BookOpen, group: 'Marketing y Clientes' },
+  // 4. Sistema y Pagos
+  { id: 'calculator', label: 'Calculadora de Raciones', icon: Calculator, group: 'Sistema y Pagos' },
+  { id: 'payments', label: 'Pagos & Mercado Pago', icon: CreditCard, group: 'Sistema y Pagos' },
+  { id: 'telegram', label: 'Bot Telegram', icon: Send, group: 'Sistema y Pagos' },
+  { id: 'settings', label: 'Seguridad', icon: Key, group: 'Sistema y Pagos' },
+];
+
+const NAV_GROUPS = [
+  'Ventas y Pedidos',
+  'Producción e Inventario',
+  'Marketing y Clientes',
+  'Sistema y Pagos',
 ];
 
 const AdminPanel = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_token'));
   const [activeTab, setActiveTab] = useState('orders');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [blogPosts, setBlogPosts] = useState([]);
@@ -526,11 +538,12 @@ const AdminPanel = () => {
         />
       )}
 
-      {/* Sidebar: Drawer en Móvil, Barra Lateral Fija en Desktop */}
+      {/* Sidebar: Drawer en Móvil, Barra Lateral Colapsable en Desktop */}
       <aside className={`
         fixed md:static top-0 left-0 bottom-0 z-50 md:z-10
-        w-72 md:w-64 bg-primary-green-dark text-white flex flex-col shadow-2xl md:shadow-xl shrink-0
-        transition-transform duration-300 ease-in-out
+        bg-primary-green-dark text-white flex flex-col shadow-2xl md:shadow-xl shrink-0
+        transition-all duration-300 ease-in-out
+        ${sidebarCollapsed ? 'md:w-0 md:overflow-hidden md:opacity-0 md:pointer-events-none' : 'w-72 md:w-64'}
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
         {/* Cabecera del Sidebar */}
@@ -558,6 +571,14 @@ const AdminPanel = () => {
             >
               <ExternalLink size={17} />
             </a>
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed(true)}
+              className="hidden md:flex text-white/75 hover:text-white p-2 hover:bg-white/10 rounded-xl transition cursor-pointer"
+              title="Ocultar menú lateral para ampliar espacio"
+            >
+              <ChevronLeft size={18} />
+            </button>
             {/* Botón cerrar en móvil dentro del drawer */}
             <button
               onClick={() => setMobileMenuOpen(false)}
@@ -569,27 +590,37 @@ const AdminPanel = () => {
           </div>
         </div>
         
-        {/* Opciones del Menú */}
-        <div className="flex-1 overflow-y-auto p-3 md:p-4 flex flex-col gap-1.5 md:gap-2">
-          {NAV_TABS.map((tab) => {
-            const TabIcon = tab.icon;
-            const isActive = activeTab === tab.id;
+        {/* Opciones del Menú Agrupadas */}
+        <div className="flex-1 overflow-y-auto p-3 md:p-4 flex flex-col gap-4">
+          {NAV_GROUPS.map((groupName) => {
+            const groupTabs = NAV_TABS.filter((t) => t.group === groupName);
             return (
-              <button 
-                key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  setMobileMenuOpen(false); // Cierra automáticamente el drawer en móvil
-                }}
-                className={`flex items-center gap-3 px-3.5 py-2.5 md:px-4 md:py-3 rounded-xl font-bold text-sm md:text-base transition text-left cursor-pointer ${
-                  isActive 
-                    ? 'bg-white text-primary-green-dark shadow-sm' 
-                    : 'text-white/85 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <TabIcon size={19} className="shrink-0" />
-                <span className="truncate">{tab.label}</span>
-              </button>
+              <div key={groupName} className="flex flex-col gap-1">
+                <span className="px-3 text-[10px] font-extrabold uppercase tracking-wider text-white/50 mb-0.5">
+                  {groupName}
+                </span>
+                {groupTabs.map((tab) => {
+                  const TabIcon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button 
+                      key={tab.id}
+                      onClick={() => {
+                        setActiveTab(tab.id);
+                        setMobileMenuOpen(false);
+                      }}
+                      className={`flex items-center gap-3 px-3.5 py-2 md:px-3.5 md:py-2.5 rounded-xl font-bold text-sm transition text-left cursor-pointer ${
+                        isActive 
+                          ? 'bg-white text-primary-green-dark shadow-sm' 
+                          : 'text-white/85 hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      <TabIcon size={17} className="shrink-0" />
+                      <span className="truncate">{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             );
           })}
         </div>
@@ -610,6 +641,17 @@ const AdminPanel = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 bg-gray-50 flex flex-col min-w-0">
+        {sidebarCollapsed && (
+          <div className="hidden md:flex items-center gap-2 px-6 pt-4">
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed(false)}
+              className="inline-flex items-center gap-1.5 bg-primary-green-dark text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm hover:opacity-95 transition cursor-pointer"
+            >
+              <ChevronRight size={16} /> Mostrar Menú ({currentTabObj.label})
+            </button>
+          </div>
+        )}
         <main className="p-3 sm:p-5 md:p-8 lg:p-10 flex-1 overflow-x-hidden">
           {loading ? (
             <div className="text-center py-10 text-gray-500">Cargando datos...</div>
@@ -648,6 +690,7 @@ const AdminPanel = () => {
               {activeTab === 'orders' && (
                 <DispatchManager 
                   orders={orders} 
+                  products={products}
                   handleUpdateOrderStatus={handleUpdateOrderStatus} 
                   handleDeleteOrder={handleDeleteOrder} 
                   handleBulkDeleteOrders={handleBulkDeleteOrders}
