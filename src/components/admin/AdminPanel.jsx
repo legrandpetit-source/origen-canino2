@@ -20,6 +20,7 @@ import TelegramSettingsManager from './TelegramSettingsManager';
 import PromotionsManager from './PromotionsManager';
 import KitchenProductionManager from './KitchenProductionManager';
 import PartnersManager from './PartnersManager';
+import BatchProductionManager from './BatchProductionManager';
 
 // Comprime y convierte una imagen a WebP en el navegador antes de enviarla
 const compressImageToWebP = (file, maxDim = 1200, quality = 0.82) => {
@@ -73,6 +74,7 @@ const NAV_TABS = [
   { id: 'orders', label: 'Pedidos', icon: ShoppingCart },
   { id: 'products', label: 'Productos', icon: Package },
   { id: 'kitchen', label: 'Cocina & Lotes', icon: ChefHat },
+  { id: 'batches', label: 'Lotes FIFO & Cobros', icon: Package },
   { id: 'ingredients', label: 'Ingredientes', icon: Package },
   { id: 'partners', label: 'Alianzas Vet & Pet', icon: Stethoscope },
   { id: 'blog', label: 'Blog SEO IA', icon: BookOpen },
@@ -628,6 +630,13 @@ const AdminPanel = () => {
                   ingredients={ingredients} 
                   fetchIngredients={refreshIngredients}
                   products={products}
+                />
+              )}
+
+              {activeTab === 'batches' && (
+                <BatchProductionManager
+                  products={products}
+                  ingredients={ingredients}
                 />
               )}
 

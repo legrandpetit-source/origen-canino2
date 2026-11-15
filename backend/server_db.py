@@ -417,6 +417,104 @@ def init_database():
 
             cursor.execute("""
                 ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL;
+                ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP;
+                ALTER TABLE orders ADD COLUMN IF NOT EXISTS fifo_deducted INTEGER DEFAULT 0;
+                ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_direct_link INTEGER DEFAULT 0;
+            """)
+
+            # 21. Módulo de Lotes Semanales (Batches), Trazabilidad FIFO y Links de Pago Directo
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS batch_produccion (
+                    id SERIAL PRIMARY KEY,
+                    codigo_lote TEXT UNIQUE NOT NULL,
+                    producto_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+                    linea_produccion TEXT NOT NULL DEFAULT 'BARF',
+                    semana_fabricacion TEXT NOT NULL,
+                    fecha_elaboracion DATE NOT NULL,
+                    fecha_consumo_preferente DATE NOT NULL,
+                    peso_crudo_total_gramos INTEGER DEFAULT 0,
+                    stock_inicial_gramos INTEGER NOT NULL,
+                    stock_disponible_gramos INTEGER NOT NULL,
+                    costo_total_batch_clp INTEGER DEFAULT 0,
+                    kitchen_cost_id INTEGER REFERENCES kitchen_cost_history(id) ON DELETE SET NULL,
+                    notas TEXT,
+                    estado TEXT NOT NULL DEFAULT 'ACTIVO',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_batch_fifo
+                    ON batch_produccion (producto_id, estado, fecha_elaboracion);
+            """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS batch_ingredientes (
+                    id SERIAL PRIMARY KEY,
+                    batch_id INTEGER NOT NULL REFERENCES batch_produccion(id) ON DELETE CASCADE,
+                    ingrediente_id INTEGER REFERENCES ingredients(id) ON DELETE SET NULL,
+                    nombre_ingrediente TEXT NOT NULL,
+                    cantidad_gramos NUMERIC(10,2) NOT NULL,
+                    porcentaje_formula NUMERIC(6,2) NOT NULL,
+                    costo_unitario_clp INTEGER NOT NULL DEFAULT 0
+                );
+            """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS batch_nutricion (
+                    batch_id INTEGER PRIMARY KEY REFERENCES batch_produccion(id) ON DELETE CASCADE,
+                    proteina_pct NUMERIC(6,2) DEFAULT 0,
+                    grasa_pct NUMERIC(6,2) DEFAULT 0,
+                    fibra_pct NUMERIC(6,2) DEFAULT 0,
+                    humedad_pct NUMERIC(6,2) DEFAULT 0,
+                    cenizas_pct NUMERIC(6,2) DEFAULT 0,
+                    carbohidratos_pct NUMERIC(6,2) DEFAULT 0,
+                    calcio_pct NUMERIC(6,2) DEFAULT 0,
+                    fosforo_pct NUMERIC(6,2) DEFAULT 0,
+                    kcal_100g NUMERIC(7,2) DEFAULT 0
+                );
+            """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS pedido_detalle_batches (
+                    id SERIAL PRIMARY KEY,
+                    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+                    order_item_id INTEGER NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
+                    batch_id INTEGER NOT NULL REFERENCES batch_produccion(id) ON DELETE CASCADE,
+                    codigo_lote TEXT NOT NULL,
+                    gramos_descontados INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_pdb_order ON pedido_detalle_batches (order_id);
+                CREATE INDEX IF NOT EXISTS idx_pdb_batch ON pedido_detalle_batches (batch_id);
+            """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS batch_waitlist (
+                    id SERIAL PRIMARY KEY,
+                    producto_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+                    customer_name TEXT,
+                    contact_phone TEXT,
+                    contact_email TEXT,
+                    notified INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS direct_payment_links (
+                    id SERIAL PRIMARY KEY,
+                    token TEXT UNIQUE NOT NULL,
+                    mode TEXT NOT NULL DEFAULT 'assisted_cart',
+                    order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
+                    customer_name TEXT,
+                    customer_phone TEXT,
+                    customer_email TEXT,
+                    items_json JSONB NOT NULL,
+                    total_clp INTEGER NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pendiente',
+                    opened_at TIMESTAMP,
+                    paid_at TIMESTAMP,
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
             """)
 
             # Cargar datos semilla si la base de datos es nueva

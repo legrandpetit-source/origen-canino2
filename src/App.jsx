@@ -11,6 +11,7 @@ import AdminPanel from './components/admin/AdminPanel';
 import CustomerPortal from './components/customer/CustomerPortal';
 import CustomerAuthModal from './components/customer/CustomerAuthModal';
 import PaymentStatusModal from './components/shop/PaymentStatusModal';
+import DirectPaymentPage from './components/shop/DirectPaymentPage';
 import TopBanner from './components/shop/TopBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -39,6 +40,7 @@ function App() {
                   <Route index element={<Home />} />
                   <Route path="blog/:slug" element={<BlogPost />} />
                   <Route path="mi-cuenta" element={<CustomerPortal />} />
+                  <Route path="pagar/:token" element={<DirectPaymentPage />} />
                 </Route>
 
                 {/* Ruta Dedicada del Panel de Administración (Sin banners ni menú de tienda) */}

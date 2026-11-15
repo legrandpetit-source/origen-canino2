@@ -4,10 +4,23 @@ const CartContext = createContext();
 
 export const useCart = () => useContext(CartContext);
 
+export const parseWeightGrams = (weightStr) => {
+  if (!weightStr) return 1000;
+  const text = String(weightStr).trim().toLowerCase().replace(',', '.');
+  const m = text.match(/(\d+(?:\.\d+)?)\s*(kg|k|g|gr|grs)?/);
+  if (!m) return 1000;
+  const val = parseFloat(m[1]);
+  const unit = m[2] || '';
+  if (unit.startsWith('k')) return Math.max(1, Math.round(val * 1000));
+  if (unit.startsWith('g')) return Math.max(1, Math.round(val));
+  return val <= 20 ? Math.max(1, Math.round(val * 1000)) : Math.max(1, Math.round(val));
+};
+
 export const CartProvider = ({ children }) => {
   const [items, setItems] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [dogData, setDogData] = useState({ name: '', weight: '', age: '' });
+  const [directLinkToken, setDirectLinkToken] = useState(null);
   
   // Promoción de Primera Compra
   const [firstOrderPromo, setFirstOrderPromo] = useState({
@@ -73,9 +86,15 @@ export const CartProvider = ({ children }) => {
   const addItem = (product, quantity = 1) => {
     setItems(current => {
       const existing = current.find(item => item.id === product.id);
+      const nextQty = (existing ? existing.quantity : 0) + quantity;
+      if (product.has_batches && product.stock_disponible_gramos != null) {
+        const unitG = parseWeightGrams(product.weight);
+        const maxQty = Math.floor(product.stock_disponible_gramos / unitG);
+        if (nextQty > maxQty) return current;
+      }
       if (existing) {
         return current.map(item => 
-          item.id === product.id ? { ...item, quantity: item.quantity + quantity } : item
+          item.id === product.id ? { ...item, quantity: nextQty } : item
         );
       }
       return [...current, { ...product, quantity }];
@@ -89,26 +108,38 @@ export const CartProvider = ({ children }) => {
 
   const updateQuantity = (productId, newQuantity) => {
     if (newQuantity <= 0) return removeItem(productId);
-    setItems(current => current.map(item => 
-      item.id === productId ? { ...item, quantity: newQuantity } : item
-    ));
+    setItems(current => current.map(item => {
+      if (item.id !== productId) return item;
+      if (item.has_batches && item.stock_disponible_gramos != null) {
+        const unitG = parseWeightGrams(item.weight);
+        const maxQty = Math.floor(item.stock_disponible_gramos / unitG);
+        if (newQuantity > maxQty) return { ...item, quantity: Math.max(1, maxQty) };
+      }
+      return { ...item, quantity: newQuantity };
+    }));
+  };
+
+  const loadAssistedCart = (assistedItems, token) => {
+    setDirectLinkToken(token);
+    setItems(assistedItems || []);
   };
 
   const clearCart = () => {
     setItems([]);
+    setDirectLinkToken(null);
   };
 
   const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
-  // Descuento NFC calculado
-  const nfcDiscount = (nfcCommunity && nfcCommunity.discount_percent > 0)
+  // Descuento NFC calculado (anulado en links de pago directo sin descuento)
+  const nfcDiscount = (!directLinkToken && nfcCommunity && nfcCommunity.discount_percent > 0)
     ? Math.round(total * (nfcCommunity.discount_percent / 100))
     : 0;
 
-  // Descuento Primera Compra (si está habilitado y es nuevo comprador)
-  const isFirstPurchaseEligible = !hasPurchased;
-  const firstOrderDiscount = (firstOrderPromo?.enabled && isFirstPurchaseEligible && total > 0)
+  // Descuento Primera Compra (anulado en links de pago directo sin descuento)
+  const isFirstPurchaseEligible = !hasPurchased && !directLinkToken;
+  const firstOrderDiscount = (!directLinkToken && firstOrderPromo?.enabled && isFirstPurchaseEligible && total > 0)
     ? Math.round(total * (Number(firstOrderPromo.percent) / 100))
     : 0;
 
@@ -117,7 +148,8 @@ export const CartProvider = ({ children }) => {
       items, addItem, removeItem, updateQuantity, clearCart, total, itemCount,
       isCartOpen, setIsCartOpen, dogData, setDogData,
       nfcCommunity, setNfcCommunity, clearNfcCommunity, nfcDiscount,
-      firstOrderPromo, firstOrderDiscount, isFirstPurchaseEligible, markAsPurchased
+      firstOrderPromo, firstOrderDiscount, isFirstPurchaseEligible, markAsPurchased,
+      directLinkToken, setDirectLinkToken, loadAssistedCart
     }}>
       {children}
     </CartContext.Provider>

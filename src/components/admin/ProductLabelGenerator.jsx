@@ -1,15 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Printer, X, Tag, ShieldCheck, QrCode, Snowflake, 
   Flame, Drumstick, AlertCircle, Check, Copy, Sliders
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
-const ProductLabelGenerator = ({ activeLine, totalKg, isOpen, onClose }) => {
+const ProductLabelGenerator = ({ activeLine = 'barf', totalKg, isOpen, onClose, batchLabelData = null }) => {
   const [packSize, setPackSize] = useState('1kg'); // '1kg', '500g', '2kg'
   const [printLayout, setPrintLayout] = useState('single'); // 'single' (10x15 adhesiva) o 'sheet' (4 por hoja carta)
   const [copiesCount, setCopiesCount] = useState(4);
 
-  // Fechas y Lote automáticos
+  // Fechas y Lote automáticos (prioriza snapshot del batch si viene definido)
   const today = new Date();
   const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
   const [lotNumber, setLotNumber] = useState(`LOT-${activeLine.toUpperCase()}-${dateStr}-01`);
@@ -19,18 +20,50 @@ const ProductLabelGenerator = ({ activeLine, totalKg, isOpen, onClose }) => {
   expireDateObj.setMonth(expireDateObj.getMonth() + 6);
   const [expireDate, setExpireDate] = useState(expireDateObj.toLocaleDateString('es-CL'));
 
+  useEffect(() => {
+    if (batchLabelData) {
+      setLotNumber(batchLabelData.codigo_lote || lotNumber);
+      if (batchLabelData.fecha_elaboracion) {
+        setElabDate(new Date(`${batchLabelData.fecha_elaboracion}T12:00:00`).toLocaleDateString('es-CL'));
+      }
+      if (batchLabelData.fecha_consumo_preferente) {
+        setExpireDate(new Date(`${batchLabelData.fecha_consumo_preferente}T12:00:00`).toLocaleDateString('es-CL'));
+      }
+    }
+  }, [batchLabelData]);
+
   if (!isOpen) return null;
 
-  // Datos específicos según la línea
-  const isBarf = activeLine === 'barf';
+  // Datos específicos según la línea o snapshot real del batch
+  const effectiveLine = batchLabelData
+    ? (String(batchLabelData.linea_produccion || '').toLowerCase() === 'cocido' ? 'cocinada' : 'barf')
+    : activeLine;
+  const isBarf = effectiveLine === 'barf';
 
-  const labelData = isBarf ? {
-    title: "DIETA BARF CRUDA BIOLÓGICA",
+  const batchIngredientsStr = batchLabelData?.ingredientes?.length
+    ? batchLabelData.ingredientes
+        .map(i => `${i.nombre_ingrediente} (${Number(i.porcentaje_formula).toFixed(1)}%)`)
+        .join(', ') + '.'
+    : null;
+
+  const batchNutritionRows = batchLabelData ? [
+    { label: "Proteína Cruda (mín.)", value: `${Number(batchLabelData.proteina_pct || 0).toFixed(1)}%` },
+    { label: "Grasa Cruda (mín.)", value: `${Number(batchLabelData.grasa_pct || 0).toFixed(1)}%` },
+    { label: "Fibra Cruda (máx.)", value: `${Number(batchLabelData.fibra_pct || 0).toFixed(1)}%` },
+    { label: "Humedad (máx.)", value: `${Number(batchLabelData.humedad_pct || 0).toFixed(1)}%` },
+    { label: "Materia Mineral / Cenizas (máx.)", value: `${Number(batchLabelData.cenizas_pct || 0).toFixed(1)}%` },
+    { label: "Calcio (mín.)", value: `${Number(batchLabelData.calcio_pct || 0).toFixed(2)}%` },
+    { label: "Fósforo (mín.)", value: `${Number(batchLabelData.fosforo_pct || 0).toFixed(2)}%` },
+    { label: "Energía Metabolizable (EM)", value: `${Math.round(Number(batchLabelData.kcal_100g || 0) * 10).toLocaleString('es-CL')} kcal/kg` }
+  ] : null;
+
+  const baseLabelData = isBarf ? {
+    title: batchLabelData?.producto_nombre || "DIETA BARF CRUDA BIOLÓGICA",
     subtitle: "Pollo & Vegetales Vivos con Hueso Carnoso Molido",
     typeTag: "ALIMENTO CRUDO CONGELADO PARA PERROS DE TODAS LAS EDADES",
     netWeight: packSize === '1kg' ? '1.000 g (1 Kg)' : packSize === '500g' ? '500 g' : '2.000 g (2 Kg)',
-    ingredients: "Cogote de pollo entero con hueso carnoso molido (70%), puré vegetal cocido al vapor (zapallo camote, zanahoria, betarraga) (12%), contre de vacuno/pollo (10%), pana de pollo/cerdo (5%), zapallo italiano, manzana fresca, tallos de apio (3%), huevos frescos enteros sin cáscara, cúrcuma longa pura, pimienta negra molida activadora.",
-    guaranteedAnalysis: [
+    ingredients: batchIngredientsStr || "Cogote de pollo entero con hueso carnoso molido (70%), puré vegetal cocido al vapor (zapallo camote, zanahoria, betarraga) (12%), contre de vacuno/pollo (10%), pana de pollo/cerdo (5%), zapallo italiano, manzana fresca, tallos de apio (3%), huevos frescos enteros sin cáscara, cúrcuma longa pura, pimienta negra molida activadora.",
+    guaranteedAnalysis: batchNutritionRows || [
       { label: "Proteína Cruda (mín.)", value: "14.5%" },
       { label: "Grasa Cruda (mín.)", value: "11.2%" },
       { label: "Fibra Cruda (máx.)", value: "1.8%" },
@@ -45,12 +78,12 @@ const ProductLabelGenerator = ({ activeLine, totalKg, isOpen, onClose }) => {
     safetyWarning: "Lavar manos, recipientes y superficies con agua caliente y jabón después de manipular alimentos crudos. Exclusivo para consumo canino.",
     sagNote: "Elaborado conforme a estándares biológicos AAFCO y directrices nutricionales SAG Chile."
   } : {
-    title: "DIETA COCINADA AL VAPOR",
+    title: batchLabelData?.producto_nombre || "DIETA COCINADA AL VAPOR",
     subtitle: "Cerdo Magro & Puré Digestivo con Balance Óseo de Calcio",
     typeTag: "ALIMENTO COMPLETO COCINADO PARA PERROS CON ESTÓMAGO SENSIBLE",
     netWeight: packSize === '1kg' ? '1.000 g (1 Kg)' : packSize === '500g' ? '500 g' : '2.000 g (2 Kg)',
-    ingredients: "Carne magra de cerdo sin hueso (70%), puré de verduras al vapor con caldo natural (zapallo camote, zapallo italiano, zanahoria) (20%), pana/hígado de cerdo o pollo (10%), carbonato de calcio orgánico bioasimilable (harina ultrafina de cáscara de huevo pasteurizada), huevos de gallina enteros cocidos.",
-    guaranteedAnalysis: [
+    ingredients: batchIngredientsStr || "Carne magra de cerdo sin hueso (70%), puré de verduras al vapor con caldo natural (zapallo camote, zapallo italiano, zanahoria) (20%), pana/hígado de cerdo o pollo (10%), carbonato de calcio orgánico bioasimilable (harina ultrafina de cáscara de huevo pasteurizada), huevos de gallina enteros cocidos.",
+    guaranteedAnalysis: batchNutritionRows || [
       { label: "Proteína Cruda (mín.)", value: "16.8%" },
       { label: "Grasa Cruda (mín.)", value: "8.5%" },
       { label: "Fibra Cruda (máx.)", value: "1.5%" },
@@ -65,6 +98,7 @@ const ProductLabelGenerator = ({ activeLine, totalKg, isOpen, onClose }) => {
     safetyWarning: "Fórmula hipoalergénica de descarte monoproteica. Libre de granos, gluten, subproductos, colorantes y conservantes químicos.",
     sagNote: "Suplementado con calcio bioasimilable para estricto equilibrio mineral óseo (AAFCO/SAG)."
   };
+  const labelData = baseLabelData;
 
   const handlePrintLabels = () => {
     window.print();
@@ -250,24 +284,30 @@ const ProductLabelGenerator = ({ activeLine, totalKg, isOpen, onClose }) => {
 
               {/* Pie de Etiqueta: Lote, Conservación y QR */}
               <div className="border-t-2 border-stone-900 pt-2 mt-auto">
-                <div className="flex items-center justify-between text-[9px] mb-1.5">
-                  <div>
-                    <span className="text-stone-500 font-bold">LOTE: </span>
-                    <span className="font-mono font-black text-stone-900">{lotNumber}</span>
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between text-[9px] mb-1">
+                      <div>
+                        <span className="text-stone-500 font-bold">LOTE: </span>
+                        <span className="font-mono font-black text-stone-900">{lotNumber}</span>
+                      </div>
+                      <div>
+                        <span className="text-stone-500 font-bold">ELAB: </span>
+                        <span className="font-mono font-bold text-stone-800">{elabDate}</span>
+                      </div>
+                      <div>
+                        <span className="text-stone-500 font-bold">VENC (-18°C): </span>
+                        <span className="font-mono font-black text-red-700">{expireDate}</span>
+                      </div>
+                    </div>
+                    <p className="text-[8.5px] text-stone-600 leading-tight">
+                      <strong>CONSERVACIÓN:</strong> {labelData.storage}
+                    </p>
                   </div>
-                  <div>
-                    <span className="text-stone-500 font-bold">ELAB: </span>
-                    <span className="font-mono font-bold text-stone-800">{elabDate}</span>
-                  </div>
-                  <div>
-                    <span className="text-stone-500 font-bold">VENC (-18°C): </span>
-                    <span className="font-mono font-black text-red-700">{expireDate}</span>
+                  <div className="shrink-0 bg-white p-0.5 border border-stone-200 rounded">
+                    <QRCodeSVG value={`https://origencanino.cl/?lote=${encodeURIComponent(lotNumber)}`} size={38} />
                   </div>
                 </div>
-
-                <p className="text-[8.5px] text-stone-600 leading-tight mb-1">
-                  <strong>CONSERVACIÓN:</strong> {labelData.storage}
-                </p>
 
                 <div className="flex items-center justify-between text-[8px] text-stone-500 pt-1 border-t border-stone-200">
                   <span>origencanino.cl • Santiago, Chile</span>

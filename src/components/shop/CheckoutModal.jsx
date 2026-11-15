@@ -26,7 +26,7 @@ const CHILEAN_BANKS = [
 const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
   const { 
     items, total, clearCart, dogData, nfcCommunity, nfcDiscount, 
-    firstOrderPromo, isFirstPurchaseEligible, markAsPurchased 
+    firstOrderPromo, isFirstPurchaseEligible, markAsPurchased, directLinkToken 
   } = useCart();
   const { customer, dogs, openAuthModal, login, register } = useCustomer();
   
@@ -544,10 +544,11 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
         transfer_receipt_number: paymentMethod === 'transferencia' ? formData.transfer_receipt_number.trim() : null,
         transfer_receipt_url: uploadedReceiptUrl,
         nfc_building_code: nfcCommunity ? nfcCommunity.slug : null,
-        discount_amount: totalDiscount,
-        coupon_code: appliedCoupon || null,
-        referral_code: (appliedCouponData?.is_referral && appliedCoupon) ? appliedCoupon : null,
-        use_wallet_balance: useWalletBalance && walletDeduction > 0,
+        discount_amount: directLinkToken ? 0 : totalDiscount,
+        coupon_code: directLinkToken ? null : (appliedCoupon || null),
+        referral_code: directLinkToken ? null : ((appliedCouponData?.is_referral && appliedCoupon) ? appliedCoupon : null),
+        use_wallet_balance: directLinkToken ? false : (useWalletBalance && walletDeduction > 0),
+        direct_link_token: directLinkToken || null,
         items: items.map(item => ({
           id: item.id,
           name: item.name,

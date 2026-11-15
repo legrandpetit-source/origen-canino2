@@ -16,6 +16,8 @@ import urllib.request
 import urllib.parse
 import urllib.error
 from server_db import get_connection, init_database
+import batch_service
+from batch_routes import create_batch_router
 from PIL import Image, UnidentifiedImageError, ImageOps
 import io
 import uuid
@@ -146,6 +148,8 @@ class ProductResponse(BaseModel):
     image: str
     isNew: bool
     fixed_cost: int = 0
+    stock_disponible_gramos: Optional[int] = None
+    has_batches: bool = False
 
 class ProductCreate(BaseModel):
     name: str
@@ -296,6 +300,7 @@ class OrderCreate(BaseModel):
     coupon_code: Optional[str] = None
     referral_code: Optional[str] = None
     use_wallet_balance: Optional[bool] = False
+    direct_link_token: Optional[str] = None
 
 class CouponCreate(BaseModel):
     code: str
@@ -485,6 +490,8 @@ def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(securi
         raise HTTPException(status_code=401, detail="Token expirado")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Token inválido")
+
+app.include_router(create_batch_router(get_current_admin))
 
 def get_current_customer(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
@@ -1499,9 +1506,11 @@ def get_products():
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM products WHERE active = 1 ORDER BY id ASC")
         rows = cursor.fetchall()
+        stock_map = batch_service.get_products_live_stock(cursor)
         
         products = []
         for row in rows:
+            s_info = stock_map.get(int(row["id"]), {"has_batches": False, "stock_disponible_gramos": None})
             products.append(ProductResponse(
                 id=row["id"],
                 name=row["name"],
@@ -1513,7 +1522,9 @@ def get_products():
                 benefits=json.loads(row["benefits"]),
                 image=row["image"],
                 isNew=bool(row["is_new"]),
-                fixed_cost=row.get("fixed_cost", 0)
+                fixed_cost=row.get("fixed_cost", 0),
+                stock_disponible_gramos=s_info["stock_disponible_gramos"],
+                has_batches=s_info["has_batches"]
             ))
         return products
 
@@ -2762,7 +2773,9 @@ def create_order(order: OrderCreate, req: Request):
             status_code=400, 
             detail=f"El monto mínimo de compra es de ${MIN_PURCHASE_AMOUNT:,} CLP. Tu subtotal actual es de ${subtotal:,} CLP."
         )
-    discount = order.discount_amount or 0
+    # Links de pago directo: sin ningún tipo de descuento (precio lista duro)
+    is_direct_link = 1 if (order.direct_link_token and order.direct_link_token.strip()) else 0
+    discount = 0 if is_direct_link else (order.discount_amount or 0)
     subtotal_after_discount = max(0, subtotal - discount)
     
     # Envío gratis si es suscripción, de lo contrario $5000 si es menor a $100.000
@@ -2787,6 +2800,10 @@ def create_order(order: OrderCreate, req: Request):
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
+            try:
+                batch_service.validate_cart_stock(cursor, order.items)
+            except ValueError as stock_err:
+                raise HTTPException(status_code=400, detail=str(stock_err))
             
             # Buscar si el cliente ya está registrado por email
             clean_email = order.customer_email.strip().lower()
@@ -2828,10 +2845,10 @@ def create_order(order: OrderCreate, req: Request):
                     total = max(0, total - wallet_discount)
                     cursor.execute("UPDATE customers SET wallet_balance = wallet_balance - %s WHERE id = %s", (wallet_discount, linked_customer_id))
 
-            coupon_applied = order.coupon_code.strip().upper() if order.coupon_code else None
+            coupon_applied = None if is_direct_link else (order.coupon_code.strip().upper() if order.coupon_code else None)
             raw_ref = order.referral_code.strip().upper() if order.referral_code else None
             # Regla de integridad: el referido solo es válido si fue activamente canjeado como cupón
-            ref_applied = raw_ref if (raw_ref and raw_ref == coupon_applied) else None
+            ref_applied = None if is_direct_link else (raw_ref if (raw_ref and raw_ref == coupon_applied) else None)
 
             cursor.execute("""
                 INSERT INTO orders (
@@ -2840,9 +2857,9 @@ def create_order(order: OrderCreate, req: Request):
                     is_subscription, dog_name, dog_weight, dog_age, payment_method, 
                     transfer_bank, transfer_receipt_number, transfer_receipt_url, nfc_building_code, 
                     discount_amount, coupon_code, payment_status, delivery_status, customer_id,
-                    referral_code, wallet_discount
+                    referral_code, wallet_discount, is_direct_link
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
                 RETURNING id
             """, (
                 order.customer_name, order.customer_email, order.customer_phone, order.customer_address, 
@@ -2851,10 +2868,16 @@ def create_order(order: OrderCreate, req: Request):
                 order.payment_method or 'transferencia', order.transfer_bank, order.transfer_receipt_number,
                 order.transfer_receipt_url,
                 order.nfc_building_code, discount, coupon_applied, initial_payment_status, initial_delivery_status, linked_customer_id,
-                ref_applied, wallet_discount
+                ref_applied, wallet_discount, is_direct_link
             ))
             
             order_id = cursor.fetchone()['id']
+
+            if is_direct_link:
+                cursor.execute(
+                    "UPDATE direct_payment_links SET order_id = %s WHERE token = %s",
+                    (order_id, order.direct_link_token.strip()),
+                )
 
             if wallet_discount > 0 and linked_customer_id:
                 cursor.execute("""
@@ -3112,9 +3135,17 @@ async def mercadopago_webhook(request: Request):
                         cursor = conn.cursor()
                         cursor.execute("""
                             UPDATE orders 
-                            SET payment_status = 'Pagado', delivery_status = 'Preparación', mercadopago_payment_id = %s
+                            SET payment_status = 'Pagado',
+                                delivery_status = CASE WHEN delivery_status = 'Entregado' THEN 'Entregado' ELSE 'Preparación' END,
+                                mercadopago_payment_id = %s
                             WHERE id = %s
                         """, (str(data_id), order_id))
+                        batch_service.deduct_fifo_for_order(cursor, order_id)
+                        cursor.execute("""
+                            UPDATE direct_payment_links
+                            SET status = 'pagado', paid_at = CURRENT_TIMESTAMP
+                            WHERE order_id = %s AND status != 'pagado'
+                        """, (order_id,))
                         check_and_award_referral(cursor, order_id)
                         
                         # Obtener datos completos de la orden y productos para la notificación
@@ -3823,6 +3854,8 @@ def update_order(order_id: int, update_data: OrderStatusUpdate, current_user: st
             if update_data.delivery_status is not None:
                 updates.append("delivery_status = %s")
                 params.append(update_data.delivery_status)
+                if update_data.delivery_status == 'Entregado':
+                    updates.append("delivered_at = COALESCE(delivered_at, CURRENT_TIMESTAMP)")
                 
             if not updates:
                 return {"success": True, "message": "Nada que actualizar"}
@@ -3830,8 +3863,16 @@ def update_order(order_id: int, update_data: OrderStatusUpdate, current_user: st
             params.append(order_id)
             query = f"UPDATE orders SET {', '.join(updates)} WHERE id = %s"
             cursor.execute(query, tuple(params))
+            if update_data.payment_status == 'Pagado' or update_data.delivery_status == 'Entregado':
+                batch_service.deduct_fifo_for_order(cursor, order_id)
             if update_data.payment_status == 'Pagado':
+                cursor.execute(
+                    "UPDATE direct_payment_links SET status = 'pagado', paid_at = CURRENT_TIMESTAMP WHERE order_id = %s AND status != 'pagado'",
+                    (order_id,),
+                )
                 check_and_award_referral(cursor, order_id)
+            if update_data.delivery_status in ('Anulado', 'Cancelado'):
+                batch_service.restore_fifo_for_order(cursor, order_id)
             conn.commit()
             return {"success": True, "message": "Orden actualizada"}
     except Exception as e:
