@@ -187,6 +187,8 @@ class IngredientResponse(BaseModel):
     moisture_g: Optional[float] = 0
     ash_g: Optional[float] = 0
     carbs_g: Optional[float] = 0
+    calcium_g: Optional[float] = 0
+    phosphorus_g: Optional[float] = 0
 
 class IngredientCreateUpdate(BaseModel):
     name: str
@@ -199,6 +201,8 @@ class IngredientCreateUpdate(BaseModel):
     moisture_g: Optional[float] = 0
     ash_g: Optional[float] = 0
     carbs_g: Optional[float] = 0
+    calcium_g: Optional[float] = 0
+    phosphorus_g: Optional[float] = 0
 
 class EstimateNutritionRequest(BaseModel):
     ingredient_name: str
@@ -1658,12 +1662,12 @@ def create_ingredient(i: IngredientCreateUpdate, current_user: str = Depends(get
             cursor.execute("""
                 INSERT INTO ingredients (
                     name, cost_per_unit, unit, 
-                    kcal_per_100g, protein_g, fat_g, fiber_g, moisture_g, ash_g, carbs_g
+                    kcal_per_100g, protein_g, fat_g, fiber_g, moisture_g, ash_g, carbs_g, calcium_g, phosphorus_g
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
             """, (
                 i.name, i.cost_per_unit, i.unit,
-                i.kcal_per_100g, i.protein_g, i.fat_g, i.fiber_g, i.moisture_g, i.ash_g, i.carbs_g
+                i.kcal_per_100g, i.protein_g, i.fat_g, i.fiber_g, i.moisture_g, i.ash_g, i.carbs_g, i.calcium_g, i.phosphorus_g
             ))
             new_id = cursor.fetchone()["id"]
 
@@ -1693,11 +1697,11 @@ def update_ingredient(ingredient_id: int, i: IngredientCreateUpdate, current_use
             cursor.execute("""
                 UPDATE ingredients 
                 SET name = %s, cost_per_unit = %s, unit = %s,
-                    kcal_per_100g = %s, protein_g = %s, fat_g = %s, fiber_g = %s, moisture_g = %s, ash_g = %s, carbs_g = %s
+                    kcal_per_100g = %s, protein_g = %s, fat_g = %s, fiber_g = %s, moisture_g = %s, ash_g = %s, carbs_g = %s, calcium_g = %s, phosphorus_g = %s
                 WHERE id = %s
             """, (
                 i.name, i.cost_per_unit, i.unit,
-                i.kcal_per_100g, i.protein_g, i.fat_g, i.fiber_g, i.moisture_g, i.ash_g, i.carbs_g,
+                i.kcal_per_100g, i.protein_g, i.fat_g, i.fiber_g, i.moisture_g, i.ash_g, i.carbs_g, i.calcium_g, i.phosphorus_g,
                 ingredient_id
             ))
 
@@ -1761,7 +1765,9 @@ def estimate_nutrition(req: EstimateNutritionRequest, current_user: str = Depend
       "fiber_g": 0.0,
       "moisture_g": 0.0,
       "ash_g": 0.0,
-      "carbs_g": 0.0
+      "carbs_g": 0.0,
+      "calcium_g": 0.0,
+      "phosphorus_g": 0.0
     }}
     No devuelvas ningún otro texto, markdown, ni explicaciones. Solo el JSON.
     """

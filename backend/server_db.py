@@ -111,6 +111,8 @@ def init_database():
                 ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS moisture_g NUMERIC DEFAULT 0;
                 ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS ash_g NUMERIC DEFAULT 0;
                 ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS carbs_g NUMERIC DEFAULT 0;
+                ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS calcium_g NUMERIC DEFAULT 0;
+                ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS phosphorus_g NUMERIC DEFAULT 0;
             """)
 
             # 1.2 Tabla de Recetas (Ingredientes por Producto)

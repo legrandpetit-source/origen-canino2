@@ -52,14 +52,14 @@ const ProductLabelGenerator = ({ activeLine = 'barf', totalKg, isOpen, onClose, 
     { label: "Fibra Cruda (máx.)", value: `${Number(batchLabelData.fibra_pct || 0).toFixed(1)}%` },
     { label: "Humedad (máx.)", value: `${Number(batchLabelData.humedad_pct || 0).toFixed(1)}%` },
     { label: "Materia Mineral / Cenizas (máx.)", value: `${Number(batchLabelData.cenizas_pct || 0).toFixed(1)}%` },
-    { label: "Calcio (mín.)", value: `${Number(batchLabelData.calcio_pct || 0).toFixed(2)}%` },
-    { label: "Fósforo (mín.)", value: `${Number(batchLabelData.fosforo_pct || 0).toFixed(2)}%` },
+    ...(Number(batchLabelData.calcio_pct || 0) > 0 ? [{ label: "Calcio (mín.)", value: `${Number(batchLabelData.calcio_pct).toFixed(2)}%` }] : []),
+    ...(Number(batchLabelData.fosforo_pct || 0) > 0 ? [{ label: "Fósforo (mín.)", value: `${Number(batchLabelData.fosforo_pct).toFixed(2)}%` }] : []),
     { label: "Energía Metabolizable (EM)", value: `${Math.round(Number(batchLabelData.kcal_100g || 0) * 10).toLocaleString('es-CL')} kcal/kg` }
   ] : null;
 
   const baseLabelData = isBarf ? {
     title: batchLabelData?.producto_nombre || "DIETA BARF CRUDA BIOLÓGICA",
-    subtitle: "Pollo & Vegetales Vivos con Hueso Carnoso Molido",
+    subtitle: "Pollo & Vegetales",
     typeTag: "ALIMENTO CRUDO CONGELADO PARA PERROS DE TODAS LAS EDADES",
     netWeight: packSize === '1kg' ? '1.000 g (1 Kg)' : packSize === '500g' ? '500 g' : '2.000 g (2 Kg)',
     ingredients: batchIngredientsStr || "Cogote de pollo entero con hueso carnoso molido (70%), puré vegetal cocido al vapor (zapallo camote, zanahoria, betarraga) (12%), contre de vacuno/pollo (10%), pana de pollo/cerdo (5%), zapallo italiano, manzana fresca, tallos de apio (3%), huevos frescos enteros sin cáscara, cúrcuma longa pura, pimienta negra molida activadora.",
@@ -246,7 +246,7 @@ const ProductLabelGenerator = ({ activeLine = 'barf', totalKg, isOpen, onClose, 
                 <div className="mb-2.5">
                   <div className="text-[10px] font-black uppercase tracking-wider text-stone-900 border-b border-stone-400 pb-0.5 mb-1 flex items-center justify-between">
                     <span>ANÁLISIS GARANTIZADO (BASE TAL CUAL)</span>
-                    <span className="font-mono text-[9px] text-stone-500">ESTÁNDAR AAFCO / SAG</span>
+                    <span className="font-mono text-[9px] text-stone-500">ESTÁNDAR AAFCO</span>
                   </div>
                   <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
                     {labelData.guaranteedAnalysis.map((item, i) => (
@@ -256,16 +256,6 @@ const ProductLabelGenerator = ({ activeLine = 'barf', totalKg, isOpen, onClose, 
                       </div>
                     ))}
                   </div>
-                </div>
-
-                {/* Ingredientes */}
-                <div className="mb-2">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-stone-900 block mb-0.5">
-                    INGREDIENTES (ORDEN DECRECIENTE):
-                  </span>
-                  <p className="text-[9.5px] text-stone-700 leading-tight">
-                    {labelData.ingredients}
-                  </p>
                 </div>
 
                 {/* Guía Rápida de Alimentación */}
@@ -311,7 +301,6 @@ const ProductLabelGenerator = ({ activeLine = 'barf', totalKg, isOpen, onClose, 
 
                 <div className="flex items-center justify-between text-[8px] text-stone-500 pt-1 border-t border-stone-200">
                   <span>origencanino.cl • Santiago, Chile</span>
-                  <span className="font-mono font-bold text-stone-700">Resolución SAG en Trámite</span>
                 </div>
               </div>
 

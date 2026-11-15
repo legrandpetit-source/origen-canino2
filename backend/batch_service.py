@@ -92,7 +92,9 @@ def compute_batch_nutrition_and_cost(
                    COALESCE(fiber_g, 0) AS fiber_g,
                    COALESCE(moisture_g, 0) AS moisture_g,
                    COALESCE(ash_g, 0) AS ash_g,
-                   COALESCE(carbs_g, 0) AS carbs_g
+                   COALESCE(carbs_g, 0) AS carbs_g,
+                   COALESCE(calcium_g, 0) AS calcium_g,
+                   COALESCE(phosphorus_g, 0) AS phosphorus_g
             FROM ingredients
             WHERE id = ANY(%s)
             """,
@@ -141,6 +143,8 @@ def compute_batch_nutrition_and_cost(
         totals["cenizas_pct"] += float(db_ing.get("ash_g", 0)) * weight_ratio
         totals["carbohidratos_pct"] += float(db_ing.get("carbs_g", 0)) * weight_ratio
         totals["kcal_100g"] += float(db_ing.get("kcal_per_100g", 0)) * weight_ratio
+        totals["calcio_pct"] += float(db_ing.get("calcium_g", 0)) * weight_ratio
+        totals["fosforo_pct"] += float(db_ing.get("phosphorus_g", 0)) * weight_ratio
 
         snapshot_items.append({
             "ingrediente_id": ing_id,

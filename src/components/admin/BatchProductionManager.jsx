@@ -49,6 +49,8 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
     moisture_g: 0,
     ash_g: 0,
     carbs_g: 0,
+    calcium_g: 0,
+    phosphorus_g: 0,
   });
 
   // Recall Search
@@ -208,10 +210,12 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
       acc.humedad += Number(dbIng.moisture_g || 0) * w;
       acc.cenizas += Number(dbIng.ash_g || 0) * w * concentrationFactor;
       acc.carbs += Number(dbIng.carbs_g || 0) * w * concentrationFactor;
+      acc.calcio += Number(dbIng.calcium_g || 0) * w * concentrationFactor;
+      acc.fosforo += Number(dbIng.phosphorus_g || 0) * w * concentrationFactor;
       acc.kcal += Number(dbIng.kcal_per_100g || 0) * w * concentrationFactor;
       return acc;
     },
-    { proteina: 0, grasa: 0, fibra: 0, humedad: 0, cenizas: 0, carbs: 0, kcal: 0 }
+    { proteina: 0, grasa: 0, fibra: 0, humedad: 0, cenizas: 0, carbs: 0, calcio: 0, fosforo: 0, kcal: 0 }
   );
 
   const ingredientsCostClp = Math.round(
@@ -321,6 +325,8 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
           moisture_g: Number(data.moisture_g || 0),
           ash_g: Number(data.ash_g || 0),
           carbs_g: Number(data.carbs_g || 0),
+          calcium_g: Number(data.calcium_g || 0),
+          phosphorus_g: Number(data.phosphorus_g || 0),
         }));
       } else {
         showToast('No se pudo estimar con IA; puedes ingresar los valores manuales.');
@@ -376,6 +382,8 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
         moisture_g: 0,
         ash_g: 0,
         carbs_g: 0,
+        calcium_g: 0,
+        phosphorus_g: 0,
       });
     } catch (err) {
       showToast(err.message);
@@ -482,29 +490,29 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
       {/* SUBTAB 1: LOTES SEMANALES */}
       {subTab === 'batches' && (
         <div className="space-y-6">
-          <form onSubmit={handleCreateBatch} className="bg-white rounded-3xl p-6 border border-stone-200 shadow-xs space-y-5">
+          <form onSubmit={handleCreateBatch} className="bg-white rounded-3xl p-6 border border-stone-200 shadow-xs space-y-5 font-sans">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <div>
-                <h2 className="font-header text-lg font-extrabold text-secondary-brown">
+                <h2 className="text-base font-bold text-secondary-brown">
                   Registrar Nuevo Lote Semanal (Snapshot Inmutable)
                 </h2>
                 <p className="text-xs text-stone-500">
                   Precarga la receta base, ajusta ingredientes de estación y congela stock FIFO, nutrición y costos.
                 </p>
               </div>
-              <span className="text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 px-3 py-1 rounded-full">
+              <span className="text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 px-3 py-1 rounded-full tabular-nums">
                 Merma calculada: {mermaPct}%
               </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div className="md:col-span-2">
-                <label className="text-xs font-bold text-stone-600 block mb-1">Producto / Menú</label>
+                <label className="text-xs font-semibold text-stone-600 block mb-1">Producto / Menú</label>
                 <div className="flex gap-2">
                   <select
                     value={selectedProductId}
                     onChange={(e) => handleSelectProductForBatch(e.target.value)}
-                    className="flex-1 px-3 py-2.5 rounded-xl border border-stone-300 text-sm bg-white"
+                    className="flex-1 px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white text-stone-800"
                     required
                   >
                     <option value="">-- Seleccionar Menú --</option>
@@ -516,7 +524,7 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                     <button
                       type="button"
                       onClick={handleCopyLastBatchRecipe}
-                      className="px-3 py-2 rounded-xl border border-stone-300 text-xs font-bold text-stone-700 hover:bg-stone-100 shrink-0"
+                      className="px-3 py-2 rounded-xl border border-stone-300 text-xs font-semibold text-stone-700 hover:bg-stone-100 shrink-0"
                       title="Copiar ingredientes y precios del último lote de este menú"
                     >
                       Copiar Último Lote
@@ -525,31 +533,31 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                 </div>
               </div>
               <div>
-                <label className="text-xs font-bold text-stone-600 block mb-1">Línea</label>
+                <label className="text-xs font-semibold text-stone-600 block mb-1">Línea</label>
                 <select
                   value={lineaProduccion}
                   onChange={(e) => setLineaProduccion(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-stone-300 text-sm bg-white"
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white text-stone-800"
                 >
                   <option value="BARF">BARF (180 días)</option>
                   <option value="COCIDO">COCIDO (120 días)</option>
                 </select>
               </div>
               <div>
-                <label className="text-xs font-bold text-stone-600 block mb-1">Fecha Elaboración</label>
+                <label className="text-xs font-semibold text-stone-600 block mb-1">Fecha Elaboración</label>
                 <input
                   type="date"
                   value={fechaElab}
                   onChange={(e) => setFechaElab(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-stone-300 text-sm"
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white text-stone-800 tabular-nums"
                   required
                 />
               </div>
             </div>
 
             {/* Desglose de Costos Indirectos de Cocina */}
-            <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200 space-y-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-stone-600 block">
+            <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200 space-y-2.5">
+              <span className="text-xs font-bold uppercase tracking-wider text-stone-600 block tabular-nums">
                 Costos Indirectos del Lote (CLP) — Total: ${indirectTotalClp.toLocaleString('es-CL')}
               </span>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
@@ -561,13 +569,13 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                   { key: 'mano_obra_clp', label: 'Mano de Obra / Otros' },
                 ].map((field) => (
                   <div key={field.key}>
-                    <label className="text-[11px] font-semibold text-stone-500 block mb-1">{field.label}</label>
+                    <label className="text-xs font-semibold text-stone-500 block mb-1">{field.label}</label>
                     <input
                       type="number"
                       min="0"
                       value={indirectCosts[field.key]}
                       onChange={(e) => setIndirectCosts({ ...indirectCosts, [field.key]: parseInt(e.target.value || '0', 10) })}
-                      className="w-full px-2.5 py-2 rounded-xl border border-stone-300 text-xs bg-white font-mono"
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white text-stone-800 tabular-nums"
                     />
                   </div>
                 ))}
@@ -576,7 +584,7 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
-                <label className="text-xs font-bold text-stone-600 block mb-1">
+                <label className="text-xs font-semibold text-stone-600 block mb-1">
                   Peso Crudo Total (Suma Ingredientes)
                 </label>
                 <input
@@ -585,44 +593,44 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                   value={totalKilosIngredientes > 0 ? totalKilosIngredientes.toFixed(2) : pesoCrudoKg}
                   onChange={(e) => setPesoCrudoKg(e.target.value)}
                   readOnly={totalKilosIngredientes > 0}
-                  className={`w-full px-3 py-2.5 rounded-xl border border-stone-300 text-sm font-mono ${totalKilosIngredientes > 0 ? 'bg-stone-100 text-stone-700' : 'bg-white'}`}
+                  className={`w-full px-3 py-2 rounded-xl border border-stone-300 text-xs tabular-nums ${totalKilosIngredientes > 0 ? 'bg-stone-100 text-stone-700 font-semibold' : 'bg-white text-stone-800'}`}
                   required
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-stone-600 block mb-1">Stock Final Envasado Vendible (Kg)</label>
+                <label className="text-xs font-semibold text-stone-600 block mb-1">Stock Final Envasado Vendible (Kg)</label>
                 <input
                   type="number"
                   step="0.1"
                   value={stockInicialKg}
                   onChange={(e) => setStockInicialKg(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-stone-300 text-sm font-mono"
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white text-stone-800 tabular-nums"
                   required
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-stone-600 block mb-1">Notas de Producción / Sustituciones</label>
+                <label className="text-xs font-semibold text-stone-600 block mb-1">Notas de Producción / Sustituciones</label>
                 <input
                   type="text"
                   placeholder="Ej. Manzana sustituida por frutilla de estación"
                   value={batchNotas}
                   onChange={(e) => setBatchNotas(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-stone-300 text-sm"
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white text-stone-800"
                 />
               </div>
             </div>
 
             {/* Tabla editable de ingredientes del batch (por KILOS reales) */}
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-stone-500">
+                <span className="text-xs font-bold uppercase tracking-wider text-stone-600 tabular-nums">
                   Ingredientes Reales Usados — Total: <strong className="text-secondary-brown">{totalKilosIngredientes.toFixed(2)} kg</strong> ({pctTotal.toFixed(0)}%)
                 </span>
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
                     onClick={() => setNewIngModalOpen(true)}
-                    className="text-xs font-bold bg-amber-100 hover:bg-amber-200 text-amber-900 px-3 py-1.5 rounded-lg flex items-center gap-1 transition"
+                    className="text-xs font-bold bg-amber-100 hover:bg-amber-200 text-amber-900 px-3 py-1.5 rounded-xl flex items-center gap-1 transition"
                   >
                     <Plus size={14} /> Crear Nuevo Ingrediente
                   </button>
@@ -636,7 +644,7 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                 </div>
               </div>
               {formulaRows.length > 0 && (
-                <div className="grid grid-cols-12 gap-2 px-2 text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                <div className="grid grid-cols-12 gap-2 px-2.5 text-xs font-semibold text-stone-500">
                   <div className="col-span-5">Ingrediente</div>
                   <div className="col-span-2 text-right">Kilos (Kg)</div>
                   <div className="col-span-2 text-right">% Fórmula</div>
@@ -661,7 +669,7 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                           };
                           setFormulaRows(recalcFromKilos(copy));
                         }}
-                        className="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 text-xs bg-white"
+                        className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white text-stone-800"
                       >
                         <option value="">{row.nombre_ingrediente || '-- Ingrediente --'}</option>
                         {ingredients.map((ing) => (
@@ -680,11 +688,11 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                           copy[idx].kilos_usados = parseFloat(e.target.value) || 0;
                           setFormulaRows(recalcFromKilos(copy));
                         }}
-                        className="w-full px-2 py-1.5 rounded-lg border border-stone-300 text-xs text-right font-mono bg-white font-bold"
+                        className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs text-right tabular-nums bg-white font-semibold text-stone-800"
                         title="Kilos usados de este ingrediente"
                       />
                     </div>
-                    <div className="col-span-2 text-xs font-mono text-right text-stone-600">
+                    <div className="col-span-2 text-xs tabular-nums text-right text-stone-600 font-semibold">
                       {Number(row.porcentaje_formula || 0).toFixed(1)}%
                     </div>
                     <div className="col-span-2">
@@ -697,7 +705,7 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                           copy[idx].costo_unitario_clp = parseInt(e.target.value || '0', 10);
                           setFormulaRows(copy);
                         }}
-                        className="w-full px-2 py-1.5 rounded-lg border border-stone-300 text-xs text-right font-mono bg-white"
+                        className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs text-right tabular-nums bg-white text-stone-800"
                         title="Costo CLP por Kg de esta semana"
                       />
                     </div>
@@ -726,69 +734,77 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
             {formulaRows.length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 bg-emerald-50/50 border border-emerald-200 rounded-2xl p-4">
                 <div>
-                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-emerald-900 mb-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-900 mb-2">
                     Tabla Nutricional Recalculada en Vivo (por 100g)
                   </h4>
-                  <div className="grid grid-cols-4 gap-2 text-xs">
-                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
-                      <span className="text-[10px] text-stone-500 block">Energía</span>
-                      <strong className="font-mono">{Math.round(liveNutrition.kcal)} kcal</strong>
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-xs">
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
+                      <span className="text-xs text-stone-500 block">Energía</span>
+                      <strong className="text-xs font-bold tabular-nums text-stone-900">{Math.round(liveNutrition.kcal)} kcal</strong>
                     </div>
-                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
-                      <span className="text-[10px] text-stone-500 block">Proteína</span>
-                      <strong className="font-mono">{liveNutrition.proteina.toFixed(1)}%</strong>
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
+                      <span className="text-xs text-stone-500 block">Proteína</span>
+                      <strong className="text-xs font-bold tabular-nums text-stone-900">{liveNutrition.proteina.toFixed(1)}%</strong>
                     </div>
-                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
-                      <span className="text-[10px] text-stone-500 block">Grasa</span>
-                      <strong className="font-mono">{liveNutrition.grasa.toFixed(1)}%</strong>
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
+                      <span className="text-xs text-stone-500 block">Grasa</span>
+                      <strong className="text-xs font-bold tabular-nums text-stone-900">{liveNutrition.grasa.toFixed(1)}%</strong>
                     </div>
-                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
-                      <span className="text-[10px] text-stone-500 block">Fibra</span>
-                      <strong className="font-mono">{liveNutrition.fibra.toFixed(1)}%</strong>
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
+                      <span className="text-xs text-stone-500 block">Fibra</span>
+                      <strong className="text-xs font-bold tabular-nums text-stone-900">{liveNutrition.fibra.toFixed(1)}%</strong>
                     </div>
-                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
-                      <span className="text-[10px] text-stone-500 block">Humedad</span>
-                      <strong className="font-mono">{liveNutrition.humedad.toFixed(1)}%</strong>
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
+                      <span className="text-xs text-stone-500 block">Humedad</span>
+                      <strong className="text-xs font-bold tabular-nums text-stone-900">{liveNutrition.humedad.toFixed(1)}%</strong>
                     </div>
-                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
-                      <span className="text-[10px] text-stone-500 block">Cenizas</span>
-                      <strong className="font-mono">{liveNutrition.cenizas.toFixed(1)}%</strong>
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
+                      <span className="text-xs text-stone-500 block">Cenizas</span>
+                      <strong className="text-xs font-bold tabular-nums text-stone-900">{liveNutrition.cenizas.toFixed(1)}%</strong>
                     </div>
-                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
-                      <span className="text-[10px] text-stone-500 block">Carbohidratos</span>
-                      <strong className="font-mono">{liveNutrition.carbs.toFixed(1)}%</strong>
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
+                      <span className="text-xs text-stone-500 block">Carboh.</span>
+                      <strong className="text-xs font-bold tabular-nums text-stone-900">{liveNutrition.carbs.toFixed(1)}%</strong>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
+                      <span className="text-xs text-stone-500 block">Calcio</span>
+                      <strong className="text-xs font-bold tabular-nums text-stone-900">{liveNutrition.calcio.toFixed(2)}%</strong>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
+                      <span className="text-xs text-stone-500 block">Fósforo</span>
+                      <strong className="text-xs font-bold tabular-nums text-stone-900">{liveNutrition.fosforo.toFixed(2)}%</strong>
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-emerald-900 mb-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-900 mb-2">
                     Rentabilidad Real del Lote (Ingredientes + Indirectos)
                   </h4>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
-                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
-                      <span className="text-[10px] text-stone-500 block">Ingredientes</span>
-                      <strong className="font-mono">${ingredientsCostClp.toLocaleString('es-CL')}</strong>
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
+                      <span className="text-xs text-stone-500 block">Ingredientes</span>
+                      <strong className="text-xs font-bold tabular-nums text-stone-900">${ingredientsCostClp.toLocaleString('es-CL')}</strong>
                     </div>
-                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
-                      <span className="text-[10px] text-stone-500 block">Indirectos (Luz/Gas...)</span>
-                      <strong className="font-mono">${indirectTotalClp.toLocaleString('es-CL')}</strong>
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
+                      <span className="text-xs text-stone-500 block">Indirectos</span>
+                      <strong className="text-xs font-bold tabular-nums text-stone-900">${indirectTotalClp.toLocaleString('es-CL')}</strong>
                     </div>
-                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
-                      <span className="text-[10px] text-stone-500 block">Costo Total Lote</span>
-                      <strong className="font-mono text-secondary-brown">${totalBatchCostClp.toLocaleString('es-CL')}</strong>
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
+                      <span className="text-xs text-stone-500 block">Costo Total Lote</span>
+                      <strong className="text-xs font-bold tabular-nums text-secondary-brown">${totalBatchCostClp.toLocaleString('es-CL')}</strong>
                     </div>
-                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
-                      <span className="text-[10px] text-stone-500 block">Costo Real / Kg</span>
-                      <strong className="font-mono">${costPerKgClp.toLocaleString('es-CL')}/kg</strong>
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
+                      <span className="text-xs text-stone-500 block">Costo Real / Kg</span>
+                      <strong className="text-xs font-bold tabular-nums text-stone-900">${costPerKgClp.toLocaleString('es-CL')}/kg</strong>
                     </div>
-                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
-                      <span className="text-[10px] text-stone-500 block">PVP Menú</span>
-                      <strong className="font-mono">${pvpPerKgClp.toLocaleString('es-CL')}</strong>
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
+                      <span className="text-xs text-stone-500 block">PVP Menú</span>
+                      <strong className="text-xs font-bold tabular-nums text-stone-900">${pvpPerKgClp.toLocaleString('es-CL')}</strong>
                     </div>
-                    <div className="bg-white p-2 rounded-xl border border-emerald-100">
-                      <span className="text-[10px] text-stone-500 block">Margen Bruto</span>
-                      <strong className={`font-mono ${marginPerKgClp >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
+                      <span className="text-xs text-stone-500 block">Margen Bruto</span>
+                      <strong className={`text-xs font-bold tabular-nums ${marginPerKgClp >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
                         ${marginPerKgClp.toLocaleString('es-CL')} ({marginPctLive}%)
                       </strong>
                     </div>
@@ -850,17 +866,17 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                 <tbody className="divide-y divide-stone-100">
                   {batches.map((b) => (
                     <tr key={b.id} className="hover:bg-stone-50">
-                      <td className="py-3 pr-3 font-mono font-bold text-secondary-brown">{b.codigo_lote}</td>
+                      <td className="py-3 pr-3 tabular-nums font-bold text-secondary-brown">{b.codigo_lote}</td>
                       <td className="py-3 pr-3 font-semibold">{b.producto_nombre}</td>
-                      <td className="py-3 pr-3 font-mono">
+                      <td className="py-3 pr-3 tabular-nums">
                         <div>{b.fecha_elaboracion}</div>
                         <div className="text-[10px] text-red-600">Venc: {b.fecha_consumo_preferente}</div>
                       </td>
-                      <td className="py-3 pr-3 font-mono">
+                      <td className="py-3 pr-3 tabular-nums">
                         <strong>{(b.stock_disponible_gramos / 1000).toFixed(2)} kg</strong>
                         <span className="text-stone-400"> / {(b.stock_inicial_gramos / 1000).toFixed(2)} kg</span>
                       </td>
-                      <td className="py-3 pr-3 font-mono">${Number(b.costo_total_batch_clp || 0).toLocaleString('es-CL')}</td>
+                      <td className="py-3 pr-3 tabular-nums">${Number(b.costo_total_batch_clp || 0).toLocaleString('es-CL')}</td>
                       <td className="py-3 pr-3">
                         <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
                           b.estado === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800'
@@ -931,7 +947,7 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                 demandData.expiry_alerts.map((e) => (
                   <div key={e.batch_id} className="bg-amber-50 border border-amber-100 rounded-xl p-3 flex items-center justify-between text-xs">
                     <div>
-                      <strong className="font-mono">{e.codigo_lote}</strong> — {e.producto_nombre}
+                      <strong className="tabular-nums">{e.codigo_lote}</strong> — {e.producto_nombre}
                       <div className="text-amber-800">Saldo: {e.stock_disponible_kg} kg · Vence: {e.fecha_consumo_preferente}</div>
                     </div>
                     <span className={`font-black text-[10px] px-2.5 py-1 rounded-full ${e.nivel === 'critico' ? 'bg-red-600 text-white' : 'bg-amber-500 text-white'}`}>
@@ -957,7 +973,7 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                   demandData.production_suggestions.map((s) => (
                     <div key={s.producto_id} className="flex justify-between items-center text-xs py-2 border-b border-stone-100">
                       <span className="font-semibold">{s.producto_nombre}</span>
-                      <span className="font-mono font-bold text-primary-green">Producir {s.kg_sugeridos_producir} kg</span>
+                      <span className="tabular-nums font-bold text-primary-green">Producir {s.kg_sugeridos_producir} kg</span>
                     </div>
                   ))
                 )}
@@ -970,7 +986,7 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                   demandData.bom_shopping_list.map((b) => (
                     <div key={b.ingrediente_id} className="flex justify-between items-center text-xs py-2 border-b border-stone-100">
                       <span>{b.nombre}</span>
-                      <span className="font-mono font-bold">{b.cantidad_kg} kg (~${b.presupuesto_estimado_clp.toLocaleString('es-CL')})</span>
+                      <span className="tabular-nums font-bold">{b.cantidad_kg} kg (~${b.presupuesto_estimado_clp.toLocaleString('es-CL')})</span>
                     </div>
                   ))
                 )}
@@ -1045,7 +1061,7 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
               placeholder="Ej. OC-2026-S46-B01"
               value={recallCode}
               onChange={(e) => setRecallCode(e.target.value)}
-              className="flex-1 px-4 py-2.5 rounded-xl border border-stone-300 text-sm font-mono uppercase"
+              className="flex-1 px-4 py-2.5 rounded-xl border border-stone-300 text-sm tabular-nums uppercase"
             />
             <button type="submit" className="bg-primary-green text-white font-bold px-5 py-2.5 rounded-xl text-sm">
               Buscar Lote
@@ -1064,7 +1080,7 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                       <strong>Pedido #{o.order_id}</strong> — {o.customer_name} ({o.customer_phone})
                       <div className="text-stone-500">Pago: {o.payment_status} · Entrega: {o.delivery_status}</div>
                     </div>
-                    <span className="font-mono font-bold">{(o.gramos_descontados / 1000).toFixed(2)} kg</span>
+                    <span className="tabular-nums font-bold">{(o.gramos_descontados / 1000).toFixed(2)} kg</span>
                   </div>
                 ))}
                 {recallResult.affected_orders.length === 0 && (
@@ -1111,7 +1127,7 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                     required
                     value={newIngForm.cost_per_unit}
                     onChange={(e) => setNewIngForm({ ...newIngForm, cost_per_unit: e.target.value })}
-                    className="w-full px-3 py-2.5 rounded-xl border border-stone-300 text-sm font-mono"
+                    className="w-full px-3 py-2.5 rounded-xl border border-stone-300 text-sm tabular-nums"
                   />
                 </div>
                 <div>
@@ -1140,7 +1156,7 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                     <Sparkles size={13} /> {newIngEstimating ? 'Estimando...' : 'Estimar con IA'}
                   </button>
                 </div>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                   {[
                     { key: 'kcal_per_100g', label: 'Kcal' },
                     { key: 'protein_g', label: 'Prot (g)' },
@@ -1149,15 +1165,17 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                     { key: 'moisture_g', label: 'Hum (g)' },
                     { key: 'ash_g', label: 'Cen (g)' },
                     { key: 'carbs_g', label: 'Carb (g)' },
+                    { key: 'calcium_g', label: 'Calcio (g)' },
+                    { key: 'phosphorus_g', label: 'Fósforo (g)' },
                   ].map((m) => (
                     <div key={m.key}>
-                      <label className="text-[10px] font-semibold text-stone-500 block">{m.label}</label>
+                      <label className="text-xs font-semibold text-stone-500 block mb-1">{m.label}</label>
                       <input
                         type="number"
-                        step="0.1"
+                        step="0.01"
                         value={newIngForm[m.key]}
                         onChange={(e) => setNewIngForm({ ...newIngForm, [m.key]: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-2 py-1.5 rounded-lg border border-stone-300 text-xs font-mono bg-white"
+                        className="w-full px-2.5 py-2 rounded-xl border border-stone-300 text-xs tabular-nums bg-white"
                       />
                     </div>
                   ))}
