@@ -109,14 +109,19 @@ const BatchProductionManager = ({ products = [], ingredients = [] }) => {
       const res = await fetch(`/api/admin/products/${pid}/recipe`, { headers: authHeaders() });
       if (res.ok) {
         const data = await res.json();
-        const rawG = (parseFloat(pesoCrudoKg) || 20) * 1000;
-        const rows = (data || []).map((r) => ({
-          ingrediente_id: r.ingredient_id,
-          nombre_ingrediente: r.name,
-          porcentaje_formula: Number(r.percentage || 0),
-          cantidad_gramos: Math.round((rawG * Number(r.percentage || 0)) / 100),
-          costo_unitario_clp: Number(r.cost_per_unit || 0),
-        }));
+        const rawKg = parseFloat(pesoCrudoKg) || 20;
+        const rows = (data || []).map((r) => {
+          const pct = Number(r.percentage || 0);
+          const kg = Number(((rawKg * pct) / 100).toFixed(2));
+          return {
+            ingrediente_id: r.ingredient_id,
+            nombre_ingrediente: r.name,
+            kilos_usados: kg,
+            porcentaje_formula: pct,
+            cantidad_gramos: Math.round(kg * 1000),
+            costo_unitario_clp: Number(r.cost_per_unit || 0),
+          };
+        });
         setFormulaRows(rows);
       }
     } catch (e) {
@@ -124,16 +129,24 @@ const BatchProductionManager = ({ products = [], ingredients = [] }) => {
     }
   };
 
-  const recalcGramsFromPct = (rows, crudoKgStr) => {
-    const rawG = (parseFloat(crudoKgStr) || 0) * 1000;
-    return rows.map((r) => ({
-      ...r,
-      cantidad_gramos: Math.round((rawG * (parseFloat(r.porcentaje_formula) || 0)) / 100),
-    }));
+  const recalcFromKilos = (rows) => {
+    const totalKg = rows.reduce((s, r) => s + (parseFloat(r.kilos_usados) || 0), 0);
+    if (totalKg > 0) {
+      setPesoCrudoKg(String(Number(totalKg.toFixed(2))));
+    }
+    return rows.map((r) => {
+      const kg = parseFloat(r.kilos_usados) || 0;
+      return {
+        ...r,
+        cantidad_gramos: Math.round(kg * 1000),
+        porcentaje_formula: totalKg > 0 ? Number(((kg / totalKg) * 100).toFixed(2)) : 0,
+      };
+    });
   };
 
   const pctTotal = formulaRows.reduce((s, r) => s + (parseFloat(r.porcentaje_formula) || 0), 0);
-  const rawGramsNum = Math.round((parseFloat(pesoCrudoKg) || 0) * 1000);
+  const totalKilosIngredientes = formulaRows.reduce((s, r) => s + (parseFloat(r.kilos_usados) || 0), 0);
+  const rawGramsNum = Math.round((totalKilosIngredientes > 0 ? totalKilosIngredientes : (parseFloat(pesoCrudoKg) || 0)) * 1000);
   const packGramsNum = Math.round((parseFloat(stockInicialKg) || 0) * 1000);
   const mermaPct = rawGramsNum > packGramsNum && rawGramsNum > 0
     ? (((rawGramsNum - packGramsNum) / rawGramsNum) * 100).toFixed(1)
@@ -146,16 +159,18 @@ const BatchProductionManager = ({ products = [], ingredients = [] }) => {
       showToast('No hay un lote anterior para este menú; usando receta plantilla.');
       return;
     }
-    const rawG = (parseFloat(pesoCrudoKg) || 20) * 1000;
-    setFormulaRows(
-      prevBatch.ingredientes.map((i) => ({
+    const rows = prevBatch.ingredientes.map((i) => {
+      const kg = Number((Number(i.cantidad_gramos || 0) / 1000).toFixed(2));
+      return {
         ingrediente_id: i.ingrediente_id || '',
         nombre_ingrediente: i.nombre_ingrediente,
+        kilos_usados: kg,
         porcentaje_formula: Number(i.porcentaje_formula || 0),
-        cantidad_gramos: Math.round((rawG * Number(i.porcentaje_formula || 0)) / 100),
+        cantidad_gramos: Math.round(kg * 1000),
         costo_unitario_clp: Number(i.costo_unitario_clp || 0),
-      }))
-    );
+      };
+    });
+    setFormulaRows(recalcFromKilos(rows));
     showToast(`Receta copiada desde lote ${prevBatch.codigo_lote}.`);
   };
 
@@ -457,16 +472,16 @@ const BatchProductionManager = ({ products = [], ingredients = [] }) => {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
-                <label className="text-xs font-bold text-stone-600 block mb-1">Peso Crudo Ingresado (Kg)</label>
+                <label className="text-xs font-bold text-stone-600 block mb-1">
+                  Peso Crudo Total (Suma Ingredientes)
+                </label>
                 <input
                   type="number"
                   step="0.1"
-                  value={pesoCrudoKg}
-                  onChange={(e) => {
-                    setPesoCrudoKg(e.target.value);
-                    setFormulaRows((prev) => recalcGramsFromPct(prev, e.target.value));
-                  }}
-                  className="w-full px-3 py-2.5 rounded-xl border border-stone-300 text-sm"
+                  value={totalKilosIngredientes > 0 ? totalKilosIngredientes.toFixed(2) : pesoCrudoKg}
+                  onChange={(e) => setPesoCrudoKg(e.target.value)}
+                  readOnly={totalKilosIngredientes > 0}
+                  className={`w-full px-3 py-2.5 rounded-xl border border-stone-300 text-sm font-mono ${totalKilosIngredientes > 0 ? 'bg-stone-100 text-stone-700' : 'bg-white'}`}
                   required
                 />
               </div>
@@ -477,7 +492,7 @@ const BatchProductionManager = ({ products = [], ingredients = [] }) => {
                   step="0.1"
                   value={stockInicialKg}
                   onChange={(e) => setStockInicialKg(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-stone-300 text-sm"
+                  className="w-full px-3 py-2.5 rounded-xl border border-stone-300 text-sm font-mono"
                   required
                 />
               </div>
@@ -485,7 +500,7 @@ const BatchProductionManager = ({ products = [], ingredients = [] }) => {
                 <label className="text-xs font-bold text-stone-600 block mb-1">Notas de Producción / Sustituciones</label>
                 <input
                   type="text"
-                  placeholder="Ej. Manzana sustituida por arándanos de estación"
+                  placeholder="Ej. Manzana sustituida por frutilla de estación"
                   value={batchNotas}
                   onChange={(e) => setBatchNotas(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-stone-300 text-sm"
@@ -493,21 +508,30 @@ const BatchProductionManager = ({ products = [], ingredients = [] }) => {
               </div>
             </div>
 
-            {/* Tabla editable de ingredientes del batch */}
+            {/* Tabla editable de ingredientes del batch (por KILOS reales) */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-stone-500">
-                  Composición Real del Lote (Suma: <strong className={Math.abs(pctTotal - 100) <= 1.5 ? 'text-emerald-700' : 'text-red-600'}>{pctTotal.toFixed(1)}%</strong>)
+                  Ingredientes Reales Usados — Total: <strong className="text-secondary-brown">{totalKilosIngredientes.toFixed(2)} kg</strong> ({pctTotal.toFixed(0)}%)
                 </span>
                 <button
                   type="button"
-                  onClick={() => setFormulaRows([...formulaRows, { ingrediente_id: '', nombre_ingrediente: '', porcentaje_formula: 0, cantidad_gramos: 0, costo_unitario_clp: 0 }])}
+                  onClick={() => setFormulaRows([...formulaRows, { ingrediente_id: '', nombre_ingrediente: '', kilos_usados: 1, porcentaje_formula: 0, cantidad_gramos: 1000, costo_unitario_clp: 0 }])}
                   className="text-xs font-bold text-primary-green hover:underline flex items-center gap-1"
                 >
-                  <Plus size={14} /> Agregar / Sustituir Ingrediente
+                  <Plus size={14} /> Agregar otro ingrediente
                 </button>
               </div>
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {formulaRows.length > 0 && (
+                <div className="grid grid-cols-12 gap-2 px-2 text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                  <div className="col-span-5">Ingrediente</div>
+                  <div className="col-span-2 text-right">Kilos (Kg)</div>
+                  <div className="col-span-2 text-right">% Fórmula</div>
+                  <div className="col-span-2 text-right">Precio / Kg</div>
+                  <div className="col-span-1"></div>
+                </div>
+              )}
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                 {formulaRows.map((row, idx) => (
                   <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-stone-50 p-2 rounded-xl border border-stone-200">
                     <div className="col-span-5">
@@ -522,7 +546,7 @@ const BatchProductionManager = ({ products = [], ingredients = [] }) => {
                             nombre_ingrediente: ing ? ing.name : copy[idx].nombre_ingrediente,
                             costo_unitario_clp: ing ? ing.cost_per_unit : 0,
                           };
-                          setFormulaRows(copy);
+                          setFormulaRows(recalcFromKilos(copy));
                         }}
                         className="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 text-xs bg-white"
                       >
@@ -536,18 +560,19 @@ const BatchProductionManager = ({ products = [], ingredients = [] }) => {
                       <input
                         type="number"
                         step="0.1"
-                        value={row.porcentaje_formula}
+                        min="0"
+                        value={row.kilos_usados ?? 0}
                         onChange={(e) => {
                           const copy = [...formulaRows];
-                          copy[idx].porcentaje_formula = parseFloat(e.target.value) || 0;
-                          setFormulaRows(recalcGramsFromPct(copy, pesoCrudoKg));
+                          copy[idx].kilos_usados = parseFloat(e.target.value) || 0;
+                          setFormulaRows(recalcFromKilos(copy));
                         }}
-                        className="w-full px-2 py-1.5 rounded-lg border border-stone-300 text-xs text-right"
-                        title="Porcentaje %"
+                        className="w-full px-2 py-1.5 rounded-lg border border-stone-300 text-xs text-right font-mono bg-white font-bold"
+                        title="Kilos usados de este ingrediente"
                       />
                     </div>
-                    <div className="col-span-2 text-xs font-mono text-right text-stone-700">
-                      {row.cantidad_gramos} g
+                    <div className="col-span-2 text-xs font-mono text-right text-stone-600">
+                      {Number(row.porcentaje_formula || 0).toFixed(1)}%
                     </div>
                     <div className="col-span-2">
                       <input
@@ -566,7 +591,7 @@ const BatchProductionManager = ({ products = [], ingredients = [] }) => {
                     <div className="col-span-1 text-right">
                       <button
                         type="button"
-                        onClick={() => setFormulaRows(formulaRows.filter((_, i) => i !== idx))}
+                        onClick={() => setFormulaRows(recalcFromKilos(formulaRows.filter((_, i) => i !== idx)))}
                         className="text-red-500 hover:text-red-700 p-1"
                       >
                         <Trash2 size={14} />
@@ -575,6 +600,13 @@ const BatchProductionManager = ({ products = [], ingredients = [] }) => {
                   </div>
                 ))}
               </div>
+              <button
+                type="button"
+                onClick={() => setFormulaRows(recalcFromKilos([...formulaRows, { ingrediente_id: '', nombre_ingrediente: '', kilos_usados: 1, porcentaje_formula: 0, cantidad_gramos: 1000, costo_unitario_clp: 0 }]))}
+                className="w-full py-2 rounded-xl border border-dashed border-stone-300 text-xs font-bold text-primary-green hover:bg-stone-50 flex items-center justify-center gap-1"
+              >
+                <Plus size={14} /> Agregar otro ingrediente a esta receta
+              </button>
             </div>
 
             {/* Simulación en Vivo: Nutrición y Rentabilidad del Lote */}
