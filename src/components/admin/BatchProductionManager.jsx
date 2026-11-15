@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Layers, Plus, Printer, AlertTriangle, TrendingUp, Search, Link2,
-  Send, Copy, Check, RefreshCw, ShoppingBag, Clock, XCircle, CheckCircle2, Trash2
+  Send, Copy, Check, RefreshCw, ShoppingBag, Clock, XCircle, CheckCircle2, Trash2, Sparkles, X
 } from 'lucide-react';
 import ProductLabelGenerator from './ProductLabelGenerator';
 
@@ -33,6 +33,23 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
   // Etiqueta Dinámica del Lote
   const [labelModalOpen, setLabelModalOpen] = useState(false);
   const [activeBatchLabel, setActiveBatchLabel] = useState(null);
+
+  // Modal Crear Nuevo Ingrediente en Catálogo sin perder el lote
+  const [newIngModalOpen, setNewIngModalOpen] = useState(false);
+  const [newIngEstimating, setNewIngEstimating] = useState(false);
+  const [newIngSaving, setNewIngSaving] = useState(false);
+  const [newIngForm, setNewIngForm] = useState({
+    name: '',
+    cost_per_unit: 0,
+    unit: 'kg',
+    kcal_per_100g: 0,
+    protein_g: 0,
+    fat_g: 0,
+    fiber_g: 0,
+    moisture_g: 0,
+    ash_g: 0,
+    carbs_g: 0,
+  });
 
   // Recall Search
   const [recallCode, setRecallCode] = useState('');
@@ -281,6 +298,92 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
     }
   };
 
+  const handleEstimateNewIngredientNutrition = async () => {
+    if (!newIngForm.name.trim()) {
+      showToast('Escribe primero el nombre del ingrediente.');
+      return;
+    }
+    try {
+      setNewIngEstimating(true);
+      const res = await fetch('/api/ingredients/estimate-nutrition', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ ingredient_name: newIngForm.name.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNewIngForm((prev) => ({
+          ...prev,
+          kcal_per_100g: Number(data.kcal_per_100g || 0),
+          protein_g: Number(data.protein_g || 0),
+          fat_g: Number(data.fat_g || 0),
+          fiber_g: Number(data.fiber_g || 0),
+          moisture_g: Number(data.moisture_g || 0),
+          ash_g: Number(data.ash_g || 0),
+          carbs_g: Number(data.carbs_g || 0),
+        }));
+      } else {
+        showToast('No se pudo estimar con IA; puedes ingresar los valores manuales.');
+      }
+    } finally {
+      setNewIngEstimating(false);
+    }
+  };
+
+  const handleSaveNewIngredient = async (e) => {
+    e.preventDefault();
+    if (!newIngForm.name.trim()) return;
+    try {
+      setNewIngSaving(true);
+      const res = await fetch('/api/admin/ingredients', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          ...newIngForm,
+          name: newIngForm.name.trim(),
+          cost_per_unit: parseInt(newIngForm.cost_per_unit || '0', 10),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Error creando ingrediente.');
+
+      if (onIngredientsUpdated) await onIngredientsUpdated();
+
+      setFormulaRows((prev) =>
+        recalcFromKilos([
+          ...prev,
+          {
+            ingrediente_id: data.id,
+            nombre_ingrediente: newIngForm.name.trim(),
+            kilos_usados: 1,
+            porcentaje_formula: 0,
+            cantidad_gramos: 1000,
+            costo_unitario_clp: parseInt(newIngForm.cost_per_unit || '0', 10),
+          },
+        ])
+      );
+
+      showToast(`Ingrediente "${newIngForm.name.trim()}" creado y agregado a este lote.`);
+      setNewIngModalOpen(false);
+      setNewIngForm({
+        name: '',
+        cost_per_unit: 0,
+        unit: 'kg',
+        kcal_per_100g: 0,
+        protein_g: 0,
+        fat_g: 0,
+        fiber_g: 0,
+        moisture_g: 0,
+        ash_g: 0,
+        carbs_g: 0,
+      });
+    } catch (err) {
+      showToast(err.message);
+    } finally {
+      setNewIngSaving(false);
+    }
+  };
+
   const handleRecallSearch = async (e) => {
     e.preventDefault();
     if (!recallCode.trim()) return;
@@ -511,17 +614,26 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
 
             {/* Tabla editable de ingredientes del batch (por KILOS reales) */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-stone-500">
                   Ingredientes Reales Usados — Total: <strong className="text-secondary-brown">{totalKilosIngredientes.toFixed(2)} kg</strong> ({pctTotal.toFixed(0)}%)
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setFormulaRows([...formulaRows, { ingrediente_id: '', nombre_ingrediente: '', kilos_usados: 1, porcentaje_formula: 0, cantidad_gramos: 1000, costo_unitario_clp: 0 }])}
-                  className="text-xs font-bold text-primary-green hover:underline flex items-center gap-1"
-                >
-                  <Plus size={14} /> Agregar otro ingrediente
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setNewIngModalOpen(true)}
+                    className="text-xs font-bold bg-amber-100 hover:bg-amber-200 text-amber-900 px-3 py-1.5 rounded-lg flex items-center gap-1 transition"
+                  >
+                    <Plus size={14} /> Crear Nuevo Ingrediente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormulaRows([...formulaRows, { ingrediente_id: '', nombre_ingrediente: '', kilos_usados: 1, porcentaje_formula: 0, cantidad_gramos: 1000, costo_unitario_clp: 0 }])}
+                    className="text-xs font-bold text-primary-green hover:underline flex items-center gap-1"
+                  >
+                    <Plus size={14} /> Agregar otro ingrediente
+                  </button>
+                </div>
               </div>
               {formulaRows.length > 0 && (
                 <div className="grid grid-cols-12 gap-2 px-2 text-[10px] font-bold uppercase tracking-wider text-stone-400">
@@ -961,6 +1073,115 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal Crear Nuevo Ingrediente sin perder el lote */}
+      {newIngModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-stone-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+              <div>
+                <h3 className="font-header text-lg font-extrabold text-secondary-brown">Nuevo Ingrediente en Catálogo</h3>
+                <p className="text-xs text-stone-500">Se guardará en tu inventario y se agregará automáticamente a este lote.</p>
+              </div>
+              <button type="button" onClick={() => setNewIngModalOpen(false)} className="text-stone-400 hover:text-stone-700 p-1">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveNewIngredient} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-3">
+                  <label className="text-xs font-bold text-stone-600 block mb-1">Nombre del Ingrediente</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Corazón de cerdo"
+                    value={newIngForm.name}
+                    onChange={(e) => setNewIngForm({ ...newIngForm, name: e.target.value })}
+                    className="w-full px-3 py-2.5 rounded-xl border border-stone-300 text-sm"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-bold text-stone-600 block mb-1">Precio Compra (CLP)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={newIngForm.cost_per_unit}
+                    onChange={(e) => setNewIngForm({ ...newIngForm, cost_per_unit: e.target.value })}
+                    className="w-full px-3 py-2.5 rounded-xl border border-stone-300 text-sm font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-stone-600 block mb-1">Unidad</label>
+                  <select
+                    value={newIngForm.unit}
+                    onChange={(e) => setNewIngForm({ ...newIngForm, unit: e.target.value })}
+                    className="w-full px-3 py-2.5 rounded-xl border border-stone-300 text-sm bg-white"
+                  >
+                    <option value="kg">kg</option>
+                    <option value="unidad">unidad</option>
+                    <option value="litro">litro</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="bg-stone-50 rounded-2xl p-3.5 border border-stone-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-stone-600">Perfil Nutricional (por 100g)</span>
+                  <button
+                    type="button"
+                    disabled={newIngEstimating}
+                    onClick={handleEstimateNewIngredientNutrition}
+                    className="text-xs font-bold bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white px-3 py-1.5 rounded-lg inline-flex items-center gap-1"
+                  >
+                    <Sparkles size={13} /> {newIngEstimating ? 'Estimando...' : 'Estimar con IA'}
+                  </button>
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { key: 'kcal_per_100g', label: 'Kcal' },
+                    { key: 'protein_g', label: 'Prot (g)' },
+                    { key: 'fat_g', label: 'Grasa (g)' },
+                    { key: 'fiber_g', label: 'Fibra (g)' },
+                    { key: 'moisture_g', label: 'Hum (g)' },
+                    { key: 'ash_g', label: 'Cen (g)' },
+                    { key: 'carbs_g', label: 'Carb (g)' },
+                  ].map((m) => (
+                    <div key={m.key}>
+                      <label className="text-[10px] font-semibold text-stone-500 block">{m.label}</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={newIngForm[m.key]}
+                        onChange={(e) => setNewIngForm({ ...newIngForm, [m.key]: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-2 py-1.5 rounded-lg border border-stone-300 text-xs font-mono bg-white"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setNewIngModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-stone-300 text-xs font-bold text-stone-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={newIngSaving}
+                  className="px-5 py-2.5 rounded-xl bg-primary-green hover:bg-primary-green-dark disabled:opacity-60 text-white text-xs font-bold"
+                >
+                  {newIngSaving ? 'Guardando...' : 'Guardar y Agregar al Lote'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
