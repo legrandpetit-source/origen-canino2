@@ -258,6 +258,34 @@ def create_batch_router(get_current_admin) -> APIRouter:
                         item["costo_unitario_clp"],
                     ),
                 )
+                # Sincronizar precio vigente e historial si cambió respecto al catálogo
+                if item["ingrediente_id"] and int(item["costo_unitario_clp"] or 0) > 0:
+                    cursor.execute(
+                        "SELECT cost_per_unit, name, unit FROM ingredients WHERE id = %s",
+                        (item["ingrediente_id"],),
+                    )
+                    cur_ing = cursor.fetchone()
+                    if cur_ing and int(cur_ing["cost_per_unit"] or 0) != int(item["costo_unitario_clp"]):
+                        cursor.execute(
+                            "UPDATE ingredients SET cost_per_unit = %s WHERE id = %s",
+                            (int(item["costo_unitario_clp"]), item["ingrediente_id"]),
+                        )
+                        cursor.execute(
+                            """
+                            INSERT INTO ingredient_price_history (
+                                ingredient_id, ingredient_name, price, previous_price, unit, notes
+                            )
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                            """,
+                            (
+                                item["ingrediente_id"],
+                                cur_ing["name"],
+                                int(item["costo_unitario_clp"]),
+                                int(cur_ing["cost_per_unit"] or 0),
+                                cur_ing["unit"],
+                                f"Actualizado desde Lote {codigo_lote}",
+                            ),
+                        )
 
             cursor.execute(
                 """

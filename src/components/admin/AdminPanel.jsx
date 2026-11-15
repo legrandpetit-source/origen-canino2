@@ -679,6 +679,7 @@ const AdminPanel = () => {
                 <BatchProductionManager
                   products={products}
                   ingredients={ingredients}
+                  onIngredientsUpdated={refreshIngredients}
                 />
               )}
 

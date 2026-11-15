@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import ProductLabelGenerator from './ProductLabelGenerator';
 
-const BatchProductionManager = ({ products = [], ingredients = [] }) => {
+const BatchProductionManager = ({ products = [], ingredients = [], onIngredientsUpdated }) => {
   const [subTab, setSubTab] = useState('batches'); // 'batches' | 'demand' | 'recall' | 'links'
   const [batches, setBatches] = useState([]);
   const [demandData, setDemandData] = useState(null);
@@ -246,8 +246,9 @@ const BatchProductionManager = ({ products = [], ingredients = [] }) => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Error creando lote.');
-      showToast(`Lote ${data.codigo_lote} creado y congelado con éxito.`);
+      showToast(`Lote ${data.codigo_lote} creado, stock FIFO cargado e historial de precios actualizado.`);
       fetchBatches();
+      if (onIngredientsUpdated) onIngredientsUpdated();
       if (data.waitlist_pending > 0) {
         const wRes = await fetch(`/api/admin/waitlist/${selectedProductId}`, { headers: authHeaders() });
         if (wRes.ok) setWaitlistForCreated(await wRes.json());
