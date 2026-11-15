@@ -133,7 +133,10 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
         fiber_g: data.fiber_g || 0,
         moisture_g: data.moisture_g || 0,
         ash_g: data.ash_g || 0,
-        carbs_g: data.carbs_g || 0
+        carbs_g: data.carbs_g || 0,
+        calcium_g: data.calcium_g || 0,
+        phosphorus_g: data.phosphorus_g || 0,
+        micronutrients: Array.isArray(data.micronutrients) ? data.micronutrients : []
       }));
     } catch (error) {
       console.error(error);
@@ -146,7 +149,8 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
   const openAdd = () => {
     setFormData({ 
       name: '', cost_per_unit: 0, unit: 'kg',
-      kcal_per_100g: 0, protein_g: 0, fat_g: 0, fiber_g: 0, moisture_g: 0, ash_g: 0, carbs_g: 0
+      kcal_per_100g: 0, protein_g: 0, fat_g: 0, fiber_g: 0, moisture_g: 0, ash_g: 0, carbs_g: 0,
+      calcium_g: 0, phosphorus_g: 0, micronutrients: []
     });
     setLastSavedMsg(null);
     setIsAdding(true);
@@ -166,7 +170,10 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
       fiber_g: ing.fiber_g || 0,
       moisture_g: ing.moisture_g || 0,
       ash_g: ing.ash_g || 0,
-      carbs_g: ing.carbs_g || 0
+      carbs_g: ing.carbs_g || 0,
+      calcium_g: ing.calcium_g || 0,
+      phosphorus_g: ing.phosphorus_g || 0,
+      micronutrients: Array.isArray(ing.micronutrients) ? ing.micronutrients : []
     });
     setEditingIngredient(ing);
     setIsAdding(false);
@@ -321,9 +328,36 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Cenizas (g)</label>
-                  <input type="number" step="any" value={formData.ash_g} onChange={e => setFormData({...formData, ash_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white font-mono" min="0" />
+                  <input type="number" step="any" value={formData.ash_g} onChange={e => setFormData({...formData, ash_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white tabular-nums" min="0" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Calcio (g)</label>
+                  <input type="number" step="any" value={formData.calcium_g || 0} onChange={e => setFormData({...formData, calcium_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white tabular-nums" min="0" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Fósforo (g)</label>
+                  <input type="number" step="any" value={formData.phosphorus_g || 0} onChange={e => setFormData({...formData, phosphorus_g: Number(e.target.value)})} className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary-green outline-none bg-white tabular-nums" min="0" />
                 </div>
               </div>
+              {Array.isArray(formData.micronutrients) && formData.micronutrients.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <span className="block text-xs font-bold text-gray-600 mb-2">
+                    Micronutrientes, Vitaminas & Bioactivos Destacados (por 100g)
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {formData.micronutrients.map((m, idx) => (
+                      <span
+                        key={idx}
+                        title={m.highlight || ''}
+                        className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-900 border border-emerald-200 px-2.5 py-1 rounded-full font-medium"
+                      >
+                        <strong>{m.name}:</strong> {m.amount} {m.unit}
+                        {m.highlight ? <span className="text-emerald-700/80">· {m.highlight}</span> : null}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

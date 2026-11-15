@@ -258,6 +258,23 @@ const ProductLabelGenerator = ({ activeLine = 'barf', totalKg, isOpen, onClose, 
                   </div>
                 </div>
 
+                {/* Micronutrientes, Vitaminas y Bioactivos Destacados */}
+                {Array.isArray(batchLabelData?.micronutrientes_json) && batchLabelData.micronutrientes_json.length > 0 && (
+                  <div className="mb-2">
+                    <div className="text-[9.5px] font-black uppercase tracking-wider text-stone-900 border-b border-stone-300 pb-0.5 mb-1">
+                      MICRONUTRIENTES & BIOACTIVOS DESTACADOS (POR 100G)
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[9.5px]">
+                      {batchLabelData.micronutrientes_json.slice(0, 8).map((m, i) => (
+                        <div key={i} className="flex justify-between border-b border-dotted border-stone-200 py-0.5">
+                          <span className="text-stone-600 truncate pr-1">{m.name}:</span>
+                          <span className="font-bold text-stone-900 shrink-0">{m.amount} {m.unit}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Guía Rápida de Alimentación */}
                 <div className="bg-amber-50/70 border border-amber-200 rounded-lg p-1.5 mb-2 text-[9px]">
                   <span className="font-black text-amber-900 block mb-0.5">

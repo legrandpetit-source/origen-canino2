@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
@@ -94,7 +95,8 @@ def compute_batch_nutrition_and_cost(
                    COALESCE(ash_g, 0) AS ash_g,
                    COALESCE(carbs_g, 0) AS carbs_g,
                    COALESCE(calcium_g, 0) AS calcium_g,
-                   COALESCE(phosphorus_g, 0) AS phosphorus_g
+                   COALESCE(phosphorus_g, 0) AS phosphorus_g,
+                   COALESCE(micronutrients, '[]'::jsonb) AS micronutrients
             FROM ingredients
             WHERE id = ANY(%s)
             """,
@@ -119,6 +121,7 @@ def compute_batch_nutrition_and_cost(
         "calcio_pct": 0.0,
         "fosforo_pct": 0.0,
     }
+    micro_acc: Dict[Tuple[str, str], Dict[str, Any]] = {}
     ingredients_cost_clp = 0.0
 
     for item in ingredients_payload:
@@ -146,6 +149,31 @@ def compute_batch_nutrition_and_cost(
         totals["calcio_pct"] += float(db_ing.get("calcium_g", 0)) * weight_ratio
         totals["fosforo_pct"] += float(db_ing.get("phosphorus_g", 0)) * weight_ratio
 
+        raw_micros = db_ing.get("micronutrients") or []
+        if isinstance(raw_micros, str):
+            try:
+                raw_micros = json.loads(raw_micros)
+            except Exception:
+                raw_micros = []
+        if isinstance(raw_micros, list):
+            for m in raw_micros:
+                if not isinstance(m, dict) or not m.get("name"):
+                    continue
+                m_name = str(m.get("name")).strip()
+                m_unit = str(m.get("unit") or "").strip()
+                m_key = (m_name.lower(), m_unit.lower())
+                m_amt = float(m.get("amount") or 0) * weight_ratio
+                if m_key not in micro_acc:
+                    micro_acc[m_key] = {
+                        "name": m_name,
+                        "amount": 0.0,
+                        "unit": m_unit,
+                        "highlight": str(m.get("highlight") or "").strip(),
+                    }
+                micro_acc[m_key]["amount"] += m_amt
+                if not micro_acc[m_key]["highlight"] and m.get("highlight"):
+                    micro_acc[m_key]["highlight"] = str(m.get("highlight")).strip()
+
         snapshot_items.append({
             "ingrediente_id": ing_id,
             "nombre_ingrediente": item.get("nombre_ingrediente") or db_ing.get("name") or "Ingrediente",
@@ -164,6 +192,19 @@ def compute_batch_nutrition_and_cost(
         # La evaporación reduce humedad proporcionalmente
         water_loss_pct = (1.0 - (1.0 / concentration)) * 100.0
         nutrition["humedad_pct"] = round(max(10.0, nutrition["humedad_pct"] - water_loss_pct * 0.5), 2)
+
+    micro_list = []
+    for item in micro_acc.values():
+        amt = round(item["amount"] * concentration, 2)
+        if amt > 0 or item["highlight"]:
+            micro_list.append({
+                "name": item["name"],
+                "amount": amt,
+                "unit": item["unit"],
+                "highlight": item["highlight"],
+            })
+    micro_list.sort(key=lambda x: x["amount"], reverse=True)
+    nutrition["micronutrientes_json"] = micro_list[:12]
 
     total_cost_clp = int(round(ingredients_cost_clp)) + int(extra_cost_clp or 0)
     return snapshot_items, nutrition, total_cost_clp

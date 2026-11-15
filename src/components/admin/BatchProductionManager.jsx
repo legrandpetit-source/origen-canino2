@@ -51,6 +51,7 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
     carbs_g: 0,
     calcium_g: 0,
     phosphorus_g: 0,
+    micronutrients: [],
   });
 
   // Recall Search
@@ -213,10 +214,30 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
       acc.calcio += Number(dbIng.calcium_g || 0) * w * concentrationFactor;
       acc.fosforo += Number(dbIng.phosphorus_g || 0) * w * concentrationFactor;
       acc.kcal += Number(dbIng.kcal_per_100g || 0) * w * concentrationFactor;
+      const micros = Array.isArray(dbIng.micronutrients) ? dbIng.micronutrients : [];
+      micros.forEach((m) => {
+        if (!m?.name) return;
+        const key = `${String(m.name).trim().toLowerCase()}|${String(m.unit || '').trim().toLowerCase()}`;
+        const amt = Number(m.amount || 0) * w * concentrationFactor;
+        if (!acc.microMap[key]) {
+          acc.microMap[key] = {
+            name: String(m.name).trim(),
+            amount: 0,
+            unit: String(m.unit || '').trim(),
+            highlight: String(m.highlight || '').trim(),
+          };
+        }
+        acc.microMap[key].amount += amt;
+      });
       return acc;
     },
-    { proteina: 0, grasa: 0, fibra: 0, humedad: 0, cenizas: 0, carbs: 0, calcio: 0, fosforo: 0, kcal: 0 }
+    { proteina: 0, grasa: 0, fibra: 0, humedad: 0, cenizas: 0, carbs: 0, calcio: 0, fosforo: 0, kcal: 0, microMap: {} }
   );
+  const liveMicronutrients = Object.values(liveNutrition.microMap || {})
+    .map((m) => ({ ...m, amount: Number(m.amount.toFixed(2)) }))
+    .filter((m) => m.amount > 0 || m.highlight)
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 12);
 
   const ingredientsCostClp = Math.round(
     formulaRows.reduce(
@@ -327,6 +348,7 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
           carbs_g: Number(data.carbs_g || 0),
           calcium_g: Number(data.calcium_g || 0),
           phosphorus_g: Number(data.phosphorus_g || 0),
+          micronutrients: Array.isArray(data.micronutrients) ? data.micronutrients : [],
         }));
       } else {
         showToast('No se pudo estimar con IA; puedes ingresar los valores manuales.');
@@ -384,6 +406,7 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
         carbs_g: 0,
         calcium_g: 0,
         phosphorus_g: 0,
+        micronutrients: [],
       });
     } catch (err) {
       showToast(err.message);
@@ -775,6 +798,24 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                       <strong className="text-xs font-bold tabular-nums text-stone-900">{liveNutrition.fosforo.toFixed(2)}%</strong>
                     </div>
                   </div>
+                  {liveMicronutrients.length > 0 && (
+                    <div className="mt-2.5 pt-2.5 border-t border-emerald-200/70">
+                      <span className="text-xs font-semibold text-emerald-900 block mb-1.5">
+                        Micronutrientes & Bioactivos Destacados (por 100g)
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {liveMicronutrients.map((m, idx) => (
+                          <span
+                            key={idx}
+                            title={m.highlight || ''}
+                            className="text-xs bg-white text-emerald-900 border border-emerald-200 px-2 py-0.5 rounded-full tabular-nums"
+                          >
+                            <strong>{m.name}:</strong> {m.amount} {m.unit}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -1180,6 +1221,24 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                     </div>
                   ))}
                 </div>
+                {Array.isArray(newIngForm.micronutrients) && newIngForm.micronutrients.length > 0 && (
+                  <div className="pt-2 border-t border-stone-200">
+                    <span className="text-xs font-semibold text-stone-600 block mb-1.5">
+                      Micronutrientes & Bioactivos Detectados (por 100g)
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {newIngForm.micronutrients.map((m, idx) => (
+                        <span
+                          key={idx}
+                          title={m.highlight || ''}
+                          className="text-xs bg-emerald-50 text-emerald-900 border border-emerald-200 px-2 py-0.5 rounded-full tabular-nums"
+                        >
+                          <strong>{m.name}:</strong> {m.amount} {m.unit}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-2">

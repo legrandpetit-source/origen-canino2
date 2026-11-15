@@ -113,6 +113,7 @@ def init_database():
                 ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS carbs_g NUMERIC DEFAULT 0;
                 ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS calcium_g NUMERIC DEFAULT 0;
                 ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS phosphorus_g NUMERIC DEFAULT 0;
+                ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS micronutrients JSONB DEFAULT '[]'::jsonb;
             """)
 
             # 1.2 Tabla de Recetas (Ingredientes por Producto)
@@ -472,8 +473,10 @@ def init_database():
                     carbohidratos_pct NUMERIC(6,2) DEFAULT 0,
                     calcio_pct NUMERIC(6,2) DEFAULT 0,
                     fosforo_pct NUMERIC(6,2) DEFAULT 0,
-                    kcal_100g NUMERIC(7,2) DEFAULT 0
+                    kcal_100g NUMERIC(7,2) DEFAULT 0,
+                    micronutrientes_json JSONB DEFAULT '[]'::jsonb
                 );
+                ALTER TABLE batch_nutricion ADD COLUMN IF NOT EXISTS micronutrientes_json JSONB DEFAULT '[]'::jsonb;
             """)
 
             cursor.execute("""

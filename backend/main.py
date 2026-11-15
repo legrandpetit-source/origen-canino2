@@ -189,6 +189,7 @@ class IngredientResponse(BaseModel):
     carbs_g: Optional[float] = 0
     calcium_g: Optional[float] = 0
     phosphorus_g: Optional[float] = 0
+    micronutrients: Optional[List[dict]] = []
 
 class IngredientCreateUpdate(BaseModel):
     name: str
@@ -203,6 +204,7 @@ class IngredientCreateUpdate(BaseModel):
     carbs_g: Optional[float] = 0
     calcium_g: Optional[float] = 0
     phosphorus_g: Optional[float] = 0
+    micronutrients: Optional[List[dict]] = []
 
 class EstimateNutritionRequest(BaseModel):
     ingredient_name: str
@@ -1662,12 +1664,13 @@ def create_ingredient(i: IngredientCreateUpdate, current_user: str = Depends(get
             cursor.execute("""
                 INSERT INTO ingredients (
                     name, cost_per_unit, unit, 
-                    kcal_per_100g, protein_g, fat_g, fiber_g, moisture_g, ash_g, carbs_g, calcium_g, phosphorus_g
+                    kcal_per_100g, protein_g, fat_g, fiber_g, moisture_g, ash_g, carbs_g, calcium_g, phosphorus_g, micronutrients
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb) RETURNING id
             """, (
                 i.name, i.cost_per_unit, i.unit,
-                i.kcal_per_100g, i.protein_g, i.fat_g, i.fiber_g, i.moisture_g, i.ash_g, i.carbs_g, i.calcium_g, i.phosphorus_g
+                i.kcal_per_100g, i.protein_g, i.fat_g, i.fiber_g, i.moisture_g, i.ash_g, i.carbs_g, i.calcium_g, i.phosphorus_g,
+                json.dumps(i.micronutrients or [], ensure_ascii=False)
             ))
             new_id = cursor.fetchone()["id"]
 
@@ -1697,11 +1700,12 @@ def update_ingredient(ingredient_id: int, i: IngredientCreateUpdate, current_use
             cursor.execute("""
                 UPDATE ingredients 
                 SET name = %s, cost_per_unit = %s, unit = %s,
-                    kcal_per_100g = %s, protein_g = %s, fat_g = %s, fiber_g = %s, moisture_g = %s, ash_g = %s, carbs_g = %s, calcium_g = %s, phosphorus_g = %s
+                    kcal_per_100g = %s, protein_g = %s, fat_g = %s, fiber_g = %s, moisture_g = %s, ash_g = %s, carbs_g = %s, calcium_g = %s, phosphorus_g = %s, micronutrients = %s::jsonb
                 WHERE id = %s
             """, (
                 i.name, i.cost_per_unit, i.unit,
                 i.kcal_per_100g, i.protein_g, i.fat_g, i.fiber_g, i.moisture_g, i.ash_g, i.carbs_g, i.calcium_g, i.phosphorus_g,
+                json.dumps(i.micronutrients or [], ensure_ascii=False),
                 ingredient_id
             ))
 
@@ -1756,8 +1760,10 @@ def estimate_nutrition(req: EstimateNutritionRequest, current_user: str = Depend
         raise HTTPException(status_code=500, detail="Groq API Key no configurada en el servidor.")
     
     prompt = f"""
-    Eres un experto en nutrición animal y de ingredientes. Estima los valores nutricionales promedio por cada 100g para el ingrediente: "{req.ingredient_name}".
-    Debes devolver ÚNICAMENTE un objeto JSON válido con la siguiente estructura (usa números flotantes sin unidades, 0 si no aplica o es mínimo):
+    Eres un experto en nutrición canina (BARF/cocido) y composición de alimentos (USDA/AAFCO). Estima el perfil nutricional promedio por cada 100g en base tal cual (fresco/crudo según corresponda) para el ingrediente: "{req.ingredient_name}".
+    IMPORTANTE: Si el corte incluye hueso (ej. cogote de pollo, carcasa, alitas), considera el aporte mineral del hueso en ash_g, calcium_g y phosphorus_g.
+    Además de los macronutrientes, identifica los 4 a 8 micronutrientes, vitaminas, aminoácidos funcionales o compuestos bioactivos más destacados y reales de ESTE ingrediente específico (ej. Colina, Taurina, CoQ10, Vitamina A/Betacarotenos, Vitamina B12, Vitamina D, Vitamina E, Hierro, Zinc, Selenio, Omega-3, Antioxidantes/Polifenoles).
+    Devuelve ÚNICAMENTE un objeto JSON válido con esta estructura exacta (números flotantes en gramos/100g para macros, calcium_g y phosphorus_g; en micronutrients usa valores por 100g):
     {{
       "kcal_per_100g": 0.0,
       "protein_g": 0.0,
@@ -1767,7 +1773,10 @@ def estimate_nutrition(req: EstimateNutritionRequest, current_user: str = Depend
       "ash_g": 0.0,
       "carbs_g": 0.0,
       "calcium_g": 0.0,
-      "phosphorus_g": 0.0
+      "phosphorus_g": 0.0,
+      "micronutrients": [
+        {{"name": "Ej: Colina", "amount": 250.0, "unit": "mg", "highlight": "Función cognitiva y hepática"}}
+      ]
     }}
     No devuelvas ningún otro texto, markdown, ni explicaciones. Solo el JSON.
     """

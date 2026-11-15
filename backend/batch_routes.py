@@ -291,9 +291,9 @@ def create_batch_router(get_current_admin) -> APIRouter:
                 """
                 INSERT INTO batch_nutricion (
                     batch_id, proteina_pct, grasa_pct, fibra_pct, humedad_pct,
-                    cenizas_pct, carbohidratos_pct, calcio_pct, fosforo_pct, kcal_100g
+                    cenizas_pct, carbohidratos_pct, calcio_pct, fosforo_pct, kcal_100g, micronutrientes_json
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
                 """,
                 (
                     batch_id,
@@ -306,6 +306,7 @@ def create_batch_router(get_current_admin) -> APIRouter:
                     nutrition["calcio_pct"],
                     nutrition["fosforo_pct"],
                     nutrition["kcal_100g"],
+                    json.dumps(nutrition.get("micronutrientes_json") or [], ensure_ascii=False),
                 ),
             )
 
@@ -354,7 +355,8 @@ def create_batch_router(get_current_admin) -> APIRouter:
                 """
                 SELECT bp.*, p.name AS producto_nombre, p.type AS producto_type, p.weight AS producto_weight,
                        bn.proteina_pct, bn.grasa_pct, bn.fibra_pct, bn.humedad_pct,
-                       bn.cenizas_pct, bn.carbohidratos_pct, bn.calcio_pct, bn.fosforo_pct, bn.kcal_100g
+                       bn.cenizas_pct, bn.carbohidratos_pct, bn.calcio_pct, bn.fosforo_pct, bn.kcal_100g,
+                       bn.micronutrientes_json
                 FROM batch_produccion bp
                 JOIN products p ON p.id = bp.producto_id
                 LEFT JOIN batch_nutricion bn ON bn.batch_id = bp.id
