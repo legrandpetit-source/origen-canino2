@@ -168,10 +168,12 @@ const AdminPanel = () => {
       if (res.ok) {
         const ingData = await res.json();
         setIngredients(ingData);
+        return ingData;
       }
     } catch (err) {
       console.error('Error refreshing ingredients:', err);
     }
+    return [];
   };
 
   const fetchData = async (showLoading = false) => {

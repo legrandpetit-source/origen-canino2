@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Edit2, Trash2, Save, X, Sparkles, Loader, History, TrendingUp, TrendingDown, Clock, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, Sparkles, Loader, History, TrendingUp, TrendingDown, Clock, ArrowRight, ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) => {
   const nameInputRef = useRef(null);
@@ -44,7 +44,7 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
     kcal_per_100g: 0, protein_g: 0, fat_g: 0, fiber_g: 0, moisture_g: 0, ash_g: 0, carbs_g: 0
   });
 
-  const handleSave = async (e, keepOpen = false) => {
+  const handleSave = async (e, keepOpen = false, advanceToNext = false) => {
     if (e) e.preventDefault();
     if (!formData.name.trim()) {
       alert("Por favor ingresa el nombre del insumo.");
@@ -66,20 +66,41 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
         const savedName = formData.name;
         const savedCost = formData.cost_per_unit;
         const savedUnit = formData.unit;
+        
+        let freshList = [];
         if (fetchIngredients) {
-          await fetchIngredients();
+          freshList = await fetchIngredients();
         }
 
-        if (keepOpen && isAdding) {
-          // Mantener el formulario abierto para ingresar el siguiente insumo sin interrupción
-          setFormData({ 
-            name: '', cost_per_unit: 0, unit: 'kg',
-            kcal_per_100g: 0, protein_g: 0, fat_g: 0, fiber_g: 0, moisture_g: 0, ash_g: 0, carbs_g: 0
-          });
-          setLastSavedMsg(`✓ Insumo "${savedName}" ($${Number(savedCost).toLocaleString()}/${savedUnit}) guardado correctamente. Puedes ingresar el siguiente ahora:`);
-          setTimeout(() => {
-            nameInputRef.current?.focus();
-          }, 100);
+        const list = Array.isArray(freshList) && freshList.length > 0 ? freshList : ingredients;
+
+        if (advanceToNext && editingIngredient) {
+          const currIdx = list.findIndex(i => i.id === editingIngredient.id);
+          if (currIdx >= 0 && currIdx < list.length - 1) {
+            const nextIng = list[currIdx + 1];
+            openEdit(nextIng);
+            setLastSavedMsg(`✓ Insumo "${savedName}" guardado. Ahora editando "${nextIng.name}":`);
+            return;
+          }
+        }
+
+        if (keepOpen) {
+          if (isAdding) {
+            // Mantener el formulario abierto para ingresar el siguiente insumo sin interrupción
+            setFormData({ 
+              name: '', cost_per_unit: 0, unit: 'kg',
+              kcal_per_100g: 0, protein_g: 0, fat_g: 0, fiber_g: 0, moisture_g: 0, ash_g: 0, carbs_g: 0,
+              calcium_g: 0, phosphorus_g: 0, micronutrients: []
+            });
+            setLastSavedMsg(`✓ Insumo "${savedName}" ($${Number(savedCost).toLocaleString()}/${savedUnit}) guardado correctamente. Puedes ingresar el siguiente ahora:`);
+            setTimeout(() => {
+              nameInputRef.current?.focus();
+            }, 100);
+          } else {
+            // Editando: guardar y mantenerse en el formulario
+            setLastSavedMsg(`✓ Insumo "${savedName}" guardado correctamente.`);
+            setEditingIngredient(prev => ({ ...prev, ...formData }));
+          }
         } else {
           setIsAdding(false);
           setEditingIngredient(null);
@@ -179,6 +200,12 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
     setIsAdding(false);
   };
 
+  const currentIndex = editingIngredient && Array.isArray(ingredients)
+    ? ingredients.findIndex((i) => i.id === editingIngredient.id) 
+    : -1;
+  const prevIngredient = currentIndex > 0 ? ingredients[currentIndex - 1] : null;
+  const nextIngredient = currentIndex >= 0 && currentIndex < ingredients.length - 1 ? ingredients[currentIndex + 1] : null;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap justify-between items-center gap-3 mb-2">
@@ -201,8 +228,8 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
 
       {(isAdding || editingIngredient) && (
         <form onSubmit={(e) => handleSave(e, isAdding)} className="bg-gray-50 p-6 rounded-2xl border-2 border-stone-200 mb-8 shadow-xs">
-          {/* Cabecera del Formulario con Botón Volver */}
-          <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-200">
+          {/* Cabecera del Formulario con Botón Volver y Selector Rápido */}
+          <div className="flex flex-wrap justify-between items-center gap-3 mb-4 pb-3 border-b border-gray-200">
             <div className="flex items-center gap-2.5">
               <button 
                 type="button" 
@@ -214,15 +241,56 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
               </button>
               <div>
                 <h4 className="font-header text-lg font-bold text-stone-800">
-                  {isAdding ? 'Ingreso Continuo de Insumos' : `Editando: ${editingIngredient.name}`}
+                  {isAdding ? 'Ingreso Continuo de Insumos' : `Editando: ${formData.name || editingIngredient.name}`}
                 </h4>
                 <p className="text-xs text-gray-500">
                   {isAdding 
                     ? 'Guarda cada insumo y el formulario se mantendrá abierto para ingresar el siguiente sin salir.'
-                    : 'Modifica los valores nutricionales o el costo unitario.'}
+                    : 'Modifica o autocompleta con IA. Guarda y quédate aquí o avanza directo al siguiente.'}
                 </p>
               </div>
             </div>
+
+            {editingIngredient && Array.isArray(ingredients) && ingredients.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-stone-500 font-semibold hidden sm:inline">Cambiar insumo:</span>
+                <select
+                  value={editingIngredient.id}
+                  onChange={(e) => {
+                    const target = ingredients.find((i) => String(i.id) === e.target.value);
+                    if (target) openEdit(target);
+                  }}
+                  className="text-xs font-semibold bg-white border border-stone-300 rounded-xl px-2.5 py-1.5 text-stone-800"
+                >
+                  {ingredients.map((ing) => (
+                    <option key={ing.id} value={ing.id}>
+                      {ing.name} (${Number(ing.cost_per_unit).toLocaleString('es-CL')}/{ing.unit})
+                    </option>
+                  ))}
+                </select>
+
+                <div className="inline-flex rounded-xl border border-stone-300 bg-white p-0.5 shadow-2xs">
+                  <button
+                    type="button"
+                    disabled={!prevIngredient}
+                    onClick={() => prevIngredient && openEdit(prevIngredient)}
+                    className="px-2.5 py-1 text-xs font-bold text-stone-700 hover:bg-stone-100 disabled:opacity-30 rounded-lg transition flex items-center gap-0.5"
+                    title={prevIngredient ? `Anterior: ${prevIngredient.name}` : ''}
+                  >
+                    <ChevronLeft size={14} /> Anterior
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!nextIngredient}
+                    onClick={() => nextIngredient && openEdit(nextIngredient)}
+                    className="px-2.5 py-1 text-xs font-bold text-stone-700 hover:bg-stone-100 disabled:opacity-30 rounded-lg transition flex items-center gap-0.5"
+                    title={nextIngredient ? `Siguiente: ${nextIngredient.name}` : ''}
+                  >
+                    Siguiente <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
 
             <button 
               type="button" 
@@ -341,19 +409,54 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
               </div>
               {Array.isArray(formData.micronutrients) && formData.micronutrients.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-gray-200">
-                  <span className="block text-xs font-bold text-gray-600 mb-2">
-                    Micronutrientes, Vitaminas & Bioactivos Destacados (por 100g)
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2">
+                    <span className="block text-xs font-bold text-gray-700">
+                      Micronutrientes, Vitaminas & Bioactivos (por cada 100g de este insumo)
+                    </span>
+                    <span className="text-[11px] text-emerald-800 bg-emerald-100/90 border border-emerald-200 px-2.5 py-0.5 rounded-md font-semibold">
+                      ⚙️ La etiqueta del lote calcula la suma ponderada real según los kilos ingresados
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                     {formData.micronutrients.map((m, idx) => (
-                      <span
+                      <div
                         key={idx}
-                        title={m.highlight || ''}
-                        className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-900 border border-emerald-200 px-2.5 py-1 rounded-full font-medium"
+                        className="flex items-center justify-between bg-white border border-stone-200 rounded-xl p-2.5 shadow-2xs"
                       >
-                        <strong>{m.name}:</strong> {m.amount} {m.unit}
-                        {m.highlight ? <span className="text-emerald-700/80">· {m.highlight}</span> : null}
-                      </span>
+                        <div className="flex-1 min-w-0 pr-2">
+                          <strong className="text-xs text-stone-900 block truncate">{m.name}</strong>
+                          {m.highlight && (
+                            <span className="text-[10px] text-stone-500 block truncate" title={m.highlight}>
+                              {m.highlight}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <input
+                            type="number"
+                            step="any"
+                            value={m.amount}
+                            onChange={(e) => {
+                              const updated = [...formData.micronutrients];
+                              updated[idx] = { ...updated[idx], amount: parseFloat(e.target.value) || 0 };
+                              setFormData({ ...formData, micronutrients: updated });
+                            }}
+                            className="w-16 px-1.5 py-1 text-xs border border-stone-300 rounded-lg font-semibold text-right tabular-nums bg-stone-50 text-stone-800"
+                          />
+                          <span className="text-xs font-bold text-stone-600 min-w-[28px]">{m.unit}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = formData.micronutrients.filter((_, i) => i !== idx);
+                              setFormData({ ...formData, micronutrients: updated });
+                            }}
+                            className="text-stone-300 hover:text-red-500 p-0.5 rounded"
+                            title="Eliminar este nutriente"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -393,14 +496,37 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
                   </button>
                 </>
               ) : (
-                <button 
-                  type="button" 
-                  onClick={(e) => handleSave(e, false)} 
-                  disabled={saving}
-                  className="bg-primary-green-dark hover:bg-opacity-90 text-white px-6 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition cursor-pointer"
-                >
-                  <Save size={16} /> {saving ? 'Guardando...' : 'Guardar Cambios'}
-                </button>
+                <>
+                  <button 
+                    type="button" 
+                    onClick={(e) => handleSave(e, false)} 
+                    disabled={saving}
+                    className="px-4 py-2 text-xs font-bold text-stone-700 bg-white border border-stone-300 hover:bg-stone-50 rounded-xl transition shadow-xs cursor-pointer"
+                  >
+                    {saving ? 'Guardando...' : 'Guardar y Salir'}
+                  </button>
+
+                  <button 
+                    type="button" 
+                    onClick={(e) => handleSave(e, true, false)} 
+                    disabled={saving}
+                    className="bg-primary-green hover:bg-primary-green-dark text-white px-5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition cursor-pointer"
+                  >
+                    <Save size={15} /> {saving ? 'Guardando...' : 'Guardar Cambios'}
+                  </button>
+
+                  {nextIngredient && (
+                    <button 
+                      type="button" 
+                      onClick={(e) => handleSave(e, true, true)} 
+                      disabled={saving}
+                      className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+                    >
+                      <span>Guardar y Siguiente ({nextIngredient.name})</span>
+                      <ChevronRight size={15} />
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
