@@ -1,5 +1,151 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Edit2, Trash2, Save, X, Sparkles, Loader, History, TrendingUp, TrendingDown, Clock, ArrowRight, ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  Plus, Edit2, Trash2, Save, X, Sparkles, Loader, History, TrendingUp, TrendingDown,
+  Clock, ArrowRight, ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Scale, Check,
+  Award, Info, Filter, Zap, Search, Layers, AlertCircle
+} from 'lucide-react';
+import { classifyIngredientBARF } from './BatchProductionManager';
+
+// =========================================================================
+// COMPARADOR BROMATOLÓGICO & CALIDAD-PRECIO DE INSUMOS
+// =========================================================================
+export const computeIngredientComparison = (comparedIngredients = []) => {
+  if (!Array.isArray(comparedIngredients) || comparedIngredients.length < 2) return null;
+
+  // 1. Métricas Económicas por Insumo
+  const econList = comparedIngredients.map(ing => {
+    const cost = Number(ing.cost_per_unit || 0);
+    const protG = Number(ing.protein_g || 0);
+    const kcal = Number(ing.kcal_per_100g || 0);
+    const fatG = Number(ing.fat_g || 0);
+    const fiberG = Number(ing.fiber_g || 0);
+    const moistureG = Number(ing.moisture_g || 0);
+    const ashG = Number(ing.ash_g || 0);
+    const carbsG = Number(ing.carbs_g || 0);
+    const calG = Number(ing.calcium_g || 0);
+    const phosG = Number(ing.phosphorus_g || 0);
+
+    // Costo por gramo de proteína: (costo / 1000g) * (100g / protG) = costo / (protG * 10)
+    const costPerGramProt = protG > 0 ? (cost / (protG * 10)) : 0;
+    // Kcal entregadas por cada $1.000 gastados
+    const kcalPerThousandClp = cost > 0 ? ((kcal * 10 / cost) * 1000) : 0;
+    // Ratio Ca:P
+    const caPRatio = phosG > 0 ? (calG / phosG).toFixed(2) : (calG > 0 ? 'Solo Ca' : 'N/A');
+
+    return {
+      id: ing.id,
+      name: ing.name,
+      cost,
+      unit: ing.unit,
+      protG,
+      fatG,
+      fiberG,
+      moistureG,
+      ashG,
+      carbsG,
+      kcal,
+      calG,
+      phosG,
+      costPerGramProt,
+      kcalPerThousandClp,
+      caPRatio,
+      category: classifyIngredientBARF(ing.name, ing)
+    };
+  });
+
+  // Ganador en costo por gramo de proteína (el menor valor positivo)
+  const validProtCosts = econList.filter(e => e.costPerGramProt > 0);
+  const bestProteinCostId = validProtCosts.length > 0
+    ? validProtCosts.reduce((min, cur) => cur.costPerGramProt < min.costPerGramProt ? cur : min).id
+    : null;
+
+  // Ganador en Kcal por $ (el mayor valor positivo)
+  const validKcalCosts = econList.filter(e => e.kcalPerThousandClp > 0);
+  const bestKcalCostId = validKcalCosts.length > 0
+    ? validKcalCosts.reduce((max, cur) => cur.kcalPerThousandClp > max.kcalPerThousandClp ? cur : max).id
+    : null;
+
+  // 2. Separar Micronutrientes Compartidos vs Exclusivos
+  const allMicros = new Map();
+  comparedIngredients.forEach(ing => {
+    let list = [];
+    if (Array.isArray(ing.micronutrients)) {
+      list = ing.micronutrients;
+    } else if (typeof ing.micronutrients === 'string' && ing.micronutrients.trim()) {
+      try { list = JSON.parse(ing.micronutrients); } catch (e) { list = []; }
+    }
+
+    list.forEach(m => {
+      if (!m || !m.name) return;
+      const norm = m.name.trim().toLowerCase();
+      if (!allMicros.has(norm)) {
+        allMicros.set(norm, { displayName: m.name.trim(), values: {} });
+      }
+      allMicros.get(norm).values[ing.id] = {
+        amount: m.amount,
+        unit: m.unit || '',
+        highlight: m.highlight || ''
+      };
+    });
+  });
+
+  const sharedMicros = [];
+  const exclusiveMicros = {};
+  comparedIngredients.forEach(ing => { exclusiveMicros[ing.id] = []; });
+
+  allMicros.forEach((item) => {
+    const presentCount = Object.keys(item.values).length;
+    if (presentCount >= 2) {
+      sharedMicros.push(item);
+    } else {
+      const singleId = Object.keys(item.values)[0];
+      if (exclusiveMicros[singleId]) {
+        exclusiveMicros[singleId].push({
+          name: item.displayName,
+          ...item.values[singleId]
+        });
+      }
+    }
+  });
+
+  // 3. Dictamen Heurístico de Decisión
+  const categories = Array.from(new Set(econList.map(e => e.category)));
+  let verdictTitle = 'Análisis de Eficiencia & Selección';
+  let verdictText = '';
+
+  if (categories.length === 1 && categories[0] === 'animal') {
+    const bestP = econList.find(e => e.id === bestProteinCostId);
+    const others = econList.filter(e => e.id !== bestProteinCostId);
+    verdictTitle = '🥩 Comparativa de Cortes Cárnicos & Rendimiento Proteico';
+    if (bestP && others.length > 0) {
+      const diffPct = others[0].costPerGramProt > 0
+        ? (((others[0].costPerGramProt - bestP.costPerGramProt) / others[0].costPerGramProt) * 100).toFixed(0)
+        : '0';
+      verdictText = `"${bestP.name}" entrega la mejor rentabilidad biológica de proteína a $${bestP.costPerGramProt.toFixed(1)} CLP/g (un ${diffPct}% más eficiente que "${others[0].name}"). Si buscas maximizar el aporte proteico al menor costo de materia prima, prioriza "${bestP.name}". Sin embargo, evalúa si "${others[0].name}" aporta elementos estructurales como calcio óseo (Ca:P ${others[0].caPRatio}:1) o ácidos grasos necesarios para la saciedad y el pelaje.`;
+    } else {
+      verdictText = 'Ambos cortes cárnicos presentan perfiles de proteína y costo similares. Puedes alternarlos según las ofertas de mayoristas para diversificar aminoácidos.';
+    }
+  } else if (categories.length === 1 && categories[0] === 'vegetal') {
+    verdictTitle = '🥦 Contraste de Fibra, Humedad & Micronutrientes Vegetales';
+    verdictText = 'En frutas y verduras el foco no es el costo por proteína, sino la densidad de fibra prebiótica, carotenoides y flavonoides bioactivos. Alternar o mezclar estos vegetales en la formulación aporta un espectro antioxidante más amplio que utilizar uno solo.';
+  } else if (categories.length === 1 && categories[0] === 'suplemento') {
+    verdictTitle = '💊 Evaluación Nutracéutica & Concentración de Principios Activos';
+    verdictText = 'Los suplementos y nutracéuticos se seleccionan por la especificidad de sus bioactivos diferenciales (revisa la tabla de bioactivos exclusivos más abajo). Generalmente se complementan entre sí en dosis pequeñas (1-3% de la fórmula) para potenciar la microbiota o desinflamar articulaciones.';
+  } else {
+    verdictTitle = '⚖️ Contraste entre Distintas Familias de Insumos';
+    verdictText = 'Estás comparando insumos de distintas familias funcionales (ej. carne vs vegetal o suplemento). Recuerda que en la dieta BARF cumplen roles biológicos complementarios e insustituibles (la carne aporta aminoácidos esenciales y energía, el vegetal aporta fibra y alcalinidad, y los suplementos micronutrientes específicos).';
+  }
+
+  return {
+    econList,
+    bestProteinCostId,
+    bestKcalCostId,
+    sharedMicros,
+    exclusiveMicros,
+    verdictTitle,
+    verdictText
+  };
+};
 
 const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) => {
   const nameInputRef = useRef(null);
@@ -38,6 +184,38 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
     setShowHistoryModal(true);
     fetchPriceHistory(ing ? ing.id : null);
   };
+
+  // --- COMPARADOR DE INSUMOS (BROMATOLÓGICO & CALIDAD-PRECIO) ---
+  const [selectedForCompare, setSelectedForCompare] = useState([]);
+  const [showCompareModal, setShowCompareModal] = useState(false);
+  const [tableCategoryFilter, setTableCategoryFilter] = useState('all'); // 'all' | 'animal' | 'vegetal' | 'suplemento'
+  const [tableSearchTerm, setTableSearchTerm] = useState('');
+
+  const toggleCompareItem = (id) => {
+    setSelectedForCompare(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const filteredIngredients = useMemo(() => {
+    if (!Array.isArray(ingredients)) return [];
+    return ingredients.filter(ing => {
+      const matchesSearch = !tableSearchTerm.trim() || ing.name.toLowerCase().includes(tableSearchTerm.toLowerCase());
+      if (!matchesSearch) return false;
+      if (tableCategoryFilter === 'all') return true;
+      const cat = classifyIngredientBARF(ing.name, ing);
+      return cat === tableCategoryFilter;
+    });
+  }, [ingredients, tableCategoryFilter, tableSearchTerm]);
+
+  const comparedIngredients = useMemo(() => {
+    if (!Array.isArray(ingredients)) return [];
+    return ingredients.filter(i => selectedForCompare.includes(i.id));
+  }, [ingredients, selectedForCompare]);
+
+  const comparisonData = useMemo(() => {
+    return computeIngredientComparison(comparedIngredients);
+  }, [comparedIngredients]);
 
   const [formData, setFormData] = useState({ 
     name: '', cost_per_unit: 0, unit: 'kg',
@@ -214,6 +392,19 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
           <p className="text-xs text-gray-500">Maestro único de insumos: costos, valores nutricionales y registro histórico de precios.</p>
         </div>
         <div className="flex items-center gap-2">
+          <button 
+            type="button"
+            onClick={() => setShowCompareModal(true)}
+            className={`px-3 py-2 rounded-lg flex items-center gap-1.5 transition shadow-sm text-xs font-bold cursor-pointer ${
+              selectedForCompare.length >= 2 
+                ? 'bg-secondary-brown text-white hover:bg-stone-800 ring-2 ring-emerald-500/40 shadow-xs' 
+                : 'bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-300'
+            }`}
+            title="Comparar valores biológicos y calidad-precio de 2 o más insumos"
+          >
+            <Scale size={15} className={selectedForCompare.length >= 2 ? 'text-emerald-400' : 'text-stone-500'} />
+            <span>Comparar Insumos {selectedForCompare.length > 0 && `(${selectedForCompare.length})`}</span>
+          </button>
           <button 
             onClick={() => { setSelectedIngredientForHistory(null); setShowHistoryModal(true); fetchPriceHistory(null); }}
             className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-lg flex items-center gap-1.5 transition shadow-sm text-xs font-bold"
@@ -533,12 +724,88 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
         </form>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      {/* Barra de Filtros por Categoría, Buscador y Comparador */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-stone-200 shadow-2xs">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-bold text-stone-500 mr-1 flex items-center gap-1">
+            <Filter size={13} /> Filtrar:
+          </span>
+          {[
+            { id: 'all', label: 'Todos los Insumos' },
+            { id: 'animal', label: '🥩 Cárnicos & Vísceras' },
+            { id: 'vegetal', label: '🥦 Frutas & Verduras' },
+            { id: 'suplemento', label: '💊 Suplementos & Otros' },
+          ].map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => setTableCategoryFilter(cat.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                tableCategoryFilter === cat.id
+                  ? 'bg-secondary-brown text-white shadow-2xs'
+                  : 'bg-stone-50 text-stone-600 hover:bg-stone-100 border border-stone-200'
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Buscar insumo..."
+              value={tableSearchTerm}
+              onChange={(e) => setTableSearchTerm(e.target.value)}
+              className="text-xs pl-7 pr-3 py-1.5 rounded-xl border border-stone-300 bg-stone-50 focus:bg-white text-stone-800 outline-none w-36 sm:w-48"
+            />
+            <Search size={13} className="absolute left-2.5 top-2 text-stone-400" />
+            {tableSearchTerm && (
+              <button
+                type="button"
+                onClick={() => setTableSearchTerm('')}
+                className="absolute right-2 top-2 text-stone-400 hover:text-stone-700"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+          {selectedForCompare.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedForCompare([])}
+              className="text-xs font-semibold text-stone-500 hover:text-stone-800 px-2 py-1 cursor-pointer"
+            >
+              Limpiar ({selectedForCompare.length})
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowCompareModal(true)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-2xs cursor-pointer ${
+              selectedForCompare.length >= 2
+                ? 'bg-primary-green hover:bg-primary-green-dark text-white ring-2 ring-primary-green/30'
+                : 'bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-300'
+            }`}
+            title="Comparar valores biológicos y calidad-precio de insumos"
+          >
+            <Scale size={14} className={selectedForCompare.length >= 2 ? 'text-white' : 'text-stone-500'} />
+            Comparar {selectedForCompare.length > 0 && `(${selectedForCompare.length})`}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-xs border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
+                <th className="w-10 px-3 py-3 text-center" title="Seleccionar para comparar">
+                  <Scale size={14} className="mx-auto text-stone-400" />
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoría</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Costo por unidad</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unidad</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kcal/100g</th>
@@ -547,29 +814,82 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {ingredients.map(ing => (
-                <tr key={ing.id} className="hover:bg-gray-50 transition">
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-800">{ing.name}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">${ing.cost_per_unit.toLocaleString()}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{ing.unit}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{ing.kcal_per_100g || 0}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{ing.protein_g || 0}g</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
-                    <button onClick={() => openHistoryForIngredient(ing)} className="text-amber-600 hover:bg-amber-50 p-1.5 rounded mr-1 transition" title="Ver historial de precios"><History size={16} /></button>
-                    <button onClick={() => openEdit(ing)} className="text-primary-green hover:bg-green-50 p-1.5 rounded mr-1 transition" title="Editar insumo"><Edit2 size={16} /></button>
-                    <button onClick={() => handleDelete(ing.id)} className="text-red-600 hover:bg-red-50 p-1.5 rounded transition" title="Eliminar insumo"><Trash2 size={16} /></button>
-                  </td>
-                </tr>
-              ))}
-              {ingredients.length === 0 && (
+              {filteredIngredients.map(ing => {
+                const isSelected = selectedForCompare.includes(ing.id);
+                const cat = classifyIngredientBARF(ing.name, ing);
+                return (
+                  <tr key={ing.id} className={`transition ${isSelected ? 'bg-emerald-50/70' : 'hover:bg-gray-50'}`}>
+                    <td className="px-3 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleCompareItem(ing.id)}
+                        className="w-4 h-4 rounded text-primary-green focus:ring-primary-green cursor-pointer"
+                        title="Marcar para comparar valores biológicos y calidad-precio"
+                      />
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-800 flex items-center gap-2">
+                      <span>{ing.name}</span>
+                      {isSelected && (
+                        <span className="bg-primary-green text-white text-[10px] px-1.5 py-0.2 rounded-md font-mono font-semibold">
+                          En Comparador
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap text-xs">
+                      {cat === 'animal' && <span className="bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full font-semibold">🥩 Cárnico</span>}
+                      {cat === 'vegetal' && <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold">🥦 Vegetal</span>}
+                      {cat === 'suplemento' && <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full font-semibold">💊 Suplemento</span>}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-700 font-mono">${ing.cost_per_unit.toLocaleString('es-CL')}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{ing.unit}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 font-mono">{ing.kcal_per_100g || 0}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 font-mono">{ing.protein_g || 0}g</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                      <button onClick={() => openHistoryForIngredient(ing)} className="text-amber-600 hover:bg-amber-50 p-1.5 rounded mr-1 transition cursor-pointer" title="Ver historial de precios"><History size={16} /></button>
+                      <button onClick={() => openEdit(ing)} className="text-primary-green hover:bg-green-50 p-1.5 rounded mr-1 transition cursor-pointer" title="Editar insumo"><Edit2 size={16} /></button>
+                      <button onClick={() => handleDelete(ing.id)} className="text-red-600 hover:bg-red-50 p-1.5 rounded transition cursor-pointer" title="Eliminar insumo"><Trash2 size={16} /></button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filteredIngredients.length === 0 && (
                 <tr>
-                  <td colSpan="6" className="px-4 py-8 text-center text-gray-500 text-sm">No hay ingredientes registrados.</td>
+                  <td colSpan="8" className="px-4 py-8 text-center text-gray-500 text-sm">
+                    No se encontraron insumos con el filtro seleccionado.
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Banner flotante de selección para comparar */}
+      {selectedForCompare.length > 0 && !showCompareModal && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-stone-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-stone-700 animate-slideUp">
+          <span className="text-xs font-semibold flex items-center gap-1.5 text-stone-200">
+            <Scale size={16} className="text-emerald-400" />
+            <strong>{selectedForCompare.length}</strong> {selectedForCompare.length === 1 ? 'insumo seleccionado' : 'insumos seleccionados'}
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowCompareModal(true)}
+            className="bg-primary-green hover:bg-primary-green-dark text-white text-xs font-bold px-4 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+          >
+            <Scale size={13} />
+            Comparar Cara a Cara
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedForCompare([])}
+            className="text-stone-400 hover:text-white text-xs p-1 cursor-pointer"
+            title="Limpiar selección"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {/* --- MODAL: HISTORIAL DE PRECIOS DE INSUMOS --- */}
       {showHistoryModal && (
@@ -690,6 +1010,383 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
                 className="bg-gray-800 hover:bg-gray-900 text-white px-5 py-2 rounded-xl text-xs font-bold transition"
               >
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL: COMPARADOR BROMATOLÓGICO & CALIDAD-PRECIO --- */}
+      {showCompareModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-3xl w-full max-w-5xl my-6 relative flex flex-col max-h-[90vh] shadow-2xl border border-stone-200 animate-fadeIn">
+            {/* Header del Modal */}
+            <div className="p-5 border-b border-stone-200 flex flex-wrap justify-between items-center bg-stone-50/90 rounded-t-3xl gap-3">
+              <div className="flex items-center gap-3">
+                <span className="p-2.5 bg-emerald-100 text-primary-green rounded-2xl shadow-2xs">
+                  <Scale size={22} />
+                </span>
+                <div>
+                  <h3 className="font-header text-xl text-secondary-brown flex items-center gap-2">
+                    Comparador Bromatológico & Calidad-Precio
+                    <span className="text-xs bg-emerald-100 text-emerald-800 font-mono px-2 py-0.5 rounded-full border border-emerald-200">
+                      {comparedIngredients.length} Insumos
+                    </span>
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    Contraste técnico de densidad nutricional, bioactivos y eficiencia económica ($/g proteína, kcal/$).
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCompareModal(false)}
+                  className="text-stone-400 hover:text-stone-700 bg-white p-2 rounded-full border border-stone-200 shadow-2xs hover:bg-stone-100 transition cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Insumos en Comparación y Selector para Añadir Más */}
+            <div className="px-6 py-3 bg-stone-100/70 border-b border-stone-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="font-semibold text-stone-600 mr-1">Insumos activos:</span>
+                {comparedIngredients.map((ing) => (
+                  <span
+                    key={ing.id}
+                    className="inline-flex items-center gap-1 bg-white text-stone-800 border border-stone-300 px-2.5 py-1 rounded-xl font-bold shadow-2xs"
+                  >
+                    <span>{ing.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => toggleCompareItem(ing.id)}
+                      className="text-stone-400 hover:text-red-600 ml-1 p-0.5 cursor-pointer"
+                      title="Quitar de la comparación"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+
+              {/* Selector para añadir más insumos directamente en el modal */}
+              <div className="flex items-center gap-2">
+                <select
+                  onChange={(e) => {
+                    const id = Number(e.target.value);
+                    if (id && !selectedForCompare.includes(id)) {
+                      setSelectedForCompare((prev) => [...prev, id]);
+                    }
+                    e.target.value = '';
+                  }}
+                  defaultValue=""
+                  className="px-3 py-1.5 rounded-xl border border-stone-300 bg-white text-stone-800 text-xs font-semibold cursor-pointer"
+                >
+                  <option value="" disabled>+ Agregar otro insumo al comparador...</option>
+                  {ingredients
+                    .filter((i) => !selectedForCompare.includes(i.id))
+                    .map((ing) => (
+                      <option key={ing.id} value={ing.id}>
+                        {ing.name} (${Number(ing.cost_per_unit).toLocaleString('es-CL')}/{ing.unit})
+                      </option>
+                    ))}
+                </select>
+                {selectedForCompare.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedForCompare([])}
+                    className="text-stone-500 hover:text-stone-800 underline text-xs cursor-pointer"
+                  >
+                    Limpiar todo
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Contenido del Modal */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-stone-800">
+              {comparedIngredients.length < 2 ? (
+                <div className="text-center py-12 space-y-3 bg-stone-50 rounded-2xl border border-dashed border-stone-300">
+                  <Scale size={40} className="mx-auto text-stone-400" />
+                  <h4 className="font-header text-base text-stone-700 font-bold">
+                    Selecciona al menos 2 insumos para contrastar
+                  </h4>
+                  <p className="text-xs text-stone-500 max-w-md mx-auto">
+                    Puedes marcar las casillas en la tabla de insumos o seleccionarlos en el desplegable superior para comparar cortes cárnicos, frutas o suplementos.
+                  </p>
+                </div>
+              ) : (
+                comparisonData && (
+                  <>
+                    {/* SECCIÓN 1: RATIO CALIDAD / PRECIO (EFICIENCIA ECONÓMICA) */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-4 rounded-full bg-primary-green"></span>
+                        <h4 className="font-header text-xs font-bold uppercase tracking-wider text-secondary-brown">
+                          1. Eficiencia Económica & Calidad / Precio
+                        </h4>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {comparisonData.econList.map((e) => {
+                          const isBestProt = e.id === comparisonData.bestProteinCostId;
+                          const isBestKcal = e.id === comparisonData.bestKcalCostId;
+                          return (
+                            <div
+                              key={e.id}
+                              className={`p-4 rounded-2xl border transition-all ${
+                                isBestProt
+                                  ? 'bg-emerald-50/70 border-emerald-300 ring-2 ring-emerald-500/20 shadow-xs'
+                                  : 'bg-white border-stone-200 shadow-2xs'
+                              }`}
+                            >
+                              <div className="flex justify-between items-start gap-1 mb-2">
+                                <h5 className="font-bold text-sm text-stone-900 truncate" title={e.name}>
+                                  {e.name}
+                                </h5>
+                                {isBestProt && (
+                                  <span className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 flex items-center gap-0.5 shadow-2xs">
+                                    <Award size={10} /> Mejor $/Prot
+                                  </span>
+                                )}
+                              </div>
+                              <div className="space-y-2 text-xs">
+                                <div className="flex justify-between items-center pb-1 border-b border-stone-100">
+                                  <span className="text-stone-500">Costo / {e.unit}:</span>
+                                  <strong className="font-mono font-bold text-stone-800">
+                                    ${e.cost.toLocaleString('es-CL')}
+                                  </strong>
+                                </div>
+                                <div className="flex justify-between items-center pb-1 border-b border-stone-100">
+                                  <span className="text-stone-500" title="Costo en CLP por cada gramo de proteína pura entregada">
+                                    Costo / g Proteína:
+                                  </span>
+                                  <strong className={`font-mono font-bold ${isBestProt ? 'text-emerald-700 text-sm' : 'text-stone-800'}`}>
+                                    {e.costPerGramProt > 0 ? `$${e.costPerGramProt.toFixed(1)} CLP` : 'N/A'}
+                                  </strong>
+                                </div>
+                                <div className="flex justify-between items-center pb-1 border-b border-stone-100">
+                                  <span className="text-stone-500" title="Kcal metabólicas entregadas por cada $1.000 gastados en este insumo">
+                                    Kcal por $1.000:
+                                  </span>
+                                  <strong className={`font-mono font-bold ${isBestKcal ? 'text-sky-700' : 'text-stone-800'}`}>
+                                    {e.kcalPerThousandClp > 0 ? `${Math.round(e.kcalPerThousandClp)} kcal` : 'N/A'}
+                                  </strong>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-stone-500">Ratio Ca:P:</span>
+                                  <strong className="font-mono font-bold text-stone-800">
+                                    {e.caPRatio}:1
+                                  </strong>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* SECCIÓN 2: TABLA BROMATOLÓGICA CARA A CARA (POR 100G) */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-4 rounded-full bg-emerald-600"></span>
+                        <h4 className="font-header text-xs font-bold uppercase tracking-wider text-secondary-brown">
+                          2. Composición Bromatológica Base (por 100g)
+                        </h4>
+                      </div>
+                      <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-2xs">
+                        <table className="w-full text-xs">
+                          <thead className="bg-stone-50 border-b border-stone-200">
+                            <tr>
+                              <th className="p-3 text-left font-bold text-stone-600">Nutriente / Métrica</th>
+                              {comparisonData.econList.map((e) => (
+                                <th key={e.id} className="p-3 text-right font-bold text-stone-800">
+                                  {e.name}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-stone-100 font-mono">
+                            {[
+                              { label: 'Energía Metabólica', key: 'kcal', unit: 'kcal' },
+                              { label: 'Proteína Cruda', key: 'protG', unit: 'g' },
+                              { label: 'Grasa Cruda', key: 'fatG', unit: 'g' },
+                              { label: 'Fibra Cruda', key: 'fiberG', unit: 'g' },
+                              { label: 'Humedad / Agua', key: 'moistureG', unit: '%' },
+                              { label: 'Cenizas / Minerales', key: 'ashG', unit: 'g' },
+                              { label: 'Carbohidratos', key: 'carbsG', unit: 'g' },
+                              { label: 'Calcio', key: 'calG', unit: 'g' },
+                              { label: 'Fósforo', key: 'phosG', unit: 'g' },
+                            ].map((row) => {
+                              const maxVal = Math.max(...comparisonData.econList.map((e) => Number(e[row.key] || 0)));
+                              return (
+                                <tr key={row.key} className="hover:bg-stone-50/50">
+                                  <td className="p-2.5 font-sans font-semibold text-stone-700">
+                                    {row.label}
+                                  </td>
+                                  {comparisonData.econList.map((e) => {
+                                    const val = Number(e[row.key] || 0);
+                                    const isMax = maxVal > 0 && val === maxVal;
+                                    return (
+                                      <td
+                                        key={e.id}
+                                        className={`p-2.5 text-right tabular-nums ${
+                                          isMax ? 'font-bold text-emerald-800 bg-emerald-50/40' : 'text-stone-700'
+                                        }`}
+                                      >
+                                        {val} {row.unit}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* SECCIÓN 3: MICRONUTRIENTES COMPARTIDOS (CARA A CARA) */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-4 rounded-full bg-sky-600"></span>
+                        <h4 className="font-header text-xs font-bold uppercase tracking-wider text-secondary-brown">
+                          3. Micronutrientes Compartidos (Presentes en 2 o más insumos)
+                        </h4>
+                      </div>
+                      {comparisonData.sharedMicros.length === 0 ? (
+                        <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 text-xs text-stone-500">
+                          Estos insumos no comparten micronutrientes idénticos en su perfil registrado (revisa los bioactivos exclusivos más abajo).
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-2xs">
+                          <table className="w-full text-xs">
+                            <thead className="bg-stone-50 border-b border-stone-200">
+                              <tr>
+                                <th className="p-3 text-left font-bold text-stone-600">Micronutriente / Bioactivo</th>
+                                {comparisonData.econList.map((e) => (
+                                  <th key={e.id} className="p-3 text-right font-bold text-stone-800">
+                                    {e.name}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-stone-100 font-mono">
+                              {comparisonData.sharedMicros.map((item, idx) => {
+                                const amounts = Object.values(item.values).map((v) => Number(v.amount || 0));
+                                const maxAmount = Math.max(...amounts);
+                                return (
+                                  <tr key={idx} className="hover:bg-stone-50/50">
+                                    <td className="p-2.5 font-sans font-semibold text-stone-800">
+                                      {item.displayName}
+                                    </td>
+                                    {comparisonData.econList.map((e) => {
+                                      const valObj = item.values[e.id];
+                                      if (!valObj) {
+                                        return (
+                                          <td key={e.id} className="p-2.5 text-right text-stone-300">
+                                            -
+                                          </td>
+                                        );
+                                      }
+                                      const isTop = Number(valObj.amount || 0) === maxAmount && maxAmount > 0;
+                                      return (
+                                        <td
+                                          key={e.id}
+                                          className={`p-2.5 text-right tabular-nums ${
+                                            isTop ? 'font-bold text-sky-800 bg-sky-50/40' : 'text-stone-700'
+                                          }`}
+                                          title={valObj.highlight || ''}
+                                        >
+                                          {valObj.amount} {valObj.unit}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* SECCIÓN 4: BIOACTIVOS EXCLUSIVOS DE CADA INSUMO */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-4 rounded-full bg-amber-500"></span>
+                        <h4 className="font-header text-xs font-bold uppercase tracking-wider text-secondary-brown">
+                          4. Bioactivos Exclusivos y Diferenciales de cada Insumo
+                        </h4>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {comparisonData.econList.map((e) => {
+                          const exclusives = comparisonData.exclusiveMicros[e.id] || [];
+                          return (
+                            <div key={e.id} className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-2.5">
+                              <h5 className="font-bold text-xs text-stone-900 border-b border-stone-200 pb-1.5 flex items-center justify-between">
+                                <span>{e.name}</span>
+                                <span className="text-[10px] text-stone-500 font-normal">
+                                  {exclusives.length} exclusivos
+                                </span>
+                              </h5>
+                              {exclusives.length === 0 ? (
+                                <p className="text-[11px] text-stone-400 italic">
+                                  No registra bioactivos exclusivos adicionales.
+                                </p>
+                              ) : (
+                                <div className="space-y-1.5">
+                                  {exclusives.map((m, mIdx) => (
+                                    <div key={mIdx} className="bg-white p-2 rounded-xl border border-stone-200/80 text-xs shadow-2xs">
+                                      <div className="flex justify-between items-center">
+                                        <strong className="text-secondary-brown text-[11px]">{m.name}</strong>
+                                        <span className="font-mono text-[11px] text-stone-600 font-bold">
+                                          {m.amount} {m.unit}
+                                        </span>
+                                      </div>
+                                      {m.highlight && (
+                                        <p className="text-[10px] text-stone-500 mt-0.5 leading-snug">
+                                          {m.highlight}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* SECCIÓN 5: DICTAMEN TÉCNICO DE SELECCIÓN */}
+                    <div className="bg-white border-2 border-emerald-300 rounded-2xl p-4 shadow-xs space-y-2">
+                      <div className="flex items-center gap-2 text-secondary-brown font-bold text-xs uppercase tracking-wider">
+                        <CheckCircle2 size={16} className="text-primary-green shrink-0" />
+                        <span>{comparisonData.verdictTitle}</span>
+                      </div>
+                      <p className="text-xs text-stone-700 leading-relaxed">
+                        {comparisonData.verdictText}
+                      </p>
+                    </div>
+                  </>
+                )
+              )}
+            </div>
+
+            {/* Footer del Modal */}
+            <div className="p-4 bg-stone-50 border-t border-stone-200 flex justify-between items-center rounded-b-3xl">
+              <span className="text-xs text-stone-500 hidden sm:inline">
+                💡 Tip: Compara cortes cárnicos para optimizar el $/kg de proteína, o verduras/suplementos para balancear antioxidantes.
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowCompareModal(false)}
+                className="bg-secondary-brown hover:bg-stone-800 text-white px-5 py-2 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs ml-auto"
+              >
+                Cerrar Comparador
               </button>
             </div>
           </div>

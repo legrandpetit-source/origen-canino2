@@ -1395,58 +1395,58 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                 </div>
               )}
 
-              {/* PASO 3: Dictamen Inteligente de Calidad Biológica & Rentabilidad */}
-              <div className="bg-gradient-to-r from-stone-900 to-stone-850 text-white rounded-2xl p-4 shadow-md space-y-3 border border-stone-800">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-800 pb-2.5">
+              {/* PASO 3: Dictamen Técnico de Calidad Biológica & Rentabilidad (Estandarizado con el panel) */}
+              <div className="bg-white border-2 border-emerald-300/80 rounded-2xl p-4 shadow-xs space-y-3.5">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-2.5">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-100 text-primary-green flex items-center justify-center">
                       <Sparkles size={16} />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-secondary-brown flex items-center gap-2">
                         Dictamen Técnico: Calidad Biológica & Rentabilidad
                       </h4>
-                      <p className="text-[11px] text-stone-400">
+                      <p className="text-[11px] text-stone-500">
                         Análisis automatizado en tiempo real de balance nutricional AAFCO vs. impacto comercial.
                       </p>
                     </div>
                   </div>
-                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${batchVerdict.badgeColor}`}>
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${batchVerdict.badgeColor} shadow-2xs`}>
                     {batchVerdict.badge}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                  <div className="bg-stone-950/70 p-3 rounded-xl border border-stone-800/80 space-y-1">
-                    <span className="font-bold text-emerald-400 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                      <Award size={14} />
+                  <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200 space-y-1">
+                    <span className="font-bold text-emerald-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                      <Award size={14} className="text-primary-green" />
                       Evaluación Biológica & Nutricional:
                     </span>
-                    <p className="text-stone-300 leading-relaxed text-[11px]">
+                    <p className="text-stone-700 leading-relaxed text-[11px]">
                       {batchVerdict.nutritionNote}
                     </p>
                   </div>
 
-                  <div className="bg-stone-950/70 p-3 rounded-xl border border-stone-800/80 space-y-1">
-                    <span className="font-bold text-sky-400 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                      <TrendingUp size={14} />
+                  <div className="bg-sky-50/70 p-3 rounded-xl border border-sky-200 space-y-1">
+                    <span className="font-bold text-sky-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                      <TrendingUp size={14} className="text-sky-700" />
                       Evaluación Financiera & Margen:
                     </span>
-                    <p className="text-stone-300 leading-relaxed text-[11px]">
+                    <p className="text-stone-700 leading-relaxed text-[11px]">
                       {batchVerdict.financeNote}
                     </p>
                   </div>
                 </div>
 
-                <div className="bg-stone-950 p-3 rounded-xl border border-emerald-500/30 flex items-start gap-2.5">
-                  <div className="mt-0.5 text-emerald-400">
+                <div className="bg-stone-50 p-3 rounded-xl border border-stone-200 flex items-start gap-2.5">
+                  <div className="mt-0.5 text-primary-green">
                     <CheckCircle2 size={16} />
                   </div>
                   <div>
-                    <strong className="text-xs text-white block mb-0.5">
+                    <strong className="text-xs font-bold text-secondary-brown block mb-0.5">
                       {batchVerdict.title}
                     </strong>
-                    <p className="text-[11px] text-stone-300 leading-relaxed">
+                    <p className="text-[11px] text-stone-600 leading-relaxed">
                       {batchVerdict.conclusion}
                     </p>
                   </div>
