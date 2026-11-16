@@ -331,28 +331,6 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
     ? (((rawGramsNum - packGramsNum) / rawGramsNum) * 100).toFixed(1)
     : '0.0';
 
-  const handleCopyLastBatchRecipe = () => {
-    if (!selectedProductId) return;
-    const prevBatch = batches.find((b) => String(b.producto_id) === String(selectedProductId));
-    if (!prevBatch || !prevBatch.ingredientes?.length) {
-      showToast('No hay un lote anterior para este menú; usando receta plantilla.');
-      return;
-    }
-    const rows = prevBatch.ingredientes.map((i) => {
-      const kg = Number((Number(i.cantidad_gramos || 0) / 1000).toFixed(2));
-      return {
-        ingrediente_id: i.ingrediente_id || '',
-        nombre_ingrediente: i.nombre_ingrediente,
-        kilos_usados: kg,
-        porcentaje_formula: Number(i.porcentaje_formula || 0),
-        cantidad_gramos: Math.round(kg * 1000),
-        costo_unitario_clp: Number(i.costo_unitario_clp || 0),
-      };
-    });
-    setFormulaRows(recalcFromKilos(rows));
-    showToast(`Receta copiada desde lote ${prevBatch.codigo_lote}.`);
-  };
-
   // Simulación Nutricional y Financiera en Vivo
   const ingMap = Object.fromEntries(ingredients.map((i) => [String(i.id), i]));
   const concentrationFactor =
@@ -761,29 +739,17 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div className="md:col-span-2">
                 <label className="text-xs font-semibold text-stone-600 block mb-1">Producto / Menú</label>
-                <div className="flex gap-2">
-                  <select
-                    value={selectedProductId}
-                    onChange={(e) => handleSelectProductForBatch(e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white text-stone-800"
-                    required
-                  >
-                    <option value="">-- Seleccionar Menú --</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.weight})</option>
-                    ))}
-                  </select>
-                  {selectedProductId && (
-                    <button
-                      type="button"
-                      onClick={handleCopyLastBatchRecipe}
-                      className="px-3 py-2 rounded-xl border border-stone-300 text-xs font-semibold text-stone-700 hover:bg-stone-100 shrink-0"
-                      title="Copiar ingredientes y precios del último lote de este menú"
-                    >
-                      Copiar Último Lote
-                    </button>
-                  )}
-                </div>
+                <select
+                  value={selectedProductId}
+                  onChange={(e) => handleSelectProductForBatch(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white text-stone-800"
+                  required
+                >
+                  <option value="">-- Seleccionar Menú --</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.weight})</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="text-xs font-semibold text-stone-600 block mb-1">Línea</label>
