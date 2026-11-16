@@ -347,6 +347,25 @@ def create_batch_router(get_current_admin) -> APIRouter:
             conn.commit()
             return {"success": True, "estado": estado}
 
+    @router.delete("/api/admin/batches/{batch_id}")
+    def delete_batch(batch_id: int, current_user: str = Depends(get_current_admin)):
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, codigo_lote, kitchen_cost_id FROM batch_produccion WHERE id = %s",
+                (batch_id,),
+            )
+            batch = cursor.fetchone()
+            if not batch:
+                raise HTTPException(status_code=404, detail="Lote no encontrado.")
+
+            kc_id = batch["kitchen_cost_id"]
+            cursor.execute("DELETE FROM batch_produccion WHERE id = %s", (batch_id,))
+            if kc_id:
+                cursor.execute("DELETE FROM kitchen_cost_history WHERE id = %s", (kc_id,))
+            conn.commit()
+            return {"success": True, "codigo_lote": batch["codigo_lote"]}
+
     @router.get("/api/admin/batches/{batch_id}/label")
     def get_batch_label(batch_id: int, current_user: str = Depends(get_current_admin)):
         with get_connection() as conn:

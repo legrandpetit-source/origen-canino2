@@ -315,6 +315,25 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
     }
   };
 
+  const handleDeleteBatch = async (batch) => {
+    if (!window.confirm(`¿Estás seguro de eliminar el lote ${batch.codigo_lote} (${batch.producto_nombre})? Esta acción borrará este lote y su stock FIFO asociado para que puedas crearlo nuevamente.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/batches/${batch.id}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Error eliminando el lote.');
+      showToast(`Lote ${batch.codigo_lote} eliminado correctamente.`);
+      fetchBatches();
+      if (onIngredientsUpdated) onIngredientsUpdated();
+    } catch (err) {
+      showToast(err.message);
+    }
+  };
+
   const handleOpenBatchLabel = async (batchId) => {
     const res = await fetch(`/api/admin/batches/${batchId}/label`, { headers: authHeaders() });
     if (res.ok) {
@@ -940,6 +959,13 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                         >
                           {b.estado === 'ACTIVO' ? <XCircle size={12} /> : <CheckCircle2 size={12} />}
                           {b.estado === 'ACTIVO' ? 'Cerrar' : 'Activar'}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteBatch(b)}
+                          className="inline-flex items-center gap-1 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 font-bold px-2.5 py-1.5 rounded-lg transition"
+                          title="Eliminar este lote para ingresarlo de nuevo"
+                        >
+                          <Trash2 size={12} /> Eliminar
                         </button>
                       </td>
                     </tr>
