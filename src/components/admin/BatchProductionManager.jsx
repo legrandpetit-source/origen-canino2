@@ -332,25 +332,65 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
     : '0.0';
 
   const handleCopyLastBatchRecipe = () => {
-    if (!selectedProductId) return;
-    const prevBatch = batches.find((b) => String(b.producto_id) === String(selectedProductId));
-    if (!prevBatch || !prevBatch.ingredientes?.length) {
-      showToast('No hay un lote anterior para este menú; usando receta plantilla.');
+    let prevBatch = null;
+    if (selectedProductId) {
+      prevBatch = batches.find((b) => String(b.producto_id) === String(selectedProductId));
+    }
+    // Si no se ha seleccionado producto, o el seleccionado no tiene lote previo, tomar el último lote registrado
+    if (!prevBatch && batches.length > 0) {
+      prevBatch = batches[0];
+    }
+
+    if (!prevBatch) {
+      showToast('No hay lotes previos registrados en el historial para copiar.');
       return;
     }
-    const rows = prevBatch.ingredientes.map((i) => {
-      const kg = Number((Number(i.cantidad_gramos || 0) / 1000).toFixed(2));
-      return {
-        ingrediente_id: i.ingrediente_id || '',
-        nombre_ingrediente: i.nombre_ingrediente,
-        kilos_usados: kg,
-        porcentaje_formula: Number(i.porcentaje_formula || 0),
-        cantidad_gramos: Math.round(kg * 1000),
-        costo_unitario_clp: Number(i.costo_unitario_clp || 0),
-      };
-    });
-    setFormulaRows(recalcFromKilos(rows));
-    showToast(`Receta copiada desde lote ${prevBatch.codigo_lote}.`);
+
+    if (prevBatch.producto_id) {
+      setSelectedProductId(String(prevBatch.producto_id));
+    }
+    if (prevBatch.linea_produccion) {
+      setLineaProduccion(prevBatch.linea_produccion);
+    }
+    if (prevBatch.peso_crudo_total_gramos) {
+      setPesoCrudoKg(String(Number((prevBatch.peso_crudo_total_gramos / 1000).toFixed(2))));
+    }
+    if (prevBatch.stock_inicial_gramos) {
+      setStockInicialKg(String(Number((prevBatch.stock_inicial_gramos / 1000).toFixed(2))));
+    }
+    if (prevBatch.indirect_costs_json) {
+      try {
+        const ic = typeof prevBatch.indirect_costs_json === 'string'
+          ? JSON.parse(prevBatch.indirect_costs_json)
+          : prevBatch.indirect_costs_json;
+        setIndirectCosts({
+          luz_clp: parseInt(ic.luz || ic.luz_clp || 0, 10),
+          gas_clp: parseInt(ic.gas || ic.gas_clp || 0, 10),
+          agua_clp: parseInt(ic.agua || ic.agua_clp || 0, 10),
+          envases_clp: parseInt(ic.envases || ic.envases_clp || 0, 10),
+          mano_obra_clp: parseInt(ic.mano_obra || ic.mano_obra_clp || 0, 10),
+        });
+      } catch (e) {
+        console.error('Error parsing indirect costs:', e);
+      }
+    }
+
+    if (prevBatch.ingredientes?.length) {
+      const rows = prevBatch.ingredientes.map((i) => {
+        const kg = Number((Number(i.cantidad_gramos || 0) / 1000).toFixed(2));
+        return {
+          ingrediente_id: i.ingrediente_id || '',
+          nombre_ingrediente: i.nombre_ingrediente,
+          kilos_usados: kg,
+          porcentaje_formula: Number(i.porcentaje_formula || 0),
+          cantidad_gramos: Math.round(kg * 1000),
+          costo_unitario_clp: Number(i.costo_unitario_clp || 0),
+        };
+      });
+      setFormulaRows(recalcFromKilos(rows));
+    }
+
+    showToast(`Receta y parámetros cargados desde lote ${prevBatch.codigo_lote} (${prevBatch.producto_nombre || 'Menú'}).`);
   };
 
   // Simulación Nutricional y Financiera en Vivo
@@ -773,16 +813,15 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                       <option key={p.id} value={p.id}>{p.name} ({p.weight})</option>
                     ))}
                   </select>
-                  {selectedProductId && (
-                    <button
-                      type="button"
-                      onClick={handleCopyLastBatchRecipe}
-                      className="px-3 py-2 rounded-xl border border-stone-300 text-xs font-semibold text-stone-700 hover:bg-stone-100 shrink-0"
-                      title="Copiar ingredientes y precios del último lote de este menú"
-                    >
-                      Copiar Último Lote
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={handleCopyLastBatchRecipe}
+                    className="px-3.5 py-2 rounded-xl border border-stone-300 bg-stone-50 hover:bg-stone-100 text-xs font-bold text-stone-800 hover:text-stone-900 shrink-0 flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95"
+                    title="Copiar ingredientes, kilos y costos del último lote registrado"
+                  >
+                    <Copy size={13} className="text-stone-600" />
+                    Copiar Último Lote
+                  </button>
                 </div>
               </div>
               <div>
