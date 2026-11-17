@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Layers, Plus, Printer, AlertTriangle, TrendingUp, TrendingDown, Scale, Award, Activity, Search, Link2,
-  Send, Copy, Check, RefreshCw, ShoppingBag, Clock, XCircle, CheckCircle2, Trash2, Sparkles, X, Info, ArrowUpRight, ArrowDownRight
+  Send, Copy, Check, RefreshCw, ShoppingBag, Clock, XCircle, CheckCircle2, Trash2, Sparkles, X, Info, ArrowUpRight, ArrowDownRight, Eye
 } from 'lucide-react';
 import ProductLabelGenerator from './ProductLabelGenerator';
 
@@ -192,6 +192,7 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
   // Etiqueta Dinámica del Lote
   const [labelModalOpen, setLabelModalOpen] = useState(false);
   const [activeBatchLabel, setActiveBatchLabel] = useState(null);
+  const [viewingBatch, setViewingBatch] = useState(null);
 
   // Modal Crear Nuevo Ingrediente en Catálogo sin perder el lote
   const [newIngModalOpen, setNewIngModalOpen] = useState(false);
@@ -590,6 +591,26 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
     if (res.ok) {
       setActiveBatchLabel(await res.json());
       setLabelModalOpen(true);
+    }
+  };
+
+  const handleSyncOrders = async () => {
+    try {
+      const res = await fetch('/api/admin/batches/sync-orders', {
+        method: 'POST',
+        headers: authHeaders()
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Error sincronizando pedidos.');
+      if (data.synced_count > 0) {
+        showToast(`Se descontaron exitosamente ${data.synced_count} pedido(s) del stock FIFO.`);
+      } else {
+        showToast('Todos los pedidos ya se encuentran sincronizados con los lotes.');
+      }
+      fetchBatches();
+      if (onIngredientsUpdated) onIngredientsUpdated();
+    } catch (err) {
+      showToast(err.message);
     }
   };
 
@@ -1486,11 +1507,21 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
 
           {/* Listado de Batches */}
           <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-xs">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <h3 className="font-header text-base font-extrabold text-secondary-brown">Historial de Lotes (Orden FIFO)</h3>
-              <button onClick={fetchBatches} className="text-xs font-bold text-stone-600 hover:text-primary-green flex items-center gap-1">
-                <RefreshCw size={14} /> Actualizar
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSyncOrders}
+                  className="text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition shadow-2xs cursor-pointer active:scale-95"
+                  title="Descontar del stock FIFO los pedidos pagados/confirmados que aún no hayan sido descontados"
+                >
+                  <RefreshCw size={13} className="text-amber-700" /> Sincronizar Pedidos a Lotes
+                </button>
+                <button onClick={fetchBatches} className="text-xs font-bold text-stone-600 hover:text-primary-green flex items-center gap-1 cursor-pointer">
+                  <RefreshCw size={14} /> Actualizar
+                </button>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -1528,23 +1559,35 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                           {b.estado}
                         </span>
                       </td>
-                      <td className="py-3 text-right space-x-2">
+                      <td className="py-3 text-right space-x-1.5 whitespace-nowrap">
                         <button
+                          type="button"
+                          onClick={() => setViewingBatch(b)}
+                          className="inline-flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 font-bold px-2.5 py-1.5 rounded-lg transition shadow-2xs cursor-pointer active:scale-95"
+                          title="Ver composición, nutrición y costos de este lote"
+                        >
+                          <Eye size={12} className="text-emerald-700" /> Ver Lote
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleOpenBatchLabel(b.id)}
-                          className="inline-flex items-center gap-1 bg-stone-800 hover:bg-stone-900 text-white font-bold px-2.5 py-1.5 rounded-lg"
+                          className="inline-flex items-center gap-1 bg-stone-800 hover:bg-stone-900 text-white font-bold px-2.5 py-1.5 rounded-lg transition cursor-pointer active:scale-95 shadow-2xs"
                         >
                           <Printer size={12} /> Etiqueta
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleToggleBatchStatus(b)}
-                          className="inline-flex items-center gap-1 border border-stone-300 hover:bg-stone-100 text-stone-700 font-bold px-2.5 py-1.5 rounded-lg"
+                          className="inline-flex items-center gap-1 border border-stone-300 hover:bg-stone-100 text-stone-700 font-bold px-2.5 py-1.5 rounded-lg transition cursor-pointer active:scale-95"
+                          title={b.estado === 'ACTIVO' ? 'Cerrar lote para que no se descuente más stock de él' : 'Reactivar lote'}
                         >
-                          {b.estado === 'ACTIVO' ? <XCircle size={12} /> : <CheckCircle2 size={12} />}
+                          {b.estado === 'ACTIVO' ? <XCircle size={12} className="text-amber-600" /> : <CheckCircle2 size={12} className="text-emerald-600" />}
                           {b.estado === 'ACTIVO' ? 'Cerrar' : 'Activar'}
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleDeleteBatch(b)}
-                          className="inline-flex items-center gap-1 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 font-bold px-2.5 py-1.5 rounded-lg transition"
+                          className="inline-flex items-center gap-1 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 font-bold px-2.5 py-1.5 rounded-lg transition cursor-pointer active:scale-95"
                           title="Eliminar este lote para ingresarlo de nuevo"
                         >
                           <Trash2 size={12} /> Eliminar
@@ -1866,6 +1909,308 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Ficha Completa y Composición del Lote */}
+      {viewingBatch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-3xl w-full max-w-4xl my-6 relative flex flex-col max-h-[90vh] shadow-2xl border border-stone-200 animate-fadeIn">
+            {/* Header del Modal */}
+            <div className="p-5 border-b border-stone-200 flex flex-wrap justify-between items-center bg-stone-50/90 rounded-t-3xl gap-3">
+              <div className="flex items-center gap-3">
+                <span className="p-2.5 bg-emerald-100 text-primary-green rounded-2xl shadow-2xs">
+                  <Layers size={22} />
+                </span>
+                <div>
+                  <h3 className="font-header text-xl text-secondary-brown flex items-center gap-2">
+                    Lote: <span className="font-mono text-emerald-800 font-extrabold">{viewingBatch.codigo_lote}</span>
+                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${
+                      viewingBatch.estado === 'ACTIVO'
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                        : viewingBatch.estado === 'AGOTADO'
+                        ? 'bg-amber-100 text-amber-800 border-amber-300'
+                        : 'bg-stone-200 text-stone-700 border-stone-300'
+                    }`}>
+                      {viewingBatch.estado}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    {viewingBatch.producto_nombre} ({viewingBatch.linea_produccion}) • Elaboración: {viewingBatch.fecha_elaboracion} • Vencimiento: {viewingBatch.fecha_consumo_preferente}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenBatchLabel(viewingBatch.id)}
+                  className="inline-flex items-center gap-1.5 bg-stone-800 hover:bg-stone-900 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition cursor-pointer shadow-2xs"
+                >
+                  <Printer size={13} /> Etiqueta
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewingBatch(null)}
+                  className="text-stone-400 hover:text-stone-700 bg-white p-2 rounded-full border border-stone-200 shadow-2xs hover:bg-stone-100 transition cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Contenido del Modal */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-stone-800 text-xs">
+              {/* Tarjetas de Resumen Operativo */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200 space-y-1">
+                  <span className="text-[11px] text-stone-500 block">Stock Envasado Inicial:</span>
+                  <strong className="text-base font-mono font-bold text-stone-900">
+                    {(viewingBatch.stock_inicial_gramos / 1000).toFixed(2)} kg
+                  </strong>
+                </div>
+                <div className="p-3.5 bg-emerald-50/70 rounded-2xl border border-emerald-200 space-y-1">
+                  <span className="text-[11px] text-emerald-700 block">Stock Disponible FIFO:</span>
+                  <strong className="text-base font-mono font-bold text-emerald-900">
+                    {(viewingBatch.stock_disponible_gramos / 1000).toFixed(2)} kg
+                  </strong>
+                </div>
+                <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200 space-y-1">
+                  <span className="text-[11px] text-stone-500 block">Kilos Despachados:</span>
+                  <strong className="text-base font-mono font-bold text-stone-800">
+                    {(((viewingBatch.stock_inicial_gramos - viewingBatch.stock_disponible_gramos) || 0) / 1000).toFixed(2)} kg
+                  </strong>
+                </div>
+                <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200 space-y-1">
+                  <span className="text-[11px] text-stone-500 block">Merma de Cocina:</span>
+                  <strong className="text-base font-mono font-bold text-amber-700">
+                    {viewingBatch.merma_pct || 0}%
+                  </strong>
+                  <span className="text-[10px] text-stone-400 block font-normal">
+                    Crudo: {((viewingBatch.peso_crudo_total_gramos || 0) / 1000).toFixed(2)} kg
+                  </span>
+                </div>
+              </div>
+
+              {/* 1. Ingredientes Reales Usados */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-header text-xs font-bold uppercase tracking-wider text-secondary-brown flex items-center gap-1.5">
+                    <span className="w-2 h-4 rounded-full bg-primary-green"></span>
+                    Ingredientes Reales Utilizados en este Lote (Snapshot Inmutable)
+                  </h4>
+                  <span className="text-[11px] text-stone-500 font-semibold">
+                    {(viewingBatch.ingredientes || []).length} insumos
+                  </span>
+                </div>
+                <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-2xs">
+                  <table className="w-full text-xs">
+                    <thead className="bg-stone-50 border-b border-stone-200 text-stone-600 font-bold">
+                      <tr>
+                        <th className="p-3 text-left">Ingrediente</th>
+                        <th className="p-3 text-right">Kilos Usados</th>
+                        <th className="p-3 text-right">% Fórmula</th>
+                        <th className="p-3 text-right">Precio Compra</th>
+                        <th className="p-3 text-right">Subtotal Insumo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100 font-mono">
+                      {(viewingBatch.ingredientes || []).map((ing, idx) => {
+                        const kg = Number(ing.cantidad_gramos || 0) / 1000;
+                        const costUnit = Number(ing.costo_unitario_clp || 0);
+                        const subtotal = Math.round(kg * costUnit);
+                        return (
+                          <tr key={idx} className="hover:bg-stone-50/50">
+                            <td className="p-2.5 font-sans font-semibold text-stone-800">
+                              {ing.nombre_ingrediente}
+                            </td>
+                            <td className="p-2.5 text-right text-stone-800">
+                              {kg.toFixed(2)} kg
+                            </td>
+                            <td className="p-2.5 text-right font-bold text-emerald-800">
+                              {Number(ing.porcentaje_formula || 0).toFixed(1)}%
+                            </td>
+                            <td className="p-2.5 text-right text-stone-600">
+                              ${costUnit.toLocaleString('es-CL')} / kg
+                            </td>
+                            <td className="p-2.5 text-right font-bold text-stone-900">
+                              ${subtotal.toLocaleString('es-CL')}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {(viewingBatch.ingredientes || []).length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="p-4 text-center text-stone-400 font-sans italic">
+                            No se registraron ingredientes individuales para este lote.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 2. Costos Indirectos y Rentabilidad del Batch */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Costos Indirectos */}
+                <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-2">
+                  <h4 className="font-header text-xs font-bold uppercase tracking-wider text-secondary-brown">
+                    Costos Indirectos Prorrateados
+                  </h4>
+                  {viewingBatch.indirect_costs_json && Object.keys(viewingBatch.indirect_costs_json).length > 0 ? (
+                    <div className="space-y-1.5 font-mono text-xs">
+                      {Object.entries(viewingBatch.indirect_costs_json).map(([k, v]) => (
+                        <div key={k} className="flex justify-between items-center text-stone-700 pb-1 border-b border-stone-200/60">
+                          <span className="font-sans capitalize text-stone-500">{k.replace('_clp', '').replace('_', ' ')}:</span>
+                          <strong>${Number(v || 0).toLocaleString('es-CL')}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-stone-400 italic">Sin costos indirectos asignados.</p>
+                  )}
+                </div>
+
+                {/* Resumen Financiero */}
+                <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200 space-y-2 font-mono text-xs">
+                  <h4 className="font-header text-xs font-bold uppercase tracking-wider text-secondary-brown font-sans">
+                    Resumen Financiero del Lote
+                  </h4>
+                  <div className="flex justify-between items-center text-stone-700 pb-1 border-b border-emerald-200/60">
+                    <span className="font-sans text-stone-600">Costo Total del Batch:</span>
+                    <strong className="text-stone-900 text-sm">
+                      ${Number(viewingBatch.costo_total_batch_clp || 0).toLocaleString('es-CL')}
+                    </strong>
+                  </div>
+                  <div className="flex justify-between items-center text-stone-700 pb-1 border-b border-emerald-200/60">
+                    <span className="font-sans text-stone-600">Costo Real por Kilo Envasado:</span>
+                    <strong className="text-emerald-800 text-sm">
+                      ${Math.round(Number(viewingBatch.costo_total_batch_clp || 0) / (Number(viewingBatch.stock_inicial_gramos || 1) / 1000)).toLocaleString('es-CL')} / kg
+                    </strong>
+                  </div>
+                  {viewingBatch.producto_price && (
+                    <div className="flex justify-between items-center text-stone-700">
+                      <span className="font-sans text-stone-600">PVP Menú:</span>
+                      <strong className="text-stone-900">
+                        ${Number(viewingBatch.producto_price).toLocaleString('es-CL')}
+                      </strong>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 3. Ficha Bromatológica Recalculada */}
+              {viewingBatch.kcal_100g !== undefined && viewingBatch.kcal_100g !== null && (
+                <div className="space-y-2">
+                  <h4 className="font-header text-xs font-bold uppercase tracking-wider text-secondary-brown flex items-center gap-1.5">
+                    <span className="w-2 h-4 rounded-full bg-emerald-600"></span>
+                    Composición Bromatológica Recalculada (Base 100g)
+                  </h4>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center font-mono">
+                    <div className="p-2.5 bg-white rounded-xl border border-stone-200 shadow-2xs">
+                      <span className="text-[10px] text-stone-500 font-sans block">Energía</span>
+                      <strong className="text-xs text-stone-900 font-bold">{Math.round(viewingBatch.kcal_100g)} kcal</strong>
+                    </div>
+                    <div className="p-2.5 bg-white rounded-xl border border-stone-200 shadow-2xs">
+                      <span className="text-[10px] text-stone-500 font-sans block">Proteína</span>
+                      <strong className="text-xs text-emerald-800 font-bold">{Number(viewingBatch.proteina_pct || 0).toFixed(1)}%</strong>
+                    </div>
+                    <div className="p-2.5 bg-white rounded-xl border border-stone-200 shadow-2xs">
+                      <span className="text-[10px] text-stone-500 font-sans block">Grasa</span>
+                      <strong className="text-xs text-stone-800 font-bold">{Number(viewingBatch.grasa_pct || 0).toFixed(1)}%</strong>
+                    </div>
+                    <div className="p-2.5 bg-white rounded-xl border border-stone-200 shadow-2xs">
+                      <span className="text-[10px] text-stone-500 font-sans block">Fibra</span>
+                      <strong className="text-xs text-stone-800 font-bold">{Number(viewingBatch.fibra_pct || 0).toFixed(1)}%</strong>
+                    </div>
+                    <div className="p-2.5 bg-white rounded-xl border border-stone-200 shadow-2xs">
+                      <span className="text-[10px] text-stone-500 font-sans block">Humedad</span>
+                      <strong className="text-xs text-sky-800 font-bold">{Number(viewingBatch.humedad_pct || 0).toFixed(1)}%</strong>
+                    </div>
+                    <div className="p-2.5 bg-white rounded-xl border border-stone-200 shadow-2xs">
+                      <span className="text-[10px] text-stone-500 font-sans block">Calcio / Fósforo</span>
+                      <strong className="text-xs text-amber-800 font-bold">
+                        {Number(viewingBatch.calcio_pct || 0).toFixed(2)}g / {Number(viewingBatch.fosforo_pct || 0).toFixed(2)}g
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 4. Trazabilidad de Pedidos Despachados desde este Lote */}
+              <div className="space-y-2">
+                <h4 className="font-header text-xs font-bold uppercase tracking-wider text-secondary-brown flex items-center gap-1.5">
+                  <span className="w-2 h-4 rounded-full bg-sky-600"></span>
+                  Trazabilidad: Pedidos Descontados de este Lote FIFO
+                </h4>
+                {(viewingBatch.orders_dispatched || []).length > 0 ? (
+                  <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-2xs">
+                    <table className="w-full text-xs">
+                      <thead className="bg-stone-50 border-b border-stone-200 text-stone-600 font-bold">
+                        <tr>
+                          <th className="p-2.5 text-left">Pedido #</th>
+                          <th className="p-2.5 text-left">Cliente</th>
+                          <th className="p-2.5 text-right">Kilos Descontados</th>
+                          <th className="p-2.5 text-right">Fecha Asignación</th>
+                          <th className="p-2.5 text-right">Estado Entrega</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-100 font-mono">
+                        {viewingBatch.orders_dispatched.map((ord, idx) => (
+                          <tr key={idx} className="hover:bg-stone-50/50">
+                            <td className="p-2.5 font-bold text-stone-900">
+                              #{ord.order_id}
+                            </td>
+                            <td className="p-2.5 font-sans text-stone-800">
+                              {ord.customer_name}
+                            </td>
+                            <td className="p-2.5 text-right font-bold text-emerald-800">
+                              {(Number(ord.gramos_descontados || 0) / 1000).toFixed(2)} kg
+                            </td>
+                            <td className="p-2.5 text-right text-stone-500 text-[11px]">
+                              {ord.created_at ? new Date(ord.created_at).toLocaleString('es-CL') : '-'}
+                            </td>
+                            <td className="p-2.5 text-right">
+                              <span className="font-sans px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800">
+                                {ord.delivery_status || 'Preparación'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 text-stone-500 italic text-[11px]">
+                    Aún no se registran pedidos descontados de este lote (el stock permanece íntegro o los pedidos no se han sincronizado).
+                  </div>
+                )}
+              </div>
+
+              {/* 5. Notas de Producción */}
+              {viewingBatch.notas && (
+                <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-1">
+                  <span className="font-bold text-secondary-brown text-[11px] block">Notas de Producción / Sustituciones:</span>
+                  <p className="text-stone-700 italic">{viewingBatch.notas}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer del Modal */}
+            <div className="p-4 bg-stone-50 border-t border-stone-200 flex justify-between items-center rounded-b-3xl">
+              <span className="text-xs text-stone-500 hidden sm:inline">
+                🔒 Snapshot inmutable: garantiza trazabilidad ante consultas de clientes o auditorías sanitarias.
+              </span>
+              <button
+                type="button"
+                onClick={() => setViewingBatch(null)}
+                className="bg-secondary-brown hover:bg-stone-800 text-white px-5 py-2 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs ml-auto"
+              >
+                Cerrar Detalle
+              </button>
+            </div>
           </div>
         </div>
       )}

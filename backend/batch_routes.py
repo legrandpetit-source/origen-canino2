@@ -113,6 +113,7 @@ def create_batch_router(get_current_admin) -> APIRouter:
             batches = [dict(r) for r in cursor.fetchall()]
             batch_ids = [b["id"] for b in batches]
             ing_by_batch: Dict[int, List[Dict[str, Any]]] = {}
+            orders_by_batch: Dict[int, List[Dict[str, Any]]] = {}
             if batch_ids:
                 cursor.execute(
                     "SELECT * FROM batch_ingredientes WHERE batch_id = ANY(%s) ORDER BY porcentaje_formula DESC, id ASC",
@@ -121,8 +122,26 @@ def create_batch_router(get_current_admin) -> APIRouter:
                 for ing in cursor.fetchall():
                     ing_by_batch.setdefault(int(ing["batch_id"]), []).append(dict(ing))
 
+                cursor.execute(
+                    """
+                    SELECT pdb.batch_id, pdb.order_id, pdb.gramos_descontados, pdb.created_at,
+                           o.customer_name, o.delivery_status
+                    FROM pedido_detalle_batches pdb
+                    JOIN orders o ON o.id = pdb.order_id
+                    WHERE pdb.batch_id = ANY(%s)
+                    ORDER BY pdb.created_at DESC
+                    """,
+                    (batch_ids,),
+                )
+                for row in cursor.fetchall():
+                    r = dict(row)
+                    if r.get("created_at") and hasattr(r["created_at"], "isoformat"):
+                        r["created_at"] = r["created_at"].isoformat()
+                    orders_by_batch.setdefault(int(r["batch_id"]), []).append(r)
+
             for b in batches:
                 b["ingredientes"] = ing_by_batch.get(int(b["id"]), [])
+                b["orders_dispatched"] = orders_by_batch.get(int(b["id"]), [])
                 if b.get("fecha_elaboracion"):
                     b["fecha_elaboracion"] = b["fecha_elaboracion"].isoformat()
                 if b.get("fecha_consumo_preferente"):
@@ -365,6 +384,35 @@ def create_batch_router(get_current_admin) -> APIRouter:
                 cursor.execute("DELETE FROM kitchen_cost_history WHERE id = %s", (kc_id,))
             conn.commit()
             return {"success": True, "codigo_lote": batch["codigo_lote"]}
+
+    @router.post("/api/admin/batches/sync-orders")
+    def sync_orders_to_batches(current_user: str = Depends(get_current_admin)):
+        """Sincroniza pedidos pagados/confirmados que aún no hayan sido descontados del stock FIFO."""
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT id, customer_name, payment_status, delivery_status
+                FROM orders
+                WHERE COALESCE(fifo_deducted, 0) = 0
+                  AND (payment_status = 'Pagado' OR delivery_status IN ('Listo para despacho', 'En reparto', 'Entregado'))
+                  AND delivery_status NOT IN ('Anulado', 'Cancelado')
+                ORDER BY created_at ASC, id ASC
+                """
+            )
+            orders = cursor.fetchall()
+            synced = []
+            for ord_row in orders:
+                oid = ord_row["id"]
+                res = batch_service.deduct_fifo_for_order(cursor, oid)
+                if res.get("deducted"):
+                    synced.append({
+                        "order_id": oid,
+                        "customer_name": ord_row["customer_name"],
+                        "allocations": res.get("allocations", [])
+                    })
+            conn.commit()
+            return {"success": True, "synced_count": len(synced), "orders": synced}
 
     @router.get("/api/admin/batches/{batch_id}/label")
     def get_batch_label(batch_id: int, current_user: str = Depends(get_current_admin)):
