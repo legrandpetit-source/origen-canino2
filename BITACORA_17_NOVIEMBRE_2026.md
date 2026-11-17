@@ -76,3 +76,27 @@ Una vez cerrado y estabilizado el ciclo de producción, trazabilidad y stock FIF
 - Desmontar contenedores de Coolify para recuperar **~700 MB - 1 GB de RAM** y eliminar para siempre las compilaciones residuales en disco.
 - Conmutación con cero caída de servicio (*Zero-Downtime*).
 
+---
+
+## 5. 🛡️ Blindaje Integral de Stock en Carrito, Cross-Sell y Límite de Unidades (Incidente Resuelto)
+
+### A. Diagnóstico del Incidente:
+- Al armar un pedido con el stock máximo disponible de un producto (ej. 17 bolsas de Patitas de Pollo), el Drawer del Carrito recomendaba en la sección inferior *"¿Te gustaría agregar algo más?"* productos sin lote activo (Calugas Articulares, Dieta Cocinada Cerdo, Caldo de Huesos) con botones `[Agregar]` activos.
+- Al agregarlos, el usuario podía además presionar el botón `+` sin límite dentro del carrito.
+- **Causa Raíz:**
+  1. `CartDrawer.jsx`: El filtro `productsToSuggest` no verificaba `stock_disponible_gramos`.
+  2. `CartContext.jsx`: `addItem` y `updateQuantity` tenían la condición `if (product.has_batches && product.stock_disponible_gramos != null)`. Al no tener lotes activos, `has_batches` era `false`, omitiendo el control y asumiendo stock infinito.
+  3. Botón `+`: No se deshabilitaba al alcanzar el stock tope de lote.
+
+### B. Solución Desplegada (Commit `d5092fa`):
+1. **`backend/main.py` (`/api/products`):** Normalización estricta para devolver siempre `stock_disponible_gramos: 0` (entero, nunca `null`/`None`) cuando no haya lote activo.
+2. **`CartContext.jsx`:** Implementación de `catalogStock` reactivo. Bloqueo total en `addItem` si `maxQty <= 0`. Tope estricto en `updateQuantity` a `Math.min(newQuantity, maxQty)`.
+3. **`CartDrawer.jsx`:**
+   - Filtro estricto en `productsToSuggest`: Solo ofrece productos con `maxAvailable > 0`. Si no hay stock disponible en el catálogo, la sección se oculta automáticamente.
+   - Botón `+` deshabilitado visualmente (`opacity-30 cursor-not-allowed`) al alcanzar el tope del lote con leyenda explicativa (`Máximo disponible`).
+   - Detección de productos agotados con etiqueta roja `⚠️ Lote semanal agotado` y bloqueo preventivo del botón de pago si existe algún ítem agotado.
+4. **Verificación en Producción:**
+   - Desplegado en contenedor `282e2a36a8ab` en Hetzner VPS (`origencanino.cl`).
+   - Probado: Calugas, Cerdo y Caldo ya no se ofrecen ni se pueden agregar. Patitas de Pollo respeta exactamente sus 17 bolsas de tope.
+
+
