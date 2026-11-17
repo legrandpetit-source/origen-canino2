@@ -125,3 +125,33 @@
 
 ### 3.4. Decisión Comercial de Pedido Mínimo:
 - **Confirmado Opción A:** Se mantiene el pedido mínimo universal de **$30.000 CLP** para proteger la rentabilidad y viabilidad del despacho en frío en Santiago.
+
+---
+
+## 4. 🔬 Corrección de Margen Real por Unidad y Bromatología de Snacks Deshidratados (Commit `c5b8e3d`)
+
+### 4.1. Diagnóstico del Desfase Matemático en Lotes de Envases < 1 Kg:
+- **Problema Detectado por Patricio (00:20 hrs):**
+  - Al ingresar un lote de prueba de *Patitas de Pollo Deshidratadas (400 g)* con 20 kg crudo $\rightarrow$ 10 kg deshidratado (\$12.000 insumo + \$50.000 indirectos = \$62.000 total batch), el sistema mostraba un margen bruto de **-$200 (-3.3%)** en color rojo.
+- **Causa Raíz:**
+  - El catálogo almacena el precio de venta por unidad vendible (\$6.000 por la bolsa de 400 g).
+  - El sistema comparaba directamente el PVP por bolsa (\$6.000) contra el costo por kilo (\$6.200 / kg).
+- **Solución Implementada (`BatchProductionManager.jsx` & Backend):**
+  - Detección automática del gramaje unitario del producto (`unitGrams = 400 g`, `unitKg = 0.40`).
+  - Rendimiento en unidades: $10\text{ kg} \div 0.4\text{ kg} =$ **25 bolsas de 400 g**.
+  - Costo por unidad: $\$62.000 \div 25 =$ **\$2.480 / bolsa** *(equivale a \$6.200/kg)*.
+  - PVP por unidad: **\$6.000 / bolsa** *(equivale a \$15.000/kg)*.
+  - Margen unitario real: $\$6.000 - \$2.480 =$ **+\$3.520 / bolsa (+58.7%)**.
+  - Proyección comercial: **Ventas Proyectadas: \$150.000 CLP** • **Ganancia Líquida Lote: +\$88.000 CLP**.
+
+### 4.2. Corrección Bromatológica de Deshidratación:
+- **Humedad Residual:** Se fijó en **~8.0%** para la línea `SNACK` (descartando el 70% de carne cruda fresca).
+- **Concentración de Nutrientes:** El factor de concentración deshidratado sigue la merma real de agua ($20\text{ kg} \rightarrow 10\text{ kg} = 2.0\times$), duplicando la densidad de proteína bruta, grasa y minerales sin aplicar el tope de cocción húmeda BARF.
+- **Banner Adaptativo:** Se reemplazó la barra BARF por la tarjeta:
+  *✓ 100% Mono-Ingrediente Natural (Patitas de Pollo Deshidratadas)* destacando los 20 kg crudos iniciales, las 25 bolsas de 400 g envasadas y el ~8% de humedad residual.
+
+### 4.3. Actualización de Producción Hetzner:
+- Build de frontend Vite compilado sin errores (`dist/index-DNhmpZjO.js`).
+- Sincronizado en contenedor Hetzner y verificado en `origencanino.cl/admin`.
+- Limpieza profunda ejecutada: **6.1 GB libres en disco (83% uso)**.
+
