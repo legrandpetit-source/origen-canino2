@@ -283,7 +283,19 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
     }
     const prod = products.find((p) => String(p.id) === String(pid));
     if (prod) {
-      setLineaProduccion(String(prod.type || '').toLowerCase().includes('coc') ? 'COCIDO' : 'BARF');
+      const pName = (prod.name || '').toLowerCase();
+      const pType = (prod.type || '').toLowerCase();
+      if (pName.includes('deshidrat') || pName.includes('patita') || pName.includes('snack')) {
+        setLineaProduccion('SNACK');
+      } else if (pName.includes('caldo')) {
+        setLineaProduccion('CALDO');
+      } else if (pName.includes('caluga') || pName.includes('articular') || pName.includes('suplemento')) {
+        setLineaProduccion('SUPLEMENTO');
+      } else if (pType.includes('coc') || pName.includes('cocin')) {
+        setLineaProduccion('COCINADA');
+      } else {
+        setLineaProduccion('BARF');
+      }
     }
     try {
       const res = await fetch(`/api/admin/products/${pid}/recipe`, { headers: authHeaders() });
@@ -850,10 +862,13 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                 <select
                   value={lineaProduccion}
                   onChange={(e) => setLineaProduccion(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white text-stone-800"
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white text-stone-800 font-semibold"
                 >
-                  <option value="BARF">BARF (180 días)</option>
-                  <option value="COCIDO">COCIDO (120 días)</option>
+                  <option value="BARF">BARF Crudo (180 días)</option>
+                  <option value="COCINADA">Cocinada Suave (120 días)</option>
+                  <option value="SNACK">Snack Deshidratado (180 días)</option>
+                  <option value="CALDO">Caldo de Huesos (180 días congelado)</option>
+                  <option value="SUPLEMENTO">Suplemento Articular / Calugas (180 días congelado)</option>
                 </select>
               </div>
               <div>
@@ -875,11 +890,38 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
               </span>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
                 {[
-                  { key: 'luz_clp', label: 'Luz / Electricidad' },
-                  { key: 'gas_clp', label: 'Gas (Cocción)' },
-                  { key: 'agua_clp', label: 'Agua / Aseo' },
-                  { key: 'envases_clp', label: 'Envases y Etiquetas' },
-                  { key: 'mano_obra_clp', label: 'Mano de Obra / Otros' },
+                  {
+                    key: 'luz_clp',
+                    label: lineaProduccion === 'SNACK' ? 'Luz (Deshidratador 24h)' : 'Luz / Electricidad',
+                  },
+                  {
+                    key: 'gas_clp',
+                    label: lineaProduccion === 'CALDO' ? 'Gas (24h fuego corona)' : 'Gas (Cocción)',
+                  },
+                  {
+                    key: 'agua_clp',
+                    label: 'Agua / Aseo',
+                  },
+                  {
+                    key: 'envases_clp',
+                    label:
+                      lineaProduccion === 'CALDO'
+                        ? 'Frascos y Tapas'
+                        : lineaProduccion === 'SNACK'
+                        ? 'Bolsas Doypack + Zipper'
+                        : lineaProduccion === 'SUPLEMENTO'
+                        ? 'Moldes y Bolsas'
+                        : 'Envases y Etiquetas',
+                  },
+                  {
+                    key: 'mano_obra_clp',
+                    label:
+                      lineaProduccion === 'SNACK'
+                        ? 'Mano de Obra (Desuñado)'
+                        : lineaProduccion === 'SUPLEMENTO'
+                        ? 'Mano de Obra (Gelificación)'
+                        : 'Mano de Obra / Otros',
+                  },
                 ].map((field) => (
                   <div key={field.key}>
                     <label className="text-xs font-semibold text-stone-500 block mb-1">{field.label}</label>

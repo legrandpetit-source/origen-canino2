@@ -48,9 +48,9 @@ def parse_weight_grams(weight_str: Optional[str]) -> int:
 
 
 def calculate_expiry_date(fecha_elab: date, linea_produccion: str) -> date:
-    """Calcula la fecha de consumo preferente según línea (BARF: 180 días, COCIDO: 120 días)."""
+    """Calcula la fecha de consumo preferente según línea (BARF/SNACK/CALDO/SUPLEMENTO: 180 días, COCIDO/COCINADA: 120 días)."""
     linea = (linea_produccion or "BARF").strip().upper()
-    days = 120 if linea == "COCIDO" else 180
+    days = 120 if linea in ("COCIDO", "COCINADA") else 180
     return fecha_elab + timedelta(days=days)
 
 
@@ -249,13 +249,11 @@ def validate_cart_stock(cursor, items: List[Any]) -> None:
 
     for pid, needed_grams in requested_by_product.items():
         info = stock_map.get(pid)
-        if not info or not info["has_batches"]:
-            continue
-        available = info["stock_disponible_gramos"]
+        available = (info["stock_disponible_gramos"] if info and info.get("has_batches") else 0) or 0
         if needed_grams > available:
             pname = prod_rows.get(pid, {}).get("name", f"Producto #{pid}")
             if available <= 0:
-                raise ValueError(f"'{pname}' tiene su lote semanal agotado por frescura. Pronto tendremos nuevo lote disponible.")
+                raise ValueError(f"'{pname}' no cuenta con lote semanal activo en este momento por frescura. Pronto tendremos nuevo lote disponible.")
             raise ValueError(
                 f"Stock insuficiente para '{pname}': solicitaste {needed_grams / 1000:.2f} kg y quedan {available / 1000:.2f} kg del lote semanal."
             )

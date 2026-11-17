@@ -8,11 +8,12 @@ const ProductCard = ({ product, addItem }) => {
   const [waitlistPhone, setWaitlistPhone] = useState('');
   const [waitlistSent, setWaitlistSent] = useState(false);
 
-  const unitGrams = parseWeightGrams(product.weight);
-  const hasBatchControl = Boolean(product.has_batches);
+  const unitGrams = parseWeightGrams(product.weight) || 1000;
   const liveGrams = product.stock_disponible_gramos ?? 0;
-  const isSoldOut = hasBatchControl && liveGrams < unitGrams;
-  const isLowStock = hasBatchControl && !isSoldOut && liveGrams <= 3000;
+  // Todo producto de Origen Canino se rige por frescura de lote semanal:
+  // Si no cuenta con lote activo con stock para al menos 1 unidad, pasa a lista de espera.
+  const isSoldOut = liveGrams < unitGrams;
+  const isLowStock = !isSoldOut && liveGrams <= Math.max(3000, unitGrams * 3);
 
   const handleWaitlistSubmit = async (e) => {
     e.preventDefault();
