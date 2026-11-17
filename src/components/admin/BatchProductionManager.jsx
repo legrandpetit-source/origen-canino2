@@ -2732,7 +2732,14 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => setAdjustForm({ ...adjustForm, actionType: 'SALIDA' })}
+                        onClick={() =>
+                          setAdjustForm({
+                            ...adjustForm,
+                            actionType: 'SALIDA',
+                            tipoMovimiento:
+                              adjustForm.tipoMovimiento === 'CONTEO_FISICO' ? 'AUTOCONSUMO' : adjustForm.tipoMovimiento,
+                          })
+                        }
                         className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
                           adjustForm.actionType === 'SALIDA'
                             ? 'bg-amber-50 border-amber-400 text-amber-900 shadow-xs'
@@ -2744,7 +2751,13 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                       </button>
                       <button
                         type="button"
-                        onClick={() => setAdjustForm({ ...adjustForm, actionType: 'INGRESO', tipoMovimiento: 'CONTEO_FISICO' })}
+                        onClick={() =>
+                          setAdjustForm({
+                            ...adjustForm,
+                            actionType: 'INGRESO',
+                            tipoMovimiento: 'CONTEO_FISICO',
+                          })
+                        }
                         className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
                           adjustForm.actionType === 'INGRESO'
                             ? 'bg-emerald-50 border-emerald-400 text-emerald-900 shadow-xs'
@@ -2757,18 +2770,27 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                     </div>
                   </div>
 
-                  {/* Selector de Motivo */}
+                  {/* Selector de Motivo Adaptativo según Acción */}
                   <div>
                     <label className="text-xs font-bold uppercase tracking-wider text-stone-600 block mb-1.5">
-                      Motivo de la Operación
+                      {adjustForm.actionType === 'SALIDA' ? 'Motivo del Descuento' : 'Motivo del Ingreso'}
                     </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {[
-                        { id: 'AUTOCONSUMO', label: 'Autoconsumo', icon: Dog, desc: 'Perros propios / taller' },
-                        { id: 'MUESTRA_REGALO', label: 'Muestra / Regalo', icon: Gift, desc: 'Veterinarios o clientes' },
-                        { id: 'MERMA', label: 'Merma / Rotura', icon: AlertTriangle, desc: 'Bolsa rota o control' },
-                        { id: 'CONTEO_FISICO', label: 'Conteo Físico', icon: Scale, desc: 'Auditoría en congelador' },
-                      ].map((mot) => {
+                    <div className={`grid gap-2 ${adjustForm.actionType === 'SALIDA' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1'}`}>
+                      {(adjustForm.actionType === 'SALIDA'
+                        ? [
+                            { id: 'AUTOCONSUMO', label: 'Autoconsumo', icon: Dog, desc: 'Perros propios / taller' },
+                            { id: 'MUESTRA_REGALO', label: 'Muestra / Regalo', icon: Gift, desc: 'Veterinarios o clientes' },
+                            { id: 'MERMA', label: 'Merma / Rotura', icon: AlertTriangle, desc: 'Bolsa rota o control' },
+                          ]
+                        : [
+                            {
+                              id: 'CONTEO_FISICO',
+                              label: 'Conteo Físico / Corrección Báscula',
+                              icon: Scale,
+                              desc: 'Sobrante detectado tras envasar, tara de báscula o auditoría física en congelador',
+                            },
+                          ]
+                      ).map((mot) => {
                         const Icon = mot.icon;
                         const isSelected = adjustForm.tipoMovimiento === mot.id;
                         return (
@@ -2776,19 +2798,19 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                             key={mot.id}
                             type="button"
                             onClick={() => setAdjustForm({ ...adjustForm, tipoMovimiento: mot.id })}
-                            className={`p-2.5 rounded-2xl border text-left transition cursor-pointer ${
+                            className={`p-3 rounded-2xl border text-left transition cursor-pointer ${
                               isSelected
                                 ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/30'
                                 : 'bg-white border-stone-200 hover:bg-stone-50'
                             }`}
                           >
-                            <div className="flex items-center gap-1.5 mb-1">
-                              <Icon size={14} className={isSelected ? 'text-emerald-700' : 'text-stone-500'} />
+                            <div className="flex items-center gap-2 mb-1">
+                              <Icon size={16} className={isSelected ? 'text-emerald-700' : 'text-stone-500'} />
                               <strong className={`text-xs ${isSelected ? 'text-emerald-900' : 'text-stone-800'}`}>
                                 {mot.label}
                               </strong>
                             </div>
-                            <span className="text-[10px] text-stone-500 block leading-tight">
+                            <span className="text-[11px] text-stone-500 block leading-tight">
                               {mot.desc}
                             </span>
                           </button>
