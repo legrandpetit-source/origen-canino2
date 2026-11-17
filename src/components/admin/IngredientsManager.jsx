@@ -2,17 +2,135 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Plus, Edit2, Trash2, Save, X, Sparkles, Loader, History, TrendingUp, TrendingDown,
   Clock, ArrowRight, ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Scale, Check,
-  Award, Info, Filter, Zap, Search, Layers, AlertCircle
+  Award, Info, Filter, Zap, Search, Layers, AlertCircle, AlertTriangle, ThumbsUp, ThumbsDown, ShieldAlert
 } from 'lucide-react';
 import { classifyIngredientBARF } from './BatchProductionManager';
 
 // =========================================================================
 // COMPARADOR BROMATOLÓGICO & CALIDAD-PRECIO DE INSUMOS
 // =========================================================================
+
+// Perfil Anatómico y Biológico de Hueso / Carne para Dieta Canina BARF
+export const getAnatomicalBoneProfile = (name = '') => {
+  const n = (name || '').toLowerCase();
+
+  // 1. Cortes de Hueso Predominante (Cogote / Cuello / Pescuezo / Carcasa)
+  if (n.includes('cogote') || n.includes('pescuezo') || n.includes('cuello')) {
+    return {
+      bonePct: 68,
+      meatPct: 32,
+      boneRatioLabel: '68% Hueso / 32% Carne',
+      level: 'danger',
+      badge: '⚠️ 68% Hueso (Muy Alto)',
+      badgeColor: 'bg-red-100 text-red-800 border-red-300',
+      pro: 'Bajo costo por kilo (00), excelente grasa superficial para energía y rico aporte de cartílago articular (colágeno/glucosamina).',
+      con: 'Exceso óseo severo. Si se formula solo (>30%), satura el calcio y provoca estreñimiento, heces calcáreas de tiza y riesgo de obstrucción. REQUIERE DILUCIÓN con carne magra cara.',
+      dilutionRequiredKg: 1.125, // Para 1kg de cogote, se requieren 1.125kg de carne magra para llegar al estándar 32%
+      recommendation: 'No usar como base cárnica única. Mezclar 1:1 con carne magra (pechuga, corazón o contre) para no exceder el calcio seguro.'
+    };
+  }
+  if (n.includes('carcasa')) {
+    return {
+      bonePct: 75,
+      meatPct: 25,
+      boneRatioLabel: '75% Hueso / 25% Carne',
+      level: 'danger',
+      badge: '⚠️ 75% Hueso (Extremo)',
+      badgeColor: 'bg-red-100 text-red-800 border-red-300',
+      pro: 'Aporte de calcio mineral y fósforo al menor costo posible.',
+      con: 'Casi nulo aporte muscular; genera heces muy duras de tiza. Requiere alta dilución con carne magra.',
+      dilutionRequiredKg: 1.34,
+      recommendation: 'Usar únicamente en porcentajes mínimos (10-15%) como fuente de calcio en recetas con carne magra.'
+    };
+  }
+  if (n.includes('pata') || n.includes('patas')) {
+    return {
+      bonePct: 60,
+      meatPct: 40,
+      boneRatioLabel: '60% Hueso/Cartílago / 40% Piel',
+      level: 'warning',
+      badge: '🦴 60% Hueso & Cartílago',
+      badgeColor: 'bg-amber-100 text-amber-800 border-amber-300',
+      pro: 'Máxima concentración natural de colágeno, condroitina y glucosamina para patas y articulaciones.',
+      con: 'Muy baja proteína muscular neta; no aporta carne roja ni vísceras.',
+      dilutionRequiredKg: 0.875,
+      recommendation: 'Ideal como ingrediente funcional secundario (5-10% de la receta) o snack crujiente, no como carne base.'
+    };
+  }
+
+  // 2. Cortes Hueso Carnoso Medio-Alto (Alas)
+  if (n.includes('ala') || n.includes('alas')) {
+    return {
+      bonePct: 46,
+      meatPct: 54,
+      boneRatioLabel: '46% Hueso / 54% Carne & Piel',
+      level: 'warning',
+      badge: '🍗 46% Hueso (Medio-Alto)',
+      badgeColor: 'bg-amber-100 text-amber-800 border-amber-300',
+      pro: 'Alta palatabilidad, piel rica en energía lipídica, hueso blando muy fácil de triturar o masticar.',
+      con: 'Mayor grasa (15.5%) y porcentaje óseo que requiere moderación en perros con sobrepeso o digestión lenta.',
+      dilutionRequiredKg: 0.44,
+      recommendation: 'Buen corte carnoso, pero vigilar la grasa y diluir ligeramente si se usa en alta proporción.'
+    };
+  }
+
+  // 3. Cortes Hueso Carnoso Equilibrado BARF (Truto / Pata-Muslo)
+  if (n.includes('truto') || n.includes('trutro') || n.includes('muslo') || n.includes('pierna')) {
+    return {
+      bonePct: 32,
+      meatPct: 68,
+      boneRatioLabel: '32% Hueso / 68% Carne Magra',
+      level: 'optimal',
+      badge: '⭐ 32% Hueso (Ratio BARF Óptimo)',
+      badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+      pro: 'Balance carne/hueso perfecto (70/30). Ratio Ca:P biológico (1.56:1). No requiere comprar carnes caras para diluir hueso. Alto hierro hemínico.',
+      con: 'Costo unitario algo mayor que el cogote (.550 vs 00), hueso largo firme que requiere molienda potente.',
+      dilutionRequiredKg: 0,
+      recommendation: 'El corte base más seguro, equilibrado y costo-eficiente para formular menús completos sin desbalance.'
+    };
+  }
+
+  // 4. Carnes Magras y Vísceras Deshuesadas (Pechuga, Corazón, Posta, Contre, Pana)
+  if (
+    n.includes('pechuga') || n.includes('posta') || n.includes('lomo') || n.includes('filete') ||
+    n.includes('corazon') || n.includes('corazón') || n.includes('contre') || n.includes('molleja') ||
+    n.includes('pana') || n.includes('higado') || n.includes('hígado') || n.includes('pulmon') || n.includes('pulmón')
+  ) {
+    return {
+      bonePct: 0,
+      meatPct: 100,
+      boneRatioLabel: '0% Hueso / 100% Carne Magra',
+      level: 'lean',
+      badge: '🥩 0% Hueso (Carne / Víscera Magra)',
+      badgeColor: 'bg-blue-100 text-blue-800 border-blue-300',
+      pro: 'Máxima concentración proteica (31g/100g), aminoácidos esenciales limpios, digestibilidad >95%.',
+      con: 'Costo unitario elevado (.000-.900/kg). Prácticamente CERO calcio (Ca:P 0.07:1). Si se da sola causa desmineralización.',
+      dilutionRequiredKg: 0,
+      recommendation: 'Indispensable para equilibrar cortes altos en hueso (ej. cogote) o para dietas especiales bajas en grasa.'
+    };
+  }
+
+  return {
+    bonePct: 0,
+    meatPct: 0,
+    boneRatioLabel: 'No aplica (Vegetal / Suplemento)',
+    level: 'neutral',
+    badge: '🌿 Vegetal / Nutracéutico',
+    badgeColor: 'bg-stone-100 text-stone-700 border-stone-200',
+    pro: 'Aporte de antioxidantes, fibra prebiótica y micronutrientes bioactivos.',
+    con: 'No sustituye el requerimiento proteico ni óseo de la dieta carnívora.',
+    dilutionRequiredKg: 0,
+    recommendation: 'Formular en proporciones moderadas (10-15% del total del menú).'
+  };
+};
+
 export const computeIngredientComparison = (comparedIngredients = []) => {
   if (!Array.isArray(comparedIngredients) || comparedIngredients.length < 2) return null;
 
-  // 1. Métricas Económicas por Insumo
+  // Precio de referencia de carne magra de compensación (ej. pechuga de pollo a .000/kg)
+  const LEAN_MEAT_REF_COST = 4000;
+
+  // 1. Métricas Económicas & Anatómicas por Insumo
   const econList = comparedIngredients.map(ing => {
     const cost = Number(ing.cost_per_unit || 0);
     const protG = Number(ing.protein_g || 0);
@@ -25,12 +143,23 @@ export const computeIngredientComparison = (comparedIngredients = []) => {
     const calG = Number(ing.calcium_g || 0);
     const phosG = Number(ing.phosphorus_g || 0);
 
+    const boneProfile = getAnatomicalBoneProfile(ing.name);
+
     // Costo por gramo de proteína: (costo / 1000g) * (100g / protG) = costo / (protG * 10)
     const costPerGramProt = protG > 0 ? (cost / (protG * 10)) : 0;
-    // Kcal entregadas por cada $1.000 gastados
+    // Kcal entregadas por cada .000 gastados
     const kcalPerThousandClp = cost > 0 ? ((kcal * 10 / cost) * 1000) : 0;
     // Ratio Ca:P
     const caPRatio = phosG > 0 ? (calG / phosG).toFixed(2) : (calG > 0 ? 'Solo Ca' : 'N/A');
+
+    // Costo Compensado para balance BARF (~32% hueso carnoso seguro):
+    // Si el insumo supera el 32% de hueso, requiere dilución obligatoria con carne magra (.000/kg)
+    let compensatedCostPerKg = cost;
+    let dilutionLeanKg = 0;
+    if (boneProfile.bonePct > 32) {
+      dilutionLeanKg = (boneProfile.bonePct - 32) / 32;
+      compensatedCostPerKg = Math.round((cost + (dilutionLeanKg * LEAN_MEAT_REF_COST)) / (1 + dilutionLeanKg));
+    }
 
     return {
       id: ing.id,
@@ -49,11 +178,20 @@ export const computeIngredientComparison = (comparedIngredients = []) => {
       costPerGramProt,
       kcalPerThousandClp,
       caPRatio,
+      boneProfile,
+      compensatedCostPerKg,
+      dilutionLeanKg,
       category: classifyIngredientBARF(ing.name, ing)
     };
   });
 
-  // Ganador en costo por gramo de proteína (el menor valor positivo)
+  // Ganador en costo compensado BARF (el menor costo real por kilo en plato equilibrado)
+  const validAnimalEcons = econList.filter(e => e.category === 'animal' && e.compensatedCostPerKg > 0);
+  const bestCompensatedCostId = validAnimalEcons.length > 0
+    ? validAnimalEcons.reduce((min, cur) => cur.compensatedCostPerKg < min.compensatedCostPerKg ? cur : min).id
+    : null;
+
+  // Ganador en costo nominal por gramo de proteína
   const validProtCosts = econList.filter(e => e.costPerGramProt > 0);
   const bestProteinCostId = validProtCosts.length > 0
     ? validProtCosts.reduce((min, cur) => cur.costPerGramProt < min.costPerGramProt ? cur : min).id
@@ -114,16 +252,17 @@ export const computeIngredientComparison = (comparedIngredients = []) => {
   let verdictText = '';
 
   if (categories.length === 1 && categories[0] === 'animal') {
-    const bestP = econList.find(e => e.id === bestProteinCostId);
-    const others = econList.filter(e => e.id !== bestProteinCostId);
-    verdictTitle = '🥩 Comparativa de Cortes Cárnicos & Rendimiento Proteico';
-    if (bestP && others.length > 0) {
-      const diffPct = others[0].costPerGramProt > 0
-        ? (((others[0].costPerGramProt - bestP.costPerGramProt) / others[0].costPerGramProt) * 100).toFixed(0)
-        : '0';
-      verdictText = `"${bestP.name}" entrega la mejor rentabilidad biológica de proteína a $${bestP.costPerGramProt.toFixed(1)} CLP/g (un ${diffPct}% más eficiente que "${others[0].name}"). Si buscas maximizar el aporte proteico al menor costo de materia prima, prioriza "${bestP.name}". Sin embargo, evalúa si "${others[0].name}" aporta elementos estructurales como calcio óseo (Ca:P ${others[0].caPRatio}:1) o ácidos grasos necesarios para la saciedad y el pelaje.`;
+    const bestComp = econList.find(e => e.id === bestCompensatedCostId);
+    const highBoneItem = econList.find(e => e.boneProfile.bonePct > 50);
+
+    verdictTitle = '🥩 Dictamen Técnico: Calidad-Precio Real & Balance Óseo Canino';
+
+    if (highBoneItem && bestComp) {
+      verdictText = `A nivel nominal, cortes con exceso óseo como "${highBoneItem.name}" ($${highBoneItem.cost.toLocaleString('es-CL')}/kg) parecen más económicos en papel, pero contienen ~${highBoneItem.boneProfile.bonePct}% de hueso y cartílago. En nutrición canina BARF, alimentar con este porcentaje óseo satura el calcio (Ca:P ${highBoneItem.caPRatio}:1) y genera heces calcáreas de tiza, estreñimiento severo y desbalance proteico. Para usarlo de forma segura, es obligatorio diluirlo con carne magra (pechuga o corazón a $${LEAN_MEAT_REF_COST.toLocaleString('es-CL')}/kg), elevando su costo real compensado a ~$${highBoneItem.compensatedCostPerKg.toLocaleString('es-CL')}/kg. En contraste, "${bestComp.name}" ($${bestComp.cost.toLocaleString('es-CL')}/kg) ofrece el ratio hueso/carne ideal de la naturaleza (~${bestComp.boneProfile.bonePct}% hueso / ${100 - bestComp.boneProfile.bonePct}% carne) con Ca:P óptimo (${bestComp.caPRatio}:1), sin requerir dilución adicional. Por ende, "${bestComp.name}" es el VERDADERO GANADOR biológico y financiero para la cocina.`;
+    } else if (bestComp) {
+      verdictText = `El corte más eficiente en balance biológico y costo en plato es "${bestComp.name}" ($${bestComp.cost.toLocaleString('es-CL')}/kg), con un balance de hueso carnoso óptimo (${bestComp.boneProfile.boneRatioLabel}) que no requiere gastos extra en carne magra de compensación.`;
     } else {
-      verdictText = 'Ambos cortes cárnicos presentan perfiles de proteína y costo similares. Puedes alternarlos según las ofertas de mayoristas para diversificar aminoácidos.';
+      verdictText = 'Los cortes analizados presentan balances similares. Alterna entre carne magra y hueso carnoso según los requerimientos de calcio y energía de cada menú.';
     }
   } else if (categories.length === 1 && categories[0] === 'vegetal') {
     verdictTitle = '🥦 Contraste de Fibra, Humedad & Micronutrientes Vegetales';
@@ -138,6 +277,7 @@ export const computeIngredientComparison = (comparedIngredients = []) => {
 
   return {
     econList,
+    bestCompensatedCostId,
     bestProteinCostId,
     bestKcalCostId,
     sharedMicros,
@@ -1121,24 +1261,33 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
               ) : (
                 comparisonData && (
                   <>
-                    {/* SECCIÓN 1: RATIO CALIDAD / PRECIO (EFICIENCIA ECONÓMICA) */}
+                    {/* SECCIÓN 1: EFICIENCIA ECONÓMICA REAL & CALIDAD / PRECIO */}
                     <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-4 rounded-full bg-primary-green"></span>
-                        <h4 className="font-header text-xs font-bold uppercase tracking-wider text-secondary-brown">
-                          1. Eficiencia Económica & Calidad / Precio
-                        </h4>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-4 rounded-full bg-primary-green"></span>
+                          <h4 className="font-header text-xs font-bold uppercase tracking-wider text-secondary-brown">
+                            1. Eficiencia Económica Real & Calidad / Precio
+                          </h4>
+                        </div>
+                        <span className="text-[11px] text-stone-500 hidden sm:inline">
+                          ⚖️ Ref. carne magra compensatoria: $4.000/kg (pechuga/corazón)
+                        </span>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                         {comparisonData.econList.map((e) => {
+                          const isBestComp = e.id === comparisonData.bestCompensatedCostId;
+                          const isHighBone = e.boneProfile.bonePct > 50;
                           const isBestProt = e.id === comparisonData.bestProteinCostId;
                           const isBestKcal = e.id === comparisonData.bestKcalCostId;
                           return (
                             <div
                               key={e.id}
                               className={`p-4 rounded-2xl border transition-all ${
-                                isBestProt
+                                isBestComp
                                   ? 'bg-emerald-50/70 border-emerald-300 ring-2 ring-emerald-500/20 shadow-xs'
+                                  : isHighBone
+                                  ? 'bg-red-50/30 border-red-200'
                                   : 'bg-white border-stone-200 shadow-2xs'
                               }`}
                             >
@@ -1146,24 +1295,55 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
                                 <h5 className="font-bold text-sm text-stone-900 truncate" title={e.name}>
                                   {e.name}
                                 </h5>
-                                {isBestProt && (
+                                {isBestComp ? (
                                   <span className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 flex items-center gap-0.5 shadow-2xs">
-                                    <Award size={10} /> Mejor $/Prot
+                                    <Award size={10} /> ⭐ Mejor Costo Real
                                   </span>
-                                )}
+                                ) : isHighBone ? (
+                                  <span className="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-300 shrink-0 flex items-center gap-0.5">
+                                    <AlertTriangle size={10} /> Exceso Óseo
+                                  </span>
+                                ) : isBestProt ? (
+                                  <span className="bg-sky-100 text-sky-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-sky-300 shrink-0 flex items-center gap-0.5">
+                                    <Award size={10} /> Mejor $/g Prot
+                                  </span>
+                                ) : null}
                               </div>
+
                               <div className="space-y-2 text-xs">
                                 <div className="flex justify-between items-center pb-1 border-b border-stone-100">
-                                  <span className="text-stone-500">Costo / {e.unit}:</span>
+                                  <span className="text-stone-500">Costo Nominal / {e.unit}:</span>
                                   <strong className="font-mono font-bold text-stone-800">
                                     ${e.cost.toLocaleString('es-CL')}
+                                  </strong>
+                                </div>
+                                <div className="flex justify-between items-center pb-1 border-b border-stone-100">
+                                  <span className="text-stone-500">Balance Hueso:</span>
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${e.boneProfile.badgeColor}`}>
+                                    {e.boneProfile.boneRatioLabel}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between items-center pb-1 border-b border-stone-100">
+                                  <span className="text-stone-500" title="Dilución con carne magra ($4.000/kg) para alcanzar el 32% óseo seguro en BARF">
+                                    Dilución Magra:
+                                  </span>
+                                  <strong className={`font-mono text-[11px] ${e.dilutionLeanKg > 0 ? 'text-red-700 font-bold' : 'text-emerald-700 font-bold'}`}>
+                                    {e.dilutionLeanKg > 0 ? `+${e.dilutionLeanKg.toFixed(2)} kg / kg` : '0 kg (Ideal)'}
+                                  </strong>
+                                </div>
+                                <div className="flex justify-between items-center pb-1 border-b border-stone-100 bg-stone-50/70 p-1 rounded-lg">
+                                  <span className="text-stone-600 font-semibold" title="Costo real en plato por kilo una vez compensado el hueso con carne magra">
+                                    Costo Real en Plato:
+                                  </span>
+                                  <strong className={`font-mono font-bold ${isBestComp ? 'text-emerald-800 text-sm' : 'text-stone-800'}`}>
+                                    ${e.compensatedCostPerKg.toLocaleString('es-CL')} / kg
                                   </strong>
                                 </div>
                                 <div className="flex justify-between items-center pb-1 border-b border-stone-100">
                                   <span className="text-stone-500" title="Costo en CLP por cada gramo de proteína pura entregada">
                                     Costo / g Proteína:
                                   </span>
-                                  <strong className={`font-mono font-bold ${isBestProt ? 'text-emerald-700 text-sm' : 'text-stone-800'}`}>
+                                  <strong className="font-mono font-bold text-stone-800">
                                     {e.costPerGramProt > 0 ? `$${e.costPerGramProt.toFixed(1)} CLP` : 'N/A'}
                                   </strong>
                                 </div>
@@ -1188,12 +1368,73 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
                       </div>
                     </div>
 
-                    {/* SECCIÓN 2: TABLA BROMATOLÓGICA CARA A CARA (POR 100G) */}
+                    {/* SECCIÓN 2: LO BUENO Y LO MALO (PROS, CONTRAS & FISIOLOGÍA BARF) */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-4 rounded-full bg-amber-500"></span>
+                        <h4 className="font-header text-xs font-bold uppercase tracking-wider text-secondary-brown">
+                          2. ⚖️ "Lo Bueno y Lo Malo" (Pros, Contras y Fisiología BARF)
+                        </h4>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        {comparisonData.econList.map((e) => {
+                          const p = e.boneProfile;
+                          return (
+                            <div key={e.id} className="p-4 bg-white rounded-2xl border border-stone-200 shadow-2xs space-y-3">
+                              <div className="flex justify-between items-center border-b border-stone-100 pb-2">
+                                <h5 className="font-bold text-sm text-stone-900 flex items-center gap-2">
+                                  {e.name}
+                                </h5>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${p.badgeColor}`}>
+                                  {p.badge}
+                                </span>
+                              </div>
+
+                              <div className="space-y-2 text-xs">
+                                {/* LO BUENO */}
+                                <div className="bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-200/80 space-y-1">
+                                  <span className="font-bold text-emerald-800 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                                    <ThumbsUp size={12} className="text-emerald-600" />
+                                    Lo Bueno (Beneficios & Nutrientes Clave):
+                                  </span>
+                                  <p className="text-emerald-950 leading-relaxed text-[11px]">
+                                    {p.pro}
+                                  </p>
+                                </div>
+
+                                {/* LO MALO */}
+                                <div className="bg-red-50/70 p-2.5 rounded-xl border border-red-200/80 space-y-1">
+                                  <span className="font-bold text-red-800 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                                    <ThumbsDown size={12} className="text-red-600" />
+                                    Lo Malo (Riesgos Biológicos & Limitaciones):
+                                  </span>
+                                  <p className="text-red-950 leading-relaxed text-[11px]">
+                                    {p.con}
+                                  </p>
+                                </div>
+
+                                {/* RECOMENDACIÓN DE COCINA */}
+                                <div className="bg-stone-50 p-2.5 rounded-xl border border-stone-200 space-y-0.5">
+                                  <span className="font-bold text-stone-700 text-[10px] uppercase tracking-wider flex items-center gap-1">
+                                    💡 Recomendación en Cocina BARF:
+                                  </span>
+                                  <p className="text-stone-600 leading-relaxed text-[11px]">
+                                    {p.recommendation}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* SECCIÓN 3: TABLA BROMATOLÓGICA CARA A CARA (POR 100G) */}
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-4 rounded-full bg-emerald-600"></span>
                         <h4 className="font-header text-xs font-bold uppercase tracking-wider text-secondary-brown">
-                          2. Composición Bromatológica Base (por 100g)
+                          3. Composición Bromatológica Base (por 100g)
                         </h4>
                       </div>
                       <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-2xs">
@@ -1209,6 +1450,16 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-stone-100 font-mono">
+                            <tr className="hover:bg-amber-50/40 bg-amber-50/20">
+                              <td className="p-2.5 font-sans font-semibold text-amber-900 flex items-center gap-1.5">
+                                🦴 % Hueso Anatómico Estimado
+                              </td>
+                              {comparisonData.econList.map((e) => (
+                                <td key={e.id} className="p-2.5 text-right font-bold text-amber-900 tabular-nums">
+                                  {e.boneProfile.bonePct > 0 ? `${e.boneProfile.bonePct}%` : '0% (Magro)'}
+                                </td>
+                              ))}
+                            </tr>
                             {[
                               { label: 'Energía Metabólica', key: 'kcal', unit: 'kcal' },
                               { label: 'Proteína Cruda', key: 'protG', unit: 'g' },
@@ -1248,12 +1499,12 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
                       </div>
                     </div>
 
-                    {/* SECCIÓN 3: MICRONUTRIENTES COMPARTIDOS (CARA A CARA) */}
+                    {/* SECCIÓN 4: MICRONUTRIENTES COMPARTIDOS (CARA A CARA) */}
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-4 rounded-full bg-sky-600"></span>
                         <h4 className="font-header text-xs font-bold uppercase tracking-wider text-secondary-brown">
-                          3. Micronutrientes Compartidos (Presentes en 2 o más insumos)
+                          4. Micronutrientes Compartidos (Presentes en 2 o más insumos)
                         </h4>
                       </div>
                       {comparisonData.sharedMicros.length === 0 ? (
@@ -1313,12 +1564,12 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
                       )}
                     </div>
 
-                    {/* SECCIÓN 4: BIOACTIVOS EXCLUSIVOS DE CADA INSUMO */}
+                    {/* SECCIÓN 5: BIOACTIVOS EXCLUSIVOS DE CADA INSUMO */}
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-4 rounded-full bg-amber-500"></span>
                         <h4 className="font-header text-xs font-bold uppercase tracking-wider text-secondary-brown">
-                          4. Bioactivos Exclusivos y Diferenciales de cada Insumo
+                          5. Bioactivos Exclusivos y Diferenciales de cada Insumo
                         </h4>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -1361,13 +1612,13 @@ const IngredientsManager = ({ ingredients, fetchIngredients, fetchWithAuth }) =>
                       </div>
                     </div>
 
-                    {/* SECCIÓN 5: DICTAMEN TÉCNICO DE SELECCIÓN */}
-                    <div className="bg-white border-2 border-emerald-300 rounded-2xl p-4 shadow-xs space-y-2">
+                    {/* SECCIÓN 6: DICTAMEN TÉCNICO DE SELECCIÓN */}
+                    <div className="bg-white border-2 border-emerald-300 rounded-2xl p-4 shadow-xs space-y-2.5">
                       <div className="flex items-center gap-2 text-secondary-brown font-bold text-xs uppercase tracking-wider">
-                        <CheckCircle2 size={16} className="text-primary-green shrink-0" />
+                        <Sparkles size={16} className="text-primary-green shrink-0" />
                         <span>{comparisonData.verdictTitle}</span>
                       </div>
-                      <p className="text-xs text-stone-700 leading-relaxed">
+                      <p className="text-xs text-stone-700 leading-relaxed bg-stone-50/70 p-3.5 rounded-xl border border-stone-200 font-sans">
                         {comparisonData.verdictText}
                       </p>
                     </div>
