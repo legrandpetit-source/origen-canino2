@@ -194,7 +194,7 @@ def create_batch_router(get_current_admin) -> APIRouter:
             effective_extra_cost = indirect_sum if indirect_sum > 0 else int(payload.extra_cost_clp or 0)
 
             snapshot_items, nutrition, total_cost_clp = batch_service.compute_batch_nutrition_and_cost(
-                cursor, ing_dicts, peso_crudo, payload.stock_inicial_gramos, effective_extra_cost
+                cursor, ing_dicts, peso_crudo, payload.stock_inicial_gramos, effective_extra_cost, payload.linea_produccion
             )
 
             # Registrar automáticamente en kitchen_cost_history para alimentar Finanzas y Cocina

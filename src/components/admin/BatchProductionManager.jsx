@@ -4,6 +4,7 @@ import {
   Send, Copy, Check, RefreshCw, ShoppingBag, Clock, XCircle, CheckCircle2, Trash2, Sparkles, X, Info, ArrowUpRight, ArrowDownRight, Eye
 } from 'lucide-react';
 import ProductLabelGenerator from './ProductLabelGenerator';
+import { parseWeightGrams } from '../../context/CartContext';
 
 
 // =========================================================================
@@ -63,15 +64,48 @@ const generateBatchVerdict = ({
   prevMargenPct,
   barfComposition,
   liveCaPRatio,
-  prevCaPRatio
+  prevCaPRatio,
+  lineaProduccion = 'BARF',
+  unitGrams = 1000,
+  unitKg = 1.0,
+  costPerUnitClp = 0,
+  pvpPerUnitClp = 0,
+  totalUnitsProduced = 0,
+  projectedProfitClp = 0,
+  selectedProd = null,
 }) => {
+  const isDehydrated = lineaProduccion === 'SNACK' || (selectedProd?.name || '').toLowerCase().includes('deshidrat');
+  const isLiquidBroth = lineaProduccion === 'CALDO' || (selectedProd?.name || '').toLowerCase().includes('caldo');
+
   if (!previousBatch) {
+    if (isDehydrated) {
+      return {
+        badge: 'Lote Base Snack Deshidratado',
+        badgeColor: 'bg-amber-100 text-amber-900 border-amber-300',
+        title: '⭐ Formulación Snack 100% Mono-ingrediente',
+        nutritionNote: `Snack deshidratado (${selectedProd?.name || 'Patitas'}). Agua evaporada a humedad residual de ~${liveNutrition.humedad}%, concentrando proteína bruta en ${liveNutrition.proteina.toFixed(1)}% y minerales bioasimilables.`,
+        financeNote: `Lote rinde ${totalUnitsProduced} bolsas de ${selectedProd?.weight || '400g'}. Costo unitario: $${costPerUnitClp.toLocaleString('es-CL')} / bolsa (PVP $${pvpPerUnitClp.toLocaleString('es-CL')}), con margen unitario de +${marginPctLive}% y ganancia neta proyectada de +$${projectedProfitClp.toLocaleString('es-CL')} CLP.`,
+        conclusion: 'Lote de snack deshidratado rentable y biológicamente seguro con desuñado artesanal.'
+      };
+    }
+    if (isLiquidBroth) {
+      return {
+        badge: 'Lote Base Caldo de Huesos',
+        badgeColor: 'bg-amber-100 text-amber-900 border-amber-300',
+        title: '⭐ Extracción Lenta de Colágeno (24h)',
+        nutritionNote: `Caldo funcional rico en minerales óseos y gelatina extraída en cocción controlada a fuego corona por 24 horas.`,
+        financeNote: `Lote rinde ${totalUnitsProduced} frascos de ${selectedProd?.weight || '500ml'}. Costo unitario: $${costPerUnitClp.toLocaleString('es-CL')} (PVP $${pvpPerUnitClp.toLocaleString('es-CL')}), con margen proyectado de +${marginPctLive}%.`,
+        conclusion: 'Este lote servirá de referencia de costos para la producción de caldos funcionales.'
+      };
+    }
     return {
       badge: 'Lote Base / Inicial',
       badgeColor: 'bg-blue-100 text-blue-900 border-blue-200',
       title: 'Snapshot Inicial de Producción',
       nutritionNote: `Formulación con ${liveNutrition.proteina.toFixed(1)}% proteína, ${liveNutrition.grasa.toFixed(1)}% grasa y relación Ca:P de ${liveCaPRatio}:1. Establece la línea base para este menú.`,
-      financeNote: `Costo inicial calculado en $${costPerKgClp.toLocaleString('es-CL')} / kg con margen proyectado de ${marginPctLive}%.`,
+      financeNote: unitKg !== 1
+        ? `Lote rinde ${totalUnitsProduced} unidades. Costo unitario: $${costPerUnitClp.toLocaleString('es-CL')} (PVP $${pvpPerUnitClp.toLocaleString('es-CL')}) con margen proyectado de +${marginPctLive}%.`
+        : `Costo inicial calculado en $${costPerKgClp.toLocaleString('es-CL')} / kg con margen proyectado de +${marginPctLive}%.`,
       conclusion: 'Este lote servirá de referencia automática para contrastar costos y mejoras nutricionales en las próximas semanas.'
     };
   }
@@ -408,12 +442,20 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
 
   // Simulación Nutricional y Financiera en Vivo
   const ingMap = Object.fromEntries(ingredients.map((i) => [String(i.id), i]));
+  const selectedProd = products.find((p) => String(p.id) === String(selectedProductId));
+  const unitGrams = selectedProd ? (parseWeightGrams(selectedProd.weight) || 1000) : 1000;
+  const unitKg = unitGrams / 1000;
+  const totalUnitsProduced = unitGrams > 0 ? Math.floor(packGramsNum / unitGrams) : 0;
+
+  const isDehydrated = lineaProduccion === 'SNACK' || (selectedProd?.name || '').toLowerCase().includes('deshidrat');
+  const isLiquidBroth = lineaProduccion === 'CALDO' || (selectedProd?.name || '').toLowerCase().includes('caldo');
+
   const concentrationFactor =
     rawGramsNum > packGramsNum && packGramsNum > 0
-      ? Math.min(1.45, rawGramsNum / packGramsNum)
+      ? (isDehydrated ? (rawGramsNum / packGramsNum) : Math.min(1.45, rawGramsNum / packGramsNum))
       : 1.0;
 
-  const liveNutrition = formulaRows.reduce(
+  const liveNutritionRaw = formulaRows.reduce(
     (acc, r) => {
       const dbIng = ingMap[String(r.ingrediente_id)] || {};
       const w = (parseFloat(r.porcentaje_formula) || 0) / 100;
@@ -445,6 +487,18 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
     },
     { proteina: 0, grasa: 0, fibra: 0, humedad: 0, cenizas: 0, carbs: 0, calcio: 0, fosforo: 0, kcal: 0, microMap: {} }
   );
+
+  const liveNutrition = {
+    ...liveNutritionRaw,
+    humedad: isDehydrated
+      ? 8.0
+      : isLiquidBroth
+      ? 93.5
+      : concentrationFactor > 1.0
+      ? Number(Math.max(10.0, liveNutritionRaw.humedad - (1 - (1 / concentrationFactor)) * 40).toFixed(1))
+      : Number(liveNutritionRaw.humedad.toFixed(1)),
+  };
+
   const liveMicronutrients = Object.values(liveNutrition.microMap || {})
     .map((m) => ({ ...m, amount: Number(m.amount.toFixed(2)) }))
     .filter((m) => m.amount > 0 || m.highlight)
@@ -461,10 +515,22 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
   const totalBatchCostClp = ingredientsCostClp + indirectTotalClp;
   const stockKgNum = packGramsNum / 1000;
   const costPerKgClp = stockKgNum > 0 ? Math.round(totalBatchCostClp / stockKgNum) : 0;
-  const selectedProd = products.find((p) => String(p.id) === String(selectedProductId));
-  const pvpPerKgClp = selectedProd ? Number(selectedProd.price || 0) : 0;
+
+  // PVP por Unidad (según catálogo: $6.000 para bolsa 400g, $5.000 para 1 Kg BARF, etc.)
+  const pvpPerUnitClp = selectedProd ? Number(selectedProd.price || 0) : 0;
+  // PVP equivalente por Kg para comparar
+  const pvpPerKgClp = unitKg > 0 ? Math.round(pvpPerUnitClp / unitKg) : pvpPerUnitClp;
+
+  // Costo por Unidad (bolsa / frasco)
+  const costPerUnitClp = totalUnitsProduced > 0 ? Math.round(totalBatchCostClp / totalUnitsProduced) : (unitKg > 0 ? Math.round(costPerKgClp * unitKg) : 0);
+  const marginPerUnitClp = pvpPerUnitClp - costPerUnitClp;
+  const marginPctLive = pvpPerUnitClp > 0 ? (((pvpPerUnitClp - costPerUnitClp) / pvpPerUnitClp) * 100).toFixed(1) : '0.0';
+
   const marginPerKgClp = pvpPerKgClp - costPerKgClp;
-  const marginPctLive = pvpPerKgClp > 0 ? ((marginPerKgClp / pvpPerKgClp) * 100).toFixed(1) : '0.0';
+
+  // Proyecciones comerciales del lote
+  const projectedRevenueClp = totalUnitsProduced * pvpPerUnitClp;
+  const projectedProfitClp = projectedRevenueClp - totalBatchCostClp;
 
   // Lote Anterior para Comparación Automática
   const previousBatch = batches.find((b) => String(b.producto_id) === String(selectedProductId));
@@ -515,7 +581,15 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
     prevMargenPct,
     barfComposition,
     liveCaPRatio,
-    prevCaPRatio
+    prevCaPRatio,
+    lineaProduccion,
+    unitGrams,
+    unitKg,
+    costPerUnitClp,
+    pvpPerUnitClp,
+    totalUnitsProduced,
+    projectedProfitClp,
+    selectedProd,
   });
 
   const handleCreateBatch = async (e) => {
@@ -999,86 +1073,122 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                 </div>
               </div>
 
-              {/* PASO 1: Barra y Badges de Macro-Composición BARF en Vivo */}
+              {/* PASO 1: Barra y Badges de Macro-Composición adaptativa según línea */}
               {formulaRows.length > 0 && (
-                <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3 space-y-2.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-stone-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                        <Scale size={14} className="text-stone-500" />
-                        Macro-Composición BARF:
+                lineaProduccion === 'SNACK' ? (
+                  <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-3.5 space-y-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-amber-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                          <Award size={14} className="text-amber-700" />
+                          Composición Snack Deshidratado:
+                        </span>
+                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                          ✓ 100% Mono-Ingrediente Natural ({selectedProd?.name || 'Snack'})
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-amber-800 font-mono">
+                        Deshidratación: {mermaPct}% de evaporación hídrica (Merma de Agua)
                       </span>
-                      {barfComposition.animalPct >= 70 && barfComposition.animalPct <= 85 ? (
-                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                          ✓ Ratio BARF Equilibrado (70-85%)
-                        </span>
-                      ) : barfComposition.animalPct < 70 ? (
-                        <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                          ⚠️ Bajo en Carnes/Vísceras (&lt;70%)
-                        </span>
-                      ) : (
-                        <span className="bg-indigo-100 text-indigo-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                          ℹ️ Alto en Carnes (&gt;85%)
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[11px] text-stone-500 font-mono hidden sm:inline">
-                      Estándar Biológico: 70-80% Animal • 15-25% Vegetal • 2-5% Suplementos
-                    </span>
-                  </div>
-
-                  {/* Barra segmentada */}
-                  <div className="h-3 w-full bg-stone-200 rounded-full overflow-hidden flex shadow-inner">
-                    <div
-                      style={{ width: `${Math.min(100, Math.max(0, barfComposition.animalPct))}%` }}
-                      className="bg-rose-500 transition-all duration-300"
-                      title={`Carnes, Hueso & Vísceras: ${barfComposition.animalPct.toFixed(1)}%`}
-                    />
-                    <div
-                      style={{ width: `${Math.min(100, Math.max(0, barfComposition.vegetalPct))}%` }}
-                      className="bg-emerald-500 transition-all duration-300"
-                      title={`Frutas & Verduras: ${barfComposition.vegetalPct.toFixed(1)}%`}
-                    />
-                    <div
-                      style={{ width: `${Math.min(100, Math.max(0, barfComposition.suplementoPct))}%` }}
-                      className="bg-indigo-500 transition-all duration-300"
-                      title={`Suplementos & Otros: ${barfComposition.suplementoPct.toFixed(1)}%`}
-                    />
-                  </div>
-
-                  {/* 3 Badges de Resumen */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                    <div className="bg-white p-2 rounded-xl border border-rose-200 flex items-center justify-between">
-                      <span className="text-stone-600 font-medium flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
-                        🥩 Carnes, Hueso & Vísceras
-                      </span>
-                      <strong className="text-rose-700 font-bold tabular-nums">
-                        {barfComposition.animalPct.toFixed(1)}% ({barfComposition.animalKg.toFixed(1)} kg)
-                      </strong>
                     </div>
 
-                    <div className="bg-white p-2 rounded-xl border border-emerald-200 flex items-center justify-between">
-                      <span className="text-stone-600 font-medium flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                        🥦 Frutas & Verduras
-                      </span>
-                      <strong className="text-emerald-700 font-bold tabular-nums">
-                        {barfComposition.vegetalPct.toFixed(1)}% ({barfComposition.vegetalKg.toFixed(1)} kg)
-                      </strong>
-                    </div>
-
-                    <div className="bg-white p-2 rounded-xl border border-indigo-200 flex items-center justify-between">
-                      <span className="text-stone-600 font-medium flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
-                        💊 Suplementos & Otros
-                      </span>
-                      <strong className="text-indigo-700 font-bold tabular-nums">
-                        {barfComposition.suplementoPct.toFixed(1)}% ({barfComposition.suplementoKg.toFixed(1)} kg)
-                      </strong>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                      <div className="bg-white p-2.5 rounded-xl border border-amber-200 flex items-center justify-between">
+                        <span className="text-stone-600 font-medium">🍗 Insumo Crudo</span>
+                        <strong className="text-amber-800 font-bold tabular-nums">{pesoCrudoKg} kg iniciales</strong>
+                      </div>
+                      <div className="bg-white p-2.5 rounded-xl border border-amber-200 flex items-center justify-between">
+                        <span className="text-stone-600 font-medium">✨ Producto Envasado</span>
+                        <strong className="text-emerald-700 font-bold tabular-nums">
+                          {stockInicialKg} kg ({totalUnitsProduced} bolsas de {selectedProd?.weight || `${unitGrams}g`})
+                        </strong>
+                      </div>
+                      <div className="bg-white p-2.5 rounded-xl border border-amber-200 flex items-center justify-between">
+                        <span className="text-stone-600 font-medium">💧 Humedad Residual</span>
+                        <strong className="text-sky-700 font-bold tabular-nums">~8.0% (Seco y crujiente)</strong>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3 space-y-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-stone-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                          <Scale size={14} className="text-stone-500" />
+                          Macro-Composición:
+                        </span>
+                        {barfComposition.animalPct >= 70 && barfComposition.animalPct <= 85 ? (
+                          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                            ✓ Ratio Equilibrado (70-85%)
+                          </span>
+                        ) : barfComposition.animalPct < 70 ? (
+                          <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                            ⚠️ Bajo en Carnes/Vísceras (&lt;70%)
+                          </span>
+                        ) : (
+                          <span className="bg-indigo-100 text-indigo-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                            ℹ️ Alto en Carnes (&gt;85%)
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-stone-500 font-mono hidden sm:inline">
+                        Estándar Biológico: 70-80% Animal • 15-25% Vegetal • 2-5% Suplementos
+                      </span>
+                    </div>
+
+                    {/* Barra segmentada */}
+                    <div className="h-3 w-full bg-stone-200 rounded-full overflow-hidden flex shadow-inner">
+                      <div
+                        style={{ width: `${Math.min(100, Math.max(0, barfComposition.animalPct))}%` }}
+                        className="bg-rose-500 transition-all duration-300"
+                        title={`Carnes, Hueso & Vísceras: ${barfComposition.animalPct.toFixed(1)}%`}
+                      />
+                      <div
+                        style={{ width: `${Math.min(100, Math.max(0, barfComposition.vegetalPct))}%` }}
+                        className="bg-emerald-500 transition-all duration-300"
+                        title={`Frutas & Verduras: ${barfComposition.vegetalPct.toFixed(1)}%`}
+                      />
+                      <div
+                        style={{ width: `${Math.min(100, Math.max(0, barfComposition.suplementoPct))}%` }}
+                        className="bg-indigo-500 transition-all duration-300"
+                        title={`Suplementos & Otros: ${barfComposition.suplementoPct.toFixed(1)}%`}
+                      />
+                    </div>
+
+                    {/* 3 Badges de Resumen */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                      <div className="bg-white p-2 rounded-xl border border-rose-200 flex items-center justify-between">
+                        <span className="text-stone-600 font-medium flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                          🥩 Carnes, Hueso & Vísceras
+                        </span>
+                        <strong className="text-rose-700 font-bold tabular-nums">
+                          {barfComposition.animalPct.toFixed(1)}% ({barfComposition.animalKg.toFixed(1)} kg)
+                        </strong>
+                      </div>
+
+                      <div className="bg-white p-2 rounded-xl border border-emerald-200 flex items-center justify-between">
+                        <span className="text-stone-600 font-medium flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                          🥦 Frutas & Verduras
+                        </span>
+                        <strong className="text-emerald-700 font-bold tabular-nums">
+                          {barfComposition.vegetalPct.toFixed(1)}% ({barfComposition.vegetalKg.toFixed(1)} kg)
+                        </strong>
+                      </div>
+
+                      <div className="bg-white p-2 rounded-xl border border-indigo-200 flex items-center justify-between">
+                        <span className="text-stone-600 font-medium flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+                          💊 Suplementos & Otros
+                        </span>
+                        <strong className="text-indigo-700 font-bold tabular-nums">
+                          {barfComposition.suplementoPct.toFixed(1)}% ({barfComposition.suplementoKg.toFixed(1)} kg)
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                )
               )}
               {formulaRows.length > 0 && (
                 <div className="grid grid-cols-12 gap-2 px-2.5 text-xs font-semibold text-stone-500">
@@ -1234,16 +1344,23 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                 </div>
 
                 <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-900 mb-2">
-                    Rentabilidad Real del Lote (Ingredientes + Indirectos)
-                  </h4>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-900">
+                      Rentabilidad Real del Lote (Ingredientes + Indirectos)
+                    </h4>
+                    {unitKg !== 1 && totalUnitsProduced > 0 && (
+                      <span className="text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                        📦 Rinde {totalUnitsProduced} unidades ({selectedProd?.weight || `${unitGrams}g`} c/u)
+                      </span>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
                     <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
                       <span className="text-xs text-stone-500 block">Ingredientes</span>
                       <strong className="text-xs font-bold tabular-nums text-stone-900">${ingredientsCostClp.toLocaleString('es-CL')}</strong>
                     </div>
                     <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
-                      <span className="text-xs text-stone-500 block">Indirectos</span>
+                      <span className="text-xs text-stone-500 block">Costos Indirectos</span>
                       <strong className="text-xs font-bold tabular-nums text-stone-900">${indirectTotalClp.toLocaleString('es-CL')}</strong>
                     </div>
                     <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
@@ -1251,20 +1368,47 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                       <strong className="text-xs font-bold tabular-nums text-secondary-brown">${totalBatchCostClp.toLocaleString('es-CL')}</strong>
                     </div>
                     <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
-                      <span className="text-xs text-stone-500 block">Costo Real / Kg</span>
-                      <strong className="text-xs font-bold tabular-nums text-stone-900">${costPerKgClp.toLocaleString('es-CL')}/kg</strong>
+                      <span className="text-xs text-stone-500 block">
+                        {unitKg !== 1 ? `Costo / Unidad (${selectedProd?.weight || `${unitGrams}g`})` : 'Costo Real / Kg'}
+                      </span>
+                      <strong className="text-xs font-bold tabular-nums text-stone-900">
+                        ${(unitKg !== 1 ? costPerUnitClp : costPerKgClp).toLocaleString('es-CL')}
+                        {unitKg !== 1 ? <span className="text-[10px] text-stone-500 font-normal"> (${costPerKgClp.toLocaleString('es-CL')}/kg)</span> : '/kg'}
+                      </strong>
                     </div>
                     <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
-                      <span className="text-xs text-stone-500 block">PVP Menú</span>
-                      <strong className="text-xs font-bold tabular-nums text-stone-900">${pvpPerKgClp.toLocaleString('es-CL')}</strong>
+                      <span className="text-xs text-stone-500 block">
+                        {unitKg !== 1 ? `PVP / Unidad (${selectedProd?.weight || `${unitGrams}g`})` : 'PVP Menú / Kg'}
+                      </span>
+                      <strong className="text-xs font-bold tabular-nums text-stone-900">
+                        ${pvpPerUnitClp.toLocaleString('es-CL')}
+                        {unitKg !== 1 ? <span className="text-[10px] text-stone-500 font-normal"> (${pvpPerKgClp.toLocaleString('es-CL')}/kg)</span> : ''}
+                      </strong>
                     </div>
                     <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
-                      <span className="text-xs text-stone-500 block">Margen Bruto</span>
-                      <strong className={`text-xs font-bold tabular-nums ${marginPerKgClp >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                        ${marginPerKgClp.toLocaleString('es-CL')} ({marginPctLive}%)
+                      <span className="text-xs text-stone-500 block">
+                        {unitKg !== 1 ? 'Margen por Unidad' : 'Margen Bruto / Kg'}
+                      </span>
+                      <strong className={`text-xs font-bold tabular-nums ${marginPerUnitClp >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                        {marginPerUnitClp >= 0 ? '+' : ''}${marginPerUnitClp.toLocaleString('es-CL')} (+{marginPctLive}%)
                       </strong>
                     </div>
                   </div>
+
+                  {/* Proyección de Ventas y Ganancia del Lote */}
+                  {totalUnitsProduced > 0 && (
+                    <div className="mt-2.5 p-2.5 bg-emerald-100/70 border border-emerald-300 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-1.5 text-emerald-950 font-medium">
+                        <TrendingUp size={15} className="text-emerald-700 shrink-0" />
+                        <span>
+                          Ventas Proyectadas: <strong className="text-stone-900">${projectedRevenueClp.toLocaleString('es-CL')} CLP</strong> ({totalUnitsProduced} unidades × ${pvpPerUnitClp.toLocaleString('es-CL')})
+                        </span>
+                      </div>
+                      <div className="text-emerald-950 font-bold">
+                        Ganancia Líquida Lote: <span className="text-emerald-800 text-sm font-extrabold">+${projectedProfitClp.toLocaleString('es-CL')} CLP</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1588,8 +1732,25 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                         <div className="text-[10px] text-red-600">Venc: {b.fecha_consumo_preferente}</div>
                       </td>
                       <td className="py-3 pr-3 tabular-nums">
-                        <strong>{(b.stock_disponible_gramos / 1000).toFixed(2)} kg</strong>
-                        <span className="text-stone-400"> / {(b.stock_inicial_gramos / 1000).toFixed(2)} kg</span>
+                        {(() => {
+                          const bProd = products.find((p) => String(p.id) === String(b.producto_id));
+                          const bUnitG = bProd ? (parseWeightGrams(bProd.weight) || 1000) : 1000;
+                          const bTotalU = bUnitG > 0 ? Math.floor(b.stock_inicial_gramos / bUnitG) : 0;
+                          const bDispU = bUnitG > 0 ? Math.floor(b.stock_disponible_gramos / bUnitG) : 0;
+                          return (
+                            <>
+                              <div>
+                                <strong>{(b.stock_disponible_gramos / 1000).toFixed(2)} kg</strong>
+                                <span className="text-stone-400"> / {(b.stock_inicial_gramos / 1000).toFixed(2)} kg</span>
+                              </div>
+                              {bUnitG !== 1000 && (
+                                <div className="text-[10px] text-emerald-800 font-semibold">
+                                  {bDispU} / {bTotalU} {b.linea_produccion === 'CALDO' ? 'frascos' : 'bolsas'} ({bProd?.weight || `${bUnitG}g`})
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </td>
                       <td className="py-3 pr-3 tabular-nums">${Number(b.costo_total_batch_clp || 0).toLocaleString('es-CL')}</td>
                       <td className="py-3 pr-3">
@@ -2140,6 +2301,50 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                       </strong>
                     </div>
                   )}
+
+                  {(() => {
+                    const vProd = products.find((p) => String(p.id) === String(viewingBatch.producto_id));
+                    const vUnitG = vProd ? (parseWeightGrams(vProd.weight) || 1000) : 1000;
+                    const vUnitKg = vUnitG / 1000;
+                    const vTotalUnits = vUnitG > 0 ? Math.floor((viewingBatch.stock_inicial_gramos || 0) / vUnitG) : 0;
+                    const vCostPerUnit = vTotalUnits > 0 ? Math.round(Number(viewingBatch.costo_total_batch_clp || 0) / vTotalUnits) : 0;
+                    const vPvp = Number(viewingBatch.producto_price || vProd?.price || 0);
+                    const vMarginPerUnit = vPvp - vCostPerUnit;
+                    const vMarginPct = vPvp > 0 ? (((vPvp - vCostPerUnit) / vPvp) * 100).toFixed(1) : '0.0';
+                    const vProjectedRev = vTotalUnits * vPvp;
+                    const vProjectedProfit = vProjectedRev - Number(viewingBatch.costo_total_batch_clp || 0);
+
+                    if (vUnitKg === 1) return null;
+
+                    return (
+                      <div className="mt-2 pt-2 border-t border-emerald-300 space-y-1 bg-white/70 p-2.5 rounded-xl">
+                        <div className="flex justify-between items-center text-stone-700">
+                          <span className="font-sans text-stone-600 font-semibold">Rendimiento Comercial:</span>
+                          <strong className="text-stone-900">
+                            {vTotalUnits} {viewingBatch.linea_produccion === 'CALDO' ? 'frascos' : 'bolsas'} ({vProd?.weight || `${vUnitG}g`})
+                          </strong>
+                        </div>
+                        <div className="flex justify-between items-center text-stone-700">
+                          <span className="font-sans text-stone-600">Costo Real por Unidad:</span>
+                          <strong className="text-stone-900">
+                            ${vCostPerUnit.toLocaleString('es-CL')} / u
+                          </strong>
+                        </div>
+                        <div className="flex justify-between items-center text-stone-700">
+                          <span className="font-sans text-stone-600">Margen por Unidad:</span>
+                          <strong className={`font-bold ${vMarginPerUnit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                            {vMarginPerUnit >= 0 ? '+' : ''}${vMarginPerUnit.toLocaleString('es-CL')} (+{vMarginPct}%)
+                          </strong>
+                        </div>
+                        <div className="flex justify-between items-center text-stone-700 pt-1 border-t border-emerald-200">
+                          <span className="font-sans text-emerald-950 font-bold">Ganancia Líquida Lote:</span>
+                          <strong className="text-emerald-800 font-extrabold text-sm">
+                            +{Number(vProjectedProfit).toLocaleString('es-CL')} CLP
+                          </strong>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 

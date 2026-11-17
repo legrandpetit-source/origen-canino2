@@ -79,6 +79,7 @@ def compute_batch_nutrition_and_cost(
     peso_crudo_total_gramos: int,
     stock_inicial_gramos: int,
     extra_cost_clp: int = 0,
+    linea_produccion: str = "BARF",
 ) -> Tuple[List[Dict[str, Any]], Dict[str, float], int]:
     """Calcula snapshot de ingredientes, perfil nutricional por 100g y costo total del batch."""
     ing_ids = [item["ingrediente_id"] for item in ingredients_payload if item.get("ingrediente_id")]
@@ -182,14 +183,17 @@ def compute_batch_nutrition_and_cost(
             "costo_unitario_clp": unit_cost,
         })
 
-    # Ajuste por concentración de cocción si hubo merma real (peso_crudo > stock_inicial)
+    # Ajuste por concentración de cocción o deshidratación si hubo merma real (peso_crudo > stock_inicial)
+    linea_upper = (linea_produccion or "BARF").strip().upper()
+    is_snack = linea_upper in ("SNACK", "SNACKS")
     concentration = 1.0
     if peso_crudo_total_gramos > 0 and stock_inicial_gramos > 0 and peso_crudo_total_gramos > stock_inicial_gramos:
-        concentration = min(1.45, peso_crudo_total_gramos / float(stock_inicial_gramos))
+        concentration = (peso_crudo_total_gramos / float(stock_inicial_gramos)) if is_snack else min(1.45, peso_crudo_total_gramos / float(stock_inicial_gramos))
 
     nutrition = {k: round(v * (1.0 if k == "humedad_pct" else concentration), 2) for k, v in totals.items()}
-    if concentration > 1.0 and nutrition["humedad_pct"] > 0:
-        # La evaporación reduce humedad proporcionalmente
+    if is_snack:
+        nutrition["humedad_pct"] = 8.0  # Humedad residual típica de snacks deshidratados (<10%)
+    elif concentration > 1.0 and nutrition["humedad_pct"] > 0:
         water_loss_pct = (1.0 - (1.0 / concentration)) * 100.0
         nutrition["humedad_pct"] = round(max(10.0, nutrition["humedad_pct"] - water_loss_pct * 0.5), 2)
 
