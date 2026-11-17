@@ -49,9 +49,30 @@ Una vez cerrado y estabilizado el ciclo de producción, trazabilidad y stock FIF
 
 ---
 
-## ⏳ 3. Recordatorio para la Siguiente Jornada (Miércoles 18 de Noviembre de 2026)
+## 4. 🛠️ Implementación: Salidas No Comerciales y Ajuste de Stock en Lotes FIFO
+
+### A. Diagnóstico y Caso de Uso Real:
+- Tras la validación exitosa del primer lote de *Patitas de Pollo Deshidratadas* (17 bolsas envasadas de 400g, comprobadas en la tienda online con tope de compra exacto), se detectó la necesidad de registrar **salidas no comerciales**:
+  1. **Autoconsumo Canino:** Retiro de comida para alimentación de perros propios del taller (ej. Momo, Reina).
+  2. **Muestras y Regalos Comerciales:** Degustaciones a veterinarios aliados o clientes fidelizados.
+  3. **Mermas Post-Envasado:** Rotura de bolsa/frasco o descarte por control de calidad.
+  4. **Ajuste de Conteo Físico:** Cuadratura de existencias tras auditoría en congelador.
+
+### B. Módulos Desarrollados:
+1. **Base de Datos (PostgreSQL):**
+   - Tabla `batch_ajustes_stock` creada con campos: `batch_id`, `tipo_movimiento`, `cantidad_gramos`, `unidades_equivalentes`, `costo_unitario_kg_clp`, `costo_total_ajuste_clp`, `motivo_detalle`, `usuario`, `created_at`.
+2. **Backend FastAPI (`backend/batch_routes.py`):**
+   - `POST /api/admin/batches/{batch_id}/adjust-stock`: Descuenta o suma stock con validación de no sobre-descuento, actualiza el estado a `AGOTADO` si llega a 0, calcula el costo atribuido y registra el asiento inmutable.
+   - `PATCH /api/admin/batches/{batch_id}`: Actualiza fecha de vencimiento y notas generales.
+   - `GET /api/admin/batches`: Ahora incluye el array `ajustes` para cada lote.
+3. **Frontend Admin (`BatchProductionManager.jsx`):**
+   - Botón **`[✏️ Editar]`** en la columna de acciones de la tabla FIFO.
+   - Modal interactivo de ajuste: selector de Kilos vs. Bolsas/Frascos, badges de motivo con 1 clic, cálculo en tiempo real de nuevo stock y costo atribuido.
+   - Ficha `Ver Lote`: Sección "Salidas No Comerciales y Ajustes Manuales" para trazabilidad total junto con los despachos a clientes.
+
 
 ### 🏗️ Migración Arquitectónica Hetzner: Docker Compose Nativo (Desmonte de Coolify)
 - Configuración de `docker-compose.yml` nativo idéntico al esquema de éxito de TimbrApp.
 - Desmontar contenedores de Coolify para recuperar **~700 MB - 1 GB de RAM** y eliminar para siempre las compilaciones residuales en disco.
 - Conmutación con cero caída de servicio (*Zero-Downtime*).
+

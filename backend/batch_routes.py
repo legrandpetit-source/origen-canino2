@@ -43,6 +43,19 @@ class BatchStatusUpdate(BaseModel):
     notas: Optional[str] = None
 
 
+class BatchStockAdjustment(BaseModel):
+    tipo_movimiento: str  # 'AUTOCONSUMO', 'MUESTRA_REGALO', 'MERMA', 'CONTEO_FISICO', 'OTRO'
+    cantidad_gramos: int  # negativo para salidas (ej. -9000), positivo para sumas
+    unidades_equivalentes: Optional[float] = 0.0
+    motivo_detalle: Optional[str] = None
+
+
+class BatchUpdateParams(BaseModel):
+    fecha_consumo_preferente: Optional[str] = None
+    notas: Optional[str] = None
+    estado: Optional[str] = None
+
+
 class WaitlistCreate(BaseModel):
     producto_id: int
     customer_name: Optional[str] = None
@@ -114,6 +127,7 @@ def create_batch_router(get_current_admin) -> APIRouter:
             batch_ids = [b["id"] for b in batches]
             ing_by_batch: Dict[int, List[Dict[str, Any]]] = {}
             orders_by_batch: Dict[int, List[Dict[str, Any]]] = {}
+            adjustments_by_batch: Dict[int, List[Dict[str, Any]]] = {}
             if batch_ids:
                 cursor.execute(
                     "SELECT * FROM batch_ingredientes WHERE batch_id = ANY(%s) ORDER BY porcentaje_formula DESC, id ASC",
@@ -139,9 +153,26 @@ def create_batch_router(get_current_admin) -> APIRouter:
                         r["created_at"] = r["created_at"].isoformat()
                     orders_by_batch.setdefault(int(r["batch_id"]), []).append(r)
 
+                cursor.execute(
+                    """
+                    SELECT id, batch_id, tipo_movimiento, cantidad_gramos, unidades_equivalentes,
+                           costo_unitario_kg_clp, costo_total_ajuste_clp, motivo_detalle, usuario, created_at
+                    FROM batch_ajustes_stock
+                    WHERE batch_id = ANY(%s)
+                    ORDER BY created_at DESC
+                    """,
+                    (batch_ids,),
+                )
+                for adj in cursor.fetchall():
+                    a = dict(adj)
+                    if a.get("created_at") and hasattr(a["created_at"], "isoformat"):
+                        a["created_at"] = a["created_at"].isoformat()
+                    adjustments_by_batch.setdefault(int(a["batch_id"]), []).append(a)
+
             for b in batches:
                 b["ingredientes"] = ing_by_batch.get(int(b["id"]), [])
                 b["orders_dispatched"] = orders_by_batch.get(int(b["id"]), [])
+                b["ajustes"] = adjustments_by_batch.get(int(b["id"]), [])
                 if b.get("fecha_elaboracion"):
                     b["fecha_elaboracion"] = b["fecha_elaboracion"].isoformat()
                 if b.get("fecha_consumo_preferente"):
@@ -365,6 +396,135 @@ def create_batch_router(get_current_admin) -> APIRouter:
                 raise HTTPException(status_code=404, detail="Lote no encontrado.")
             conn.commit()
             return {"success": True, "estado": estado}
+
+    @router.patch("/api/admin/batches/{batch_id}")
+    def update_batch(
+        batch_id: int,
+        payload: BatchUpdateParams,
+        current_user: str = Depends(get_current_admin),
+    ):
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            updates = []
+            params = []
+            if payload.fecha_consumo_preferente:
+                updates.append("fecha_consumo_preferente = %s")
+                params.append(payload.fecha_consumo_preferente)
+            if payload.notas is not None:
+                updates.append("notas = %s")
+                params.append(payload.notas)
+            if payload.estado:
+                est = payload.estado.strip().upper()
+                if est not in ("ACTIVO", "AGOTADO", "CERRADO"):
+                    raise HTTPException(status_code=400, detail="Estado inválido. Use ACTIVO, AGOTADO o CERRADO.")
+                updates.append("estado = %s")
+                params.append(est)
+            if not updates:
+                return {"success": True}
+            params.append(batch_id)
+            cursor.execute(
+                f"UPDATE batch_produccion SET {', '.join(updates)} WHERE id = %s RETURNING id, estado, notas, fecha_consumo_preferente",
+                tuple(params),
+            )
+            row = cursor.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Lote no encontrado.")
+            conn.commit()
+            return {"success": True, "batch": dict(row)}
+
+    @router.post("/api/admin/batches/{batch_id}/adjust-stock")
+    def adjust_batch_stock(
+        batch_id: int,
+        payload: BatchStockAdjustment,
+        current_user: str = Depends(get_current_admin),
+    ):
+        tipo = payload.tipo_movimiento.strip().upper()
+        delta_g = int(payload.cantidad_gramos)
+        if delta_g == 0:
+            raise HTTPException(status_code=400, detail="La cantidad a ajustar no puede ser 0.")
+
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT id, codigo_lote, stock_inicial_gramos, stock_disponible_gramos,
+                       costo_total_batch_clp, estado
+                FROM batch_produccion WHERE id = %s FOR UPDATE
+                """,
+                (batch_id,),
+            )
+            batch = cursor.fetchone()
+            if not batch:
+                raise HTTPException(status_code=404, detail="Lote no encontrado.")
+
+            curr_avail = int(batch["stock_disponible_gramos"])
+            new_avail = curr_avail + delta_g
+            if new_avail < 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"El descuento ({abs(delta_g) / 1000.0:.2f} kg) supera el stock disponible del lote ({curr_avail / 1000.0:.2f} kg)."
+                )
+
+            # Cálculo de costo atribuido a la salida
+            init_kg = int(batch["stock_inicial_gramos"]) / 1000.0
+            costo_total = int(batch["costo_total_batch_clp"] or 0)
+            costo_kg = int(round(costo_total / init_kg)) if init_kg > 0 else 0
+            costo_ajuste = int(round(abs(delta_g / 1000.0) * costo_kg))
+
+            new_estado = batch["estado"]
+            if new_avail == 0 and batch["estado"] == "ACTIVO":
+                new_estado = "AGOTADO"
+            elif new_avail > 0 and batch["estado"] == "AGOTADO":
+                new_estado = "ACTIVO"
+
+            cursor.execute(
+                """
+                UPDATE batch_produccion
+                SET stock_disponible_gramos = %s, estado = %s
+                WHERE id = %s
+                """,
+                (new_avail, new_estado, batch_id),
+            )
+
+            cursor.execute(
+                """
+                INSERT INTO batch_ajustes_stock (
+                    batch_id, tipo_movimiento, cantidad_gramos, unidades_equivalentes,
+                    costo_unitario_kg_clp, costo_total_ajuste_clp, motivo_detalle, usuario
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id, created_at
+                """,
+                (
+                    batch_id,
+                    tipo,
+                    delta_g,
+                    payload.unidades_equivalentes or 0,
+                    costo_kg,
+                    costo_ajuste,
+                    payload.motivo_detalle or "",
+                    current_user,
+                ),
+            )
+            adj_row = cursor.fetchone()
+            conn.commit()
+
+            return {
+                "success": True,
+                "batch_id": batch_id,
+                "previous_stock_gramos": curr_avail,
+                "new_stock_gramos": new_avail,
+                "estado": new_estado,
+                "ajuste": {
+                    "id": adj_row["id"],
+                    "tipo_movimiento": tipo,
+                    "cantidad_gramos": delta_g,
+                    "unidades_equivalentes": payload.unidades_equivalentes or 0,
+                    "costo_total_ajuste_clp": costo_ajuste,
+                    "motivo_detalle": payload.motivo_detalle or "",
+                    "created_at": adj_row["created_at"].isoformat() if hasattr(adj_row["created_at"], "isoformat") else str(adj_row["created_at"]),
+                }
+            }
 
     @router.delete("/api/admin/batches/{batch_id}")
     def delete_batch(batch_id: int, current_user: str = Depends(get_current_admin)):

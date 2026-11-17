@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Layers, Plus, Printer, AlertTriangle, TrendingUp, TrendingDown, Scale, Award, Activity, Search, Link2,
-  Send, Copy, Check, RefreshCw, ShoppingBag, Clock, XCircle, CheckCircle2, Trash2, Sparkles, X, Info, ArrowUpRight, ArrowDownRight, Eye
+  Send, Copy, Check, RefreshCw, ShoppingBag, Clock, XCircle, CheckCircle2, Trash2, Sparkles, X, Info, ArrowUpRight, ArrowDownRight, Eye,
+  Edit3, Sliders, PackageMinus, Gift, Dog
 } from 'lucide-react';
 import ProductLabelGenerator from './ProductLabelGenerator';
 import { parseWeightGrams } from '../../context/CartContext';
@@ -227,6 +228,21 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
   const [labelModalOpen, setLabelModalOpen] = useState(false);
   const [activeBatchLabel, setActiveBatchLabel] = useState(null);
   const [viewingBatch, setViewingBatch] = useState(null);
+
+  // Modal Editar / Ajustar Stock del Lote (Salidas no comerciales y parámetros)
+  const [editingBatch, setEditingBatch] = useState(null);
+  const [adjustSubmitting, setAdjustSubmitting] = useState(false);
+  const [adjustTab, setAdjustTab] = useState('stock'); // 'stock' | 'params'
+  const [adjustForm, setAdjustForm] = useState({
+    actionType: 'SALIDA', // 'SALIDA' | 'INGRESO'
+    unitType: 'units', // 'units' | 'kg'
+    amount: '',
+    tipoMovimiento: 'AUTOCONSUMO',
+    motivoDetalle: '',
+    fechaConsumoPreferente: '',
+    notas: '',
+    estado: 'ACTIVO',
+  });
 
   // Modal Crear Nuevo Ingrediente en Catálogo sin perder el lote
   const [newIngModalOpen, setNewIngModalOpen] = useState(false);
@@ -669,6 +685,101 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
       if (onIngredientsUpdated) onIngredientsUpdated();
     } catch (err) {
       showToast(err.message);
+    }
+  };
+
+  const handleOpenEditModal = (batch) => {
+    const prod = products.find((p) => String(p.id) === String(batch.producto_id));
+    const unitG = prod ? (parseWeightGrams(prod.weight) || 1000) : 1000;
+    setEditingBatch(batch);
+    setAdjustTab('stock');
+    setAdjustForm({
+      actionType: 'SALIDA',
+      unitType: unitG !== 1000 ? 'units' : 'kg',
+      amount: '',
+      tipoMovimiento: 'AUTOCONSUMO',
+      motivoDetalle: '',
+      fechaConsumoPreferente: batch.fecha_consumo_preferente || '',
+      notas: batch.notas || '',
+      estado: batch.estado || 'ACTIVO',
+    });
+  };
+
+  const handleStockAdjustmentSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingBatch) return;
+
+    const prod = products.find((p) => String(p.id) === String(editingBatch.producto_id));
+    const unitG = prod ? (parseWeightGrams(prod.weight) || 1000) : 1000;
+    const inputVal = parseFloat(adjustForm.amount);
+    if (!inputVal || inputVal <= 0) {
+      showToast('Por favor ingresa una cantidad válida mayor a 0.', 'error');
+      return;
+    }
+
+    const deltaGramsRaw = adjustForm.unitType === 'units'
+      ? Math.round(inputVal * unitG)
+      : Math.round(inputVal * 1000);
+
+    const deltaGrams = adjustForm.actionType === 'SALIDA' ? -deltaGramsRaw : deltaGramsRaw;
+    const unitsEquiv = unitG > 0 ? (deltaGrams / unitG) : (deltaGrams / 1000);
+
+    const currAvail = Number(editingBatch.stock_disponible_gramos || 0);
+    if (currAvail + deltaGrams < 0) {
+      showToast(`El descuento supera el stock disponible del lote (${(currAvail / 1000).toFixed(2)} kg).`, 'error');
+      return;
+    }
+
+    setAdjustSubmitting(true);
+    try {
+      const res = await fetch(`/api/admin/batches/${editingBatch.id}/adjust-stock`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          tipo_movimiento: adjustForm.tipoMovimiento,
+          cantidad_gramos: deltaGrams,
+          unidades_equivalentes: unitsEquiv,
+          motivo_detalle: adjustForm.motivoDetalle || '',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Error al ajustar stock');
+
+      showToast(`Stock de lote ${editingBatch.codigo_lote} ajustado exitosamente (${adjustForm.actionType === 'SALIDA' ? 'Salida' : 'Ingreso'} de ${Math.abs(deltaGrams / 1000).toFixed(2)} kg).`);
+      setEditingBatch(null);
+      await fetchBatches();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setAdjustSubmitting(false);
+    }
+  };
+
+  const handleBatchParamsSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingBatch) return;
+
+    setAdjustSubmitting(true);
+    try {
+      const res = await fetch(`/api/admin/batches/${editingBatch.id}`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          fecha_consumo_preferente: adjustForm.fechaConsumoPreferente,
+          notas: adjustForm.notas,
+          estado: adjustForm.estado,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Error al actualizar parámetros');
+
+      showToast(`Parámetros del lote ${editingBatch.codigo_lote} actualizados correctamente.`);
+      setEditingBatch(null);
+      await fetchBatches();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setAdjustSubmitting(false);
     }
   };
 
@@ -1773,6 +1884,14 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                         </button>
                         <button
                           type="button"
+                          onClick={() => handleOpenEditModal(b)}
+                          className="inline-flex items-center gap-1 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-bold px-2.5 py-1.5 rounded-lg transition shadow-2xs cursor-pointer active:scale-95"
+                          title="Ajustar stock por autoconsumo, muestras, mermas o editar parámetros del lote"
+                        >
+                          <Edit3 size={12} className="text-amber-700" /> Editar
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleOpenBatchLabel(b.id)}
                           className="inline-flex items-center gap-1 bg-stone-800 hover:bg-stone-900 text-white font-bold px-2.5 py-1.5 rounded-lg transition cursor-pointer active:scale-95 shadow-2xs"
                         >
@@ -2436,7 +2555,71 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                 )}
               </div>
 
-              {/* 5. Notas de Producción */}
+              {/* 5. Trazabilidad: Salidas No Comerciales y Ajustes de Stock */}
+              <div className="space-y-2">
+                <h4 className="font-header text-xs font-bold uppercase tracking-wider text-secondary-brown flex items-center gap-1.5">
+                  <span className="w-2 h-4 rounded-full bg-amber-600"></span>
+                  Salidas No Comerciales y Ajustes Manuales
+                </h4>
+                {(viewingBatch.ajustes || []).length > 0 ? (
+                  <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-2xs">
+                    <table className="w-full text-xs">
+                      <thead className="bg-stone-50 border-b border-stone-200 text-stone-600 font-bold">
+                        <tr>
+                          <th className="p-2.5 text-left">Motivo / Tipo</th>
+                          <th className="p-2.5 text-right">Cantidad</th>
+                          <th className="p-2.5 text-right">Costo Atribuido</th>
+                          <th className="p-2.5 text-left">Detalle / Destino</th>
+                          <th className="p-2.5 text-right">Fecha</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-100 font-mono">
+                        {viewingBatch.ajustes.map((adj, idx) => {
+                          const isNegative = adj.cantidad_gramos < 0;
+                          const tipoLabel = {
+                            AUTOCONSUMO: '🐕 Autoconsumo (Perros Propios)',
+                            MUESTRA_REGALO: '🎁 Muestra / Regalo',
+                            MERMA: '⚠️ Merma / Rotura',
+                            CONTEO_FISICO: '⚖️ Conteo Físico',
+                            OTRO: '📝 Ajuste Manual',
+                          }[adj.tipo_movimiento] || adj.tipo_movimiento;
+
+                          return (
+                            <tr key={idx} className="hover:bg-stone-50/50">
+                              <td className="p-2.5 font-sans font-semibold text-stone-800">
+                                {tipoLabel}
+                              </td>
+                              <td className={`p-2.5 text-right font-bold ${isNegative ? 'text-amber-800' : 'text-emerald-700'}`}>
+                                {isNegative ? '-' : '+'}{(Math.abs(adj.cantidad_gramos) / 1000).toFixed(2)} kg
+                                {adj.unidades_equivalentes && adj.unidades_equivalentes !== 0 && (
+                                  <span className="text-[10px] text-stone-500 font-normal block">
+                                    ({adj.unidades_equivalentes > 0 ? '+' : ''}{adj.unidades_equivalentes} u)
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-2.5 text-right font-bold text-stone-900">
+                                ${Number(adj.costo_total_ajuste_clp || 0).toLocaleString('es-CL')}
+                              </td>
+                              <td className="p-2.5 font-sans text-stone-700">
+                                {adj.motivo_detalle || '-'}
+                              </td>
+                              <td className="p-2.5 text-right text-stone-500 text-[11px]">
+                                {adj.created_at ? new Date(adj.created_at).toLocaleString('es-CL') : '-'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 text-stone-500 italic text-[11px]">
+                    No se registran salidas no comerciales ni ajustes manuales para este lote.
+                  </div>
+                )}
+              </div>
+
+              {/* 6. Notas de Producción */}
               {viewingBatch.notas && (
                 <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-1">
                   <span className="font-bold text-secondary-brown text-[11px] block">Notas de Producción / Sustituciones:</span>
@@ -2461,6 +2644,328 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
           </div>
         </div>
       )}
+
+      {/* Modal Editar Lote & Ajustar Stock */}
+      {editingBatch && (() => {
+        const editProd = products.find((p) => String(p.id) === String(editingBatch.producto_id));
+        const editUnitG = editProd ? (parseWeightGrams(editProd.weight) || 1000) : 1000;
+        const currAvailKg = Number(editingBatch.stock_disponible_gramos || 0) / 1000;
+        const currAvailUnits = editUnitG > 0 ? Math.floor(Number(editingBatch.stock_disponible_gramos || 0) / editUnitG) : 0;
+
+        const inputVal = parseFloat(adjustForm.amount) || 0;
+        const deltaGramsRaw = adjustForm.unitType === 'units'
+          ? Math.round(inputVal * editUnitG)
+          : Math.round(inputVal * 1000);
+        const deltaGrams = adjustForm.actionType === 'SALIDA' ? -deltaGramsRaw : deltaGramsRaw;
+        const newStockGrams = Math.max(0, Number(editingBatch.stock_disponible_gramos || 0) + deltaGrams);
+        const newStockKg = newStockGrams / 1000;
+        const newStockUnits = editUnitG > 0 ? Math.floor(newStockGrams / editUnitG) : 0;
+
+        // Costo del ajuste
+        const initKg = (editingBatch.stock_inicial_gramos || 1000) / 1000;
+        const batchCostTotal = Number(editingBatch.costo_total_batch_clp || 0);
+        const costPerKg = initKg > 0 ? Math.round(batchCostTotal / initKg) : 0;
+        const attributedCost = Math.round((Math.abs(deltaGrams) / 1000) * costPerKg);
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+            <div className="bg-white rounded-3xl w-full max-w-2xl my-6 relative flex flex-col max-h-[92vh] shadow-2xl border border-stone-200 animate-fadeIn">
+              {/* Header del Modal */}
+              <div className="p-5 border-b border-stone-200 flex justify-between items-center bg-stone-50/90 rounded-t-3xl">
+                <div className="flex items-center gap-3">
+                  <span className="p-2.5 bg-amber-100 text-amber-800 rounded-2xl shadow-2xs">
+                    <Edit3 size={20} />
+                  </span>
+                  <div>
+                    <h3 className="font-header text-lg font-extrabold text-secondary-brown flex items-center gap-2">
+                      Editar / Ajustar Lote: <span className="font-mono text-emerald-800">{editingBatch.codigo_lote}</span>
+                    </h3>
+                    <p className="text-xs text-stone-500">
+                      {editingBatch.producto_nombre} ({editingBatch.linea_produccion}) • Stock Actual: <strong className="text-stone-800 tabular-nums">{currAvailKg.toFixed(2)} kg</strong>
+                      {editUnitG !== 1000 && <span className="text-emerald-800 font-semibold"> ({currAvailUnits} bolsas de {editProd?.weight || `${editUnitG}g`})</span>}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingBatch(null)}
+                  className="text-stone-400 hover:text-stone-700 bg-white p-2 rounded-full border border-stone-200 shadow-2xs hover:bg-stone-100 transition cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Selector de Pestañas */}
+              <div className="flex border-b border-stone-200 bg-stone-100/60 px-5 pt-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAdjustTab('stock')}
+                  className={`pb-2.5 px-4 text-xs font-bold border-b-2 flex items-center gap-1.5 transition cursor-pointer ${
+                    adjustTab === 'stock'
+                      ? 'border-emerald-600 text-emerald-800 bg-white rounded-t-xl'
+                      : 'border-transparent text-stone-600 hover:text-stone-900'
+                  }`}
+                >
+                  <PackageMinus size={14} /> Salida de Stock / Ajuste Manual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdjustTab('params')}
+                  className={`pb-2.5 px-4 text-xs font-bold border-b-2 flex items-center gap-1.5 transition cursor-pointer ${
+                    adjustTab === 'params'
+                      ? 'border-emerald-600 text-emerald-800 bg-white rounded-t-xl'
+                      : 'border-transparent text-stone-600 hover:text-stone-900'
+                  }`}
+                >
+                  <Sliders size={14} /> Parámetros (Vencimiento / Notas)
+                </button>
+              </div>
+
+              {/* Formulario 1: Ajuste de Stock */}
+              {adjustTab === 'stock' && (
+                <form onSubmit={handleStockAdjustmentSubmit} className="p-6 space-y-4 overflow-y-auto">
+                  {/* Selector Salida vs Ingreso */}
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-stone-600 block mb-1.5">
+                      Acción sobre el Stock
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAdjustForm({ ...adjustForm, actionType: 'SALIDA' })}
+                        className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+                          adjustForm.actionType === 'SALIDA'
+                            ? 'bg-amber-50 border-amber-400 text-amber-900 shadow-xs'
+                            : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-50'
+                        }`}
+                      >
+                        <PackageMinus size={16} className="text-amber-700" />
+                        Salida de Stock (Descontar)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAdjustForm({ ...adjustForm, actionType: 'INGRESO', tipoMovimiento: 'CONTEO_FISICO' })}
+                        className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+                          adjustForm.actionType === 'INGRESO'
+                            ? 'bg-emerald-50 border-emerald-400 text-emerald-900 shadow-xs'
+                            : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-50'
+                        }`}
+                      >
+                        <Plus size={16} className="text-emerald-700" />
+                        Ingreso / Reingreso (Sumar)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Selector de Motivo */}
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-stone-600 block mb-1.5">
+                      Motivo de la Operación
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {[
+                        { id: 'AUTOCONSUMO', label: 'Autoconsumo', icon: Dog, desc: 'Perros propios / taller' },
+                        { id: 'MUESTRA_REGALO', label: 'Muestra / Regalo', icon: Gift, desc: 'Veterinarios o clientes' },
+                        { id: 'MERMA', label: 'Merma / Rotura', icon: AlertTriangle, desc: 'Bolsa rota o control' },
+                        { id: 'CONTEO_FISICO', label: 'Conteo Físico', icon: Scale, desc: 'Auditoría en congelador' },
+                      ].map((mot) => {
+                        const Icon = mot.icon;
+                        const isSelected = adjustForm.tipoMovimiento === mot.id;
+                        return (
+                          <button
+                            key={mot.id}
+                            type="button"
+                            onClick={() => setAdjustForm({ ...adjustForm, tipoMovimiento: mot.id })}
+                            className={`p-2.5 rounded-2xl border text-left transition cursor-pointer ${
+                              isSelected
+                                ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/30'
+                                : 'bg-white border-stone-200 hover:bg-stone-50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <Icon size={14} className={isSelected ? 'text-emerald-700' : 'text-stone-500'} />
+                              <strong className={`text-xs ${isSelected ? 'text-emerald-900' : 'text-stone-800'}`}>
+                                {mot.label}
+                              </strong>
+                            </div>
+                            <span className="text-[10px] text-stone-500 block leading-tight">
+                              {mot.desc}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Cantidad y Unidad */}
+                  <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="text-xs font-semibold text-stone-700">Cantidad a {adjustForm.actionType === 'SALIDA' ? 'Descontar' : 'Agregar'}</label>
+                          {editUnitG !== 1000 && (
+                            <div className="space-x-1">
+                              <button
+                                type="button"
+                                onClick={() => setAdjustForm({ ...adjustForm, unitType: 'units' })}
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-md cursor-pointer transition ${
+                                  adjustForm.unitType === 'units' ? 'bg-emerald-600 text-white' : 'bg-stone-200 text-stone-700'
+                                }`}
+                              >
+                                Bolsas ({editProd?.weight || `${editUnitG}g`})
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setAdjustForm({ ...adjustForm, unitType: 'kg' })}
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-md cursor-pointer transition ${
+                                  adjustForm.unitType === 'kg' ? 'bg-emerald-600 text-white' : 'bg-stone-200 text-stone-700'
+                                }`}
+                              >
+                                Kilos (Kg)
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <input
+                          type="number"
+                          step={adjustForm.unitType === 'units' ? '1' : '0.1'}
+                          min="0.1"
+                          placeholder={adjustForm.unitType === 'units' ? 'Ej. 2' : 'Ej. 1.0'}
+                          value={adjustForm.amount}
+                          onChange={(e) => setAdjustForm({ ...adjustForm, amount: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white text-stone-900 font-bold tabular-nums"
+                          required
+                          autoFocus
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold text-stone-700 block mb-1">Detalle / Destino (Opcional)</label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Para Momo y Reina / Dr. Pérez"
+                          value={adjustForm.motivoDetalle}
+                          onChange={(e) => setAdjustForm({ ...adjustForm, motivoDetalle: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white text-stone-800"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Impacto en Vivo */}
+                  {inputVal > 0 && (
+                    <div className="p-3.5 bg-amber-50/80 border border-amber-300 rounded-2xl space-y-1.5 text-xs animate-fadeIn">
+                      <div className="flex justify-between items-center text-stone-700">
+                        <span>Stock Disponible Inicial:</span>
+                        <strong className="font-mono">{currAvailKg.toFixed(2)} kg {editUnitG !== 1000 ? `(${currAvailUnits} bolsas)` : ''}</strong>
+                      </div>
+                      <div className="flex justify-between items-center text-amber-900 font-bold">
+                        <span>{adjustForm.actionType === 'SALIDA' ? 'Descuento a Aplicar:' : 'Aumento a Aplicar:'}</span>
+                        <strong className="font-mono">
+                          {adjustForm.actionType === 'SALIDA' ? '-' : '+'}{(Math.abs(deltaGrams) / 1000).toFixed(2)} kg
+                          {editUnitG !== 1000 ? ` (${Math.abs(deltaGrams / editUnitG).toFixed(0)} bolsas)` : ''}
+                        </strong>
+                      </div>
+                      <div className="flex justify-between items-center text-emerald-950 font-extrabold pt-1 border-t border-amber-200">
+                        <span>Nuevo Stock Disponible:</span>
+                        <span className="font-mono text-sm text-emerald-800">
+                          {newStockKg.toFixed(2)} kg {editUnitG !== 1000 ? `(${newStockUnits} bolsas)` : ''}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-stone-600 pt-1 border-t border-amber-200/60 text-[11px]">
+                        <span>Costo Atribuido al Ajuste:</span>
+                        <strong className="font-mono text-stone-800">${attributedCost.toLocaleString('es-CL')} CLP</strong>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Botones de Acción */}
+                  <div className="pt-2 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingBatch(null)}
+                      className="px-4 py-2 rounded-xl border border-stone-300 text-stone-600 hover:bg-stone-50 text-xs font-bold transition cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={adjustSubmitting || inputVal <= 0}
+                      className="bg-primary-green hover:bg-emerald-700 text-white font-bold px-5 py-2 rounded-xl text-xs transition shadow-2xs cursor-pointer active:scale-95 disabled:opacity-50"
+                    >
+                      {adjustSubmitting ? 'Guardando Ajuste...' : 'Confirmar Ajuste de Stock'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Formulario 2: Parámetros del Lote */}
+              {adjustTab === 'params' && (
+                <form onSubmit={handleBatchParamsSubmit} className="p-6 space-y-4 overflow-y-auto">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-stone-700 block mb-1">
+                        Fecha Consumo Preferente (Vencimiento)
+                      </label>
+                      <input
+                        type="date"
+                        value={adjustForm.fechaConsumoPreferente}
+                        onChange={(e) => setAdjustForm({ ...adjustForm, fechaConsumoPreferente: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white text-stone-800 tabular-nums"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-stone-700 block mb-1">
+                        Estado del Lote
+                      </label>
+                      <select
+                        value={adjustForm.estado}
+                        onChange={(e) => setAdjustForm({ ...adjustForm, estado: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white text-stone-800"
+                      >
+                        <option value="ACTIVO">ACTIVO (Permite ventas y deducción)</option>
+                        <option value="AGOTADO">AGOTADO (Bloquea ventas)</option>
+                        <option value="CERRADO">CERRADO (Lote finalizado)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-stone-700 block mb-1">
+                      Notas de Producción / Sustituciones
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={adjustForm.notas}
+                      onChange={(e) => setAdjustForm({ ...adjustForm, notas: e.target.value })}
+                      placeholder="Observaciones de cocción, desuñado o comentarios de control de calidad..."
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white text-stone-800"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingBatch(null)}
+                      className="px-4 py-2 rounded-xl border border-stone-300 text-stone-600 hover:bg-stone-50 text-xs font-bold transition cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={adjustSubmitting}
+                      className="bg-primary-green hover:bg-emerald-700 text-white font-bold px-5 py-2 rounded-xl text-xs transition shadow-2xs cursor-pointer active:scale-95 disabled:opacity-50"
+                    >
+                      {adjustSubmitting ? 'Guardando...' : 'Guardar Parámetros'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal Etiqueta Dinámica del Lote */}
       <ProductLabelGenerator

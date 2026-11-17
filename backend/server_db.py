@@ -524,6 +524,22 @@ def init_database():
                 );
             """)
 
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS batch_ajustes_stock (
+                    id SERIAL PRIMARY KEY,
+                    batch_id INTEGER NOT NULL REFERENCES batch_produccion(id) ON DELETE CASCADE,
+                    tipo_movimiento VARCHAR(40) NOT NULL,
+                    cantidad_gramos INTEGER NOT NULL,
+                    unidades_equivalentes NUMERIC(10,2) DEFAULT 0,
+                    costo_unitario_kg_clp INTEGER NOT NULL DEFAULT 0,
+                    costo_total_ajuste_clp INTEGER NOT NULL DEFAULT 0,
+                    motivo_detalle TEXT,
+                    usuario TEXT DEFAULT 'admin',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_batch_ajustes_batch ON batch_ajustes_stock(batch_id);
+            """)
+
             # Cargar datos semilla si la base de datos es nueva
             cursor.execute("SELECT COUNT(*) FROM products")
             if cursor.fetchone()['count'] == 0:
