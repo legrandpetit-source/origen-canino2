@@ -89,3 +89,39 @@
    - **Liberación inmediata de ~700 MB a 1 GB de RAM física**, dejando el servidor con más del 50% de memoria libre.
    - **Eliminación definitiva del problema de compilaciones gigantes en disco.**
    - **Arquitectura 100% homogénea:** Todo el servidor (TimbrApp + Origen Canino + PPV Soluciones) quedará administrado bajo la misma lógica limpia de Docker Compose nativo.
+
+
+---
+
+## 3. 🛡️ Implementación de Regla de Frescura, Bloqueo de Stock FIFO y Nuevas Líneas de Producción (Commit `fc3c271`)
+
+### 3.1. Estado de Stock y Regla de Disponibilidad en Catálogo:
+- **Diagnóstico:** Los productos sin lotes registrados en `batch_produccion` (`Dieta Cocinada Cerdo`, `Caldo de Huesos`, `Calugas Articulares` y `Patitas de Pollo Deshidratadas`) permitían la compra abierta porque `hasBatchControl` evaluaba en falso.
+- **Solución Implementada en `src/components/shop/ProductCard.jsx`:**
+  - Se modificó la regla a: `isSoldOut = liveGrams < unitGrams`.
+  - Todo producto sin lote semanal activo con saldo suficiente para al menos 1 unidad pasa automáticamente a estado **"Lote semanal agotado por frescura"**.
+  - Se desactiva el botón de compra `[+ Agregar]` y se activa el botón interactivo **`[🔔 Avísame próximo lote]`** que registra el WhatsApp del cliente en lista de espera de preventa.
+  - **Dieta BARF Cruda:** Mantiene stock activo con 99 kg disponibles (post-deducción FIFO de 21 kg de pedidos #5 y #9).
+
+### 3.2. Blindaje de Integridad en Backend (`backend/batch_service.py`):
+- Se actualizó `validate_cart_stock(cursor, items)`: Si un producto no tiene lote activo o `available <= 0`, rechaza la transacción con `ValueError: '[Producto]' no cuenta con lote semanal activo en este momento por frescura. Pronto tendremos nuevo lote disponible.`.
+- Verificado en producción con pruebas automatizadas en contenedor Hetzner:
+  - Intento de compra Cerdo (0 stock) $\rightarrow$ Bloqueado exitosamente.
+  - Compra 10 kg BARF (99 kg stock) $\rightarrow$ Aprobado exitosamente.
+  - Compra 150 kg BARF (99 kg stock) $\rightarrow$ Bloqueado por sobrestock exitosamente.
+
+### 3.3. Nuevas Líneas de Producción y Costos Indirectos Dinámicos (`BatchProductionManager.jsx`):
+- **Líneas Habilitadas en Selector:**
+  1. `BARF (180 días)`
+  2. `COCINADA (120 días)`
+  3. `SNACK DESHIDRATADO (180 días)`
+  4. `CALDO DE HUESOS (180 días congelado)`
+  5. `SUPLEMENTO ARTICULAR (180 días congelado)`
+- **Auto-detección inteligente:** Al elegir el menú en el formulario de lote, el sistema preselecciona automáticamente la línea correspondiente.
+- **Costos Indirectos Adaptativos por Línea:**
+  - *Snack:* Destaca `Luz (Deshidratador 24h)` y `Mano de Obra (Desuñado manual)`.
+  - *Caldo:* Destaca `Gas (24h fuego corona)` y `Frascos y Tapas`.
+  - *Suplemento:* Destaca `Mano de Obra (Gelificación)` y `Moldes y Bolsas`.
+
+### 3.4. Decisión Comercial de Pedido Mínimo:
+- **Confirmado Opción A:** Se mantiene el pedido mínimo universal de **$30.000 CLP** para proteger la rentabilidad y viabilidad del despacho en frío en Santiago.
