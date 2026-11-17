@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useCart } from '../../context/CartContext';
+import { useCart, parseWeightGrams } from '../../context/CartContext';
 import { useCustomer } from '../../context/CustomerContext';
 import { X, Plus, Minus, Trash2, Info, RefreshCw, CheckCircle2, Sparkles, Gift } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,7 +8,8 @@ import CheckoutModal from './CheckoutModal';
 const CartDrawer = () => {
   const { 
     items, isCartOpen, setIsCartOpen, updateQuantity, removeItem, total, addItem,
-    firstOrderPromo, firstOrderDiscount, isFirstPurchaseEligible, nfcDiscount, nfcCommunity
+    firstOrderPromo, firstOrderDiscount, isFirstPurchaseEligible, nfcDiscount, nfcCommunity,
+    catalogStock, refreshCatalogStock
   } = useCart();
   const { customer, openAuthModal } = useCustomer();
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -17,16 +18,29 @@ const CartDrawer = () => {
   const [suggestedProducts, setSuggestedProducts] = useState([]);
 
   React.useEffect(() => {
-    if (isCartOpen && suggestedProducts.length === 0) {
+    if (isCartOpen) {
+      if (refreshCatalogStock) refreshCatalogStock();
       fetch('/api/products')
         .then(res => { if (!res.ok) throw new Error("HTTP error " + res.status); return res.json(); })
         .then(data => setSuggestedProducts(data))
         .catch(err => console.error(err));
     }
-  }, [isCartOpen, suggestedProducts.length]);
+  }, [isCartOpen]);
 
   const productsToSuggest = suggestedProducts
-    .filter(p => !items.some(i => i.id === p.id) && !p.name.toLowerCase().includes("pack inicial"))
+    .filter(p => {
+      // 1. Excluir si ya está en el carrito
+      if (items.some(i => i.id === p.id)) return false;
+      // 2. Excluir pack inicial
+      if (p.name.toLowerCase().includes("pack inicial")) return false;
+      // 3. Excluir productos que no tengan lote activo con stock para al menos 1 unidad
+      const unitG = parseWeightGrams(p.weight) || 1000;
+      const liveG = (catalogStock && catalogStock[p.id]?.stock_disponible_gramos != null)
+        ? catalogStock[p.id].stock_disponible_gramos
+        : (p.stock_disponible_gramos ?? 0);
+      const maxAvailable = Math.floor(liveG / unitG);
+      return maxAvailable > 0;
+    })
     .slice(0, 3);
 
   // Helper para convertir peso a kilos numéricos
@@ -52,6 +66,15 @@ const CartDrawer = () => {
   const isMinMet = total >= MIN_PURCHASE;
   const missingForMin = Math.max(0, MIN_PURCHASE - total);
 
+  // Detección de productos en el carrito cuyo lote no cuente con stock
+  const hasZeroStockItem = items.some(item => {
+    const unitG = parseWeightGrams(item.weight) || 1000;
+    const liveG = (catalogStock && catalogStock[item.id]?.stock_disponible_gramos != null)
+      ? catalogStock[item.id].stock_disponible_gramos
+      : (item.stock_disponible_gramos ?? 0);
+    return Math.floor(liveG / unitG) <= 0;
+  });
+
   React.useEffect(() => {
     if (totalKilos < 10 && isSubscription) {
       setIsSubscription(false);
@@ -59,7 +82,7 @@ const CartDrawer = () => {
   }, [totalKilos, isSubscription]);
 
   const handleCheckout = () => {
-    if (items.length === 0 || !isMinMet) return;
+    if (items.length === 0 || !isMinMet || hasZeroStockItem) return;
     setIsCheckoutOpen(true);
     setIsCartOpen(false);
   };
@@ -103,30 +126,78 @@ const CartDrawer = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {items.map(item => (
-                    <div key={item.id} className="flex gap-4 border-b pb-4">
-                      <div className="flex-1">
-                        <h4 className="font-bold text-gray-800">{item.name}</h4>
-                        <p className="text-gray-500 text-sm">
-                          ${item.price.toLocaleString('es-CL')} {item.weight ? `/ ${item.weight}` : ''}
-                        </p>
-                        
-                        <div className="flex items-center gap-3 mt-3">
-                          <div className="flex items-center border rounded-lg">
-                            <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="p-1 hover:bg-gray-100 rounded-l-lg"><Minus size={16} /></button>
-                            <span className="px-3 font-semibold">{item.quantity}</span>
-                            <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="p-1 hover:bg-gray-100 rounded-r-lg"><Plus size={16} /></button>
+                  {items.map(item => {
+                    const unitG = parseWeightGrams(item.weight) || 1000;
+                    const liveG = (catalogStock && catalogStock[item.id]?.stock_disponible_gramos != null)
+                      ? catalogStock[item.id].stock_disponible_gramos
+                      : (item.stock_disponible_gramos ?? 0);
+                    const maxQty = Math.floor(liveG / unitG);
+                    const isMaxReached = maxQty > 0 && item.quantity >= maxQty;
+                    const isZeroStock = maxQty <= 0;
+
+                    return (
+                      <div key={item.id} className="flex gap-4 border-b pb-4">
+                        <div className="flex-1">
+                          <h4 className="font-bold text-gray-800">{item.name}</h4>
+                          <p className="text-gray-500 text-sm">
+                            ${item.price.toLocaleString('es-CL')} {item.weight ? `/ ${item.weight}` : ''}
+                          </p>
+
+                          {isZeroStock && (
+                            <span className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full inline-block mt-1">
+                              ⚠️ Lote semanal agotado
+                            </span>
+                          )}
+
+                          {isMaxReached && !isZeroStock && (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full inline-block mt-1">
+                              Máximo stock disponible ({maxQty} {unitG < 1000 ? 'bolsas' : 'kg'})
+                            </span>
+                          )}
+                          
+                          <div className="flex items-center gap-3 mt-3">
+                            <div className="flex items-center border rounded-lg bg-white shadow-2xs">
+                              <button 
+                                onClick={() => updateQuantity(item.id, item.quantity - 1)} 
+                                className="p-1 hover:bg-gray-100 rounded-l-lg transition"
+                                title="Disminuir"
+                              >
+                                <Minus size={16} />
+                              </button>
+                              <span className="px-3 font-semibold text-sm">{item.quantity}</span>
+                              <button 
+                                onClick={() => updateQuantity(item.id, item.quantity + 1)} 
+                                disabled={isMaxReached || isZeroStock}
+                                className={`p-1 rounded-r-lg transition ${
+                                  (isMaxReached || isZeroStock)
+                                    ? 'opacity-30 cursor-not-allowed bg-gray-100 text-gray-400' 
+                                    : 'hover:bg-gray-100 text-gray-700'
+                                }`}
+                                title={isZeroStock ? "Lote agotado" : isMaxReached ? `Máximo stock del lote alcanzado (${maxQty})` : "Aumentar cantidad"}
+                              >
+                                <Plus size={16} />
+                              </button>
+                            </div>
+                            <button 
+                              onClick={() => removeItem(item.id)} 
+                              className="text-red-500 hover:bg-red-50 p-1.5 rounded transition"
+                              title="Eliminar del pedido"
+                            >
+                              <Trash2 size={16} />
+                            </button>
                           </div>
-                          <button onClick={() => removeItem(item.id)} className="text-red-500 hover:bg-red-50 p-1 rounded">
-                            <Trash2 size={18} />
-                          </button>
+                        </div>
+                        <div className="font-bold text-right">
+                          <div className="text-gray-900">${(item.price * item.quantity).toLocaleString('es-CL')}</div>
+                          {unitG < 1000 && (
+                            <div className="text-[11px] text-gray-400 font-normal">
+                              ({(unitG * item.quantity / 1000).toFixed(1)} kg)
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <div className="font-bold">
-                        ${(item.price * item.quantity).toLocaleString('es-CL')}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {productsToSuggest.length > 0 && (
                     <div className="mt-8 pt-6 border-t">
@@ -282,14 +353,16 @@ const CartDrawer = () => {
 
                 <button 
                   onClick={handleCheckout}
-                  disabled={!isMinMet}
+                  disabled={!isMinMet || hasZeroStockItem}
                   className={`w-full font-bold py-3.5 rounded-xl transition shadow-md flex items-center justify-center gap-2 font-body text-base ${
-                    isMinMet 
+                    isMinMet && !hasZeroStockItem
                       ? 'bg-secondary-orange text-white hover:bg-[#d65d21] shadow-md hover:shadow-lg cursor-pointer' 
                       : 'bg-stone-200 text-stone-500 cursor-not-allowed opacity-80'
                   }`}
                 >
-                  {isMinMet ? (
+                  {hasZeroStockItem ? (
+                    'Elimina productos agotados para continuar'
+                  ) : isMinMet ? (
                     'Ir al Pago'
                   ) : (
                     `Mínimo $30.000 (Faltan $${missingForMin.toLocaleString('es-CL')})`

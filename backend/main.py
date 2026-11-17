@@ -1516,7 +1516,10 @@ def get_products():
         
         products = []
         for row in rows:
-            s_info = stock_map.get(int(row["id"]), {"has_batches": False, "stock_disponible_gramos": None})
+            s_info = stock_map.get(int(row["id"]), {"has_batches": False, "stock_disponible_gramos": 0})
+            live_grams = s_info.get("stock_disponible_gramos")
+            if live_grams is None:
+                live_grams = 0
             products.append(ProductResponse(
                 id=row["id"],
                 name=row["name"],
@@ -1529,8 +1532,8 @@ def get_products():
                 image=row["image"],
                 isNew=bool(row["is_new"]),
                 fixed_cost=row.get("fixed_cost", 0),
-                stock_disponible_gramos=s_info["stock_disponible_gramos"],
-                has_batches=s_info["has_batches"]
+                stock_disponible_gramos=int(live_grams),
+                has_batches=bool(s_info.get("has_batches") and int(live_grams) > 0)
             ))
         return products
 

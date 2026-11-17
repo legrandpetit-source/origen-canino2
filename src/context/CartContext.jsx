@@ -34,7 +34,36 @@ export const CartProvider = ({ children }) => {
     return localStorage.getItem('origencanino_has_purchased') === 'true';
   });
 
+  // Catálogo de stock vivo para validación centralizada
+  const [catalogStock, setCatalogStock] = useState({});
+
+  const refreshCatalogStock = () => {
+    fetch('/api/products')
+      .then(res => {
+        if (!res.ok) throw new Error("HTTP error " + res.status);
+        return res.json();
+      })
+      .then(data => {
+        if (Array.isArray(data)) {
+          const map = {};
+          data.forEach(p => {
+            map[p.id] = {
+              id: p.id,
+              name: p.name,
+              weight: p.weight,
+              price: p.price,
+              stock_disponible_gramos: p.stock_disponible_gramos ?? 0,
+              has_batches: !!p.has_batches
+            };
+          });
+          setCatalogStock(map);
+        }
+      })
+      .catch(err => console.error("Error refreshing catalog stock in CartContext:", err));
+  };
+
   useEffect(() => {
+    refreshCatalogStock();
     fetch('/api/promotions/first-order')
       .then(res => res.json())
       .then(data => {
@@ -84,22 +113,42 @@ export const CartProvider = ({ children }) => {
   };
 
   const addItem = (product, quantity = 1) => {
+    // Info de stock fresca: buscar en catalogStock centralizado o en product
+    const stockInfo = catalogStock[product.id] || product;
+    const availG = (stockInfo.stock_disponible_gramos != null)
+      ? stockInfo.stock_disponible_gramos
+      : (product.stock_disponible_gramos ?? 0);
+    const unitG = parseWeightGrams(product.weight || stockInfo.weight) || 1000;
+    const maxQty = Math.floor(availG / unitG);
+
+    // Si el producto no tiene lote activo con stock para al menos 1 unidad, bloqueo absoluto
+    if (maxQty <= 0) {
+      console.warn(`[Cart] ${product.name} no cuenta con lote semanal activo con stock suficiente (${availG}g / ${unitG}g). Bloqueado.`);
+      return false;
+    }
+
+    let addedSuccessfully = true;
     setItems(current => {
       const existing = current.find(item => item.id === product.id);
-      const nextQty = (existing ? existing.quantity : 0) + quantity;
-      if (product.has_batches && product.stock_disponible_gramos != null) {
-        const unitG = parseWeightGrams(product.weight);
-        const maxQty = Math.floor(product.stock_disponible_gramos / unitG);
-        if (nextQty > maxQty) return current;
+      const currentQty = existing ? existing.quantity : 0;
+      if (currentQty >= maxQty) {
+        addedSuccessfully = false;
+        return current;
       }
+      const targetQty = currentQty + quantity;
+      const nextQty = Math.min(targetQty, maxQty);
+
       if (existing) {
         return current.map(item => 
-          item.id === product.id ? { ...item, quantity: nextQty } : item
+          item.id === product.id 
+            ? { ...item, quantity: nextQty, stock_disponible_gramos: availG, maxQty } 
+            : item
         );
       }
-      return [...current, { ...product, quantity }];
+      return [...current, { ...product, quantity: nextQty, stock_disponible_gramos: availG, maxQty }];
     });
     setIsCartOpen(true);
+    return addedSuccessfully;
   };
 
   const removeItem = (productId) => {
@@ -110,12 +159,18 @@ export const CartProvider = ({ children }) => {
     if (newQuantity <= 0) return removeItem(productId);
     setItems(current => current.map(item => {
       if (item.id !== productId) return item;
-      if (item.has_batches && item.stock_disponible_gramos != null) {
-        const unitG = parseWeightGrams(item.weight);
-        const maxQty = Math.floor(item.stock_disponible_gramos / unitG);
-        if (newQuantity > maxQty) return { ...item, quantity: Math.max(1, maxQty) };
+      const stockInfo = catalogStock[productId] || item;
+      const availG = (stockInfo.stock_disponible_gramos != null)
+        ? stockInfo.stock_disponible_gramos
+        : (item.stock_disponible_gramos ?? 0);
+      const unitG = parseWeightGrams(item.weight || stockInfo.weight) || 1000;
+      const maxQty = Math.floor(availG / unitG);
+
+      if (maxQty <= 0) {
+        return { ...item, maxQty: 0, stock_disponible_gramos: 0 };
       }
-      return { ...item, quantity: newQuantity };
+      const cappedQty = Math.min(newQuantity, maxQty);
+      return { ...item, quantity: cappedQty, maxQty, stock_disponible_gramos: availG };
     }));
   };
 
@@ -149,7 +204,8 @@ export const CartProvider = ({ children }) => {
       isCartOpen, setIsCartOpen, dogData, setDogData,
       nfcCommunity, setNfcCommunity, clearNfcCommunity, nfcDiscount,
       firstOrderPromo, firstOrderDiscount, isFirstPurchaseEligible, markAsPurchased,
-      directLinkToken, setDirectLinkToken, loadAssistedCart
+      directLinkToken, setDirectLinkToken, loadAssistedCart,
+      catalogStock, refreshCatalogStock
     }}>
       {children}
     </CartContext.Provider>
