@@ -1,0 +1,32 @@
+services:
+  origen-canino-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: origen-canino-app
+    restart: unless-stopped
+    expose:
+      - "8000"
+    volumes:
+      - ./backend:/app/backend
+      - ./dist:/app/dist
+      - ./uploads:/app/backend/uploads
+      - ./uploads:/app/uploads
+    environment:
+      - PORT=8000
+      - HOST=0.0.0.0
+    env_file:
+      - ./backend/.env
+    networks:
+      - coolify
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.origencanino.entrypoints=http,https"
+      - "traefik.http.routers.origencanino.rule=Host(`origencanino.cl`) || Host(`www.origencanino.cl`)"
+      - "traefik.http.routers.origencanino.tls=true"
+      - "traefik.http.routers.origencanino.tls.certresolver=letsencrypt"
+      - "traefik.http.services.origencanino.loadbalancer.server.port=8000"
+
+networks:
+  coolify:
+    external: true
