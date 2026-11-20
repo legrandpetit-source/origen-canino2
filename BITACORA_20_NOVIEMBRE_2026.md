@@ -66,3 +66,28 @@ En la producción del primer batch de 99 kg, el zapallo camote fue cocido conjun
 2. **Abatimiento Forzado Inmediato:** Una vez finalizada la cocción, no debe dejarse reposar a temperatura ambiente por más de 45 minutos. Debe ingresar a túnel de abatimiento o cámara de congelación a -18°C de forma inmediata.
 3. **Alerta en Sistema:** Se integró un banner preventivo permanente en el módulo de lotes semanales para alertar al personal de cocina ante cualquier preparación que involucre zapallo camote o vegetales fermentables.
 
+---
+
+## 5. COMPARATIVA DE MÁRGENES Y OPTIMIZACIÓN FINANCIERA (META 60%)
+
+### Requerimiento Operativo (Patricio Padilla):
+Eliminar la fricción de tener que abrir y cerrar modales individuales de lote para saber cuánto se gana en cada producto/lote. Implementar una vista comparativa transparente de rentabilidad y delta de ganancia por lote, con foco en alcanzar un **margen óptimo del 60.0%**.
+
+### Solución Implementada en Producción:
+1. **Columnas Directas en Tabla FIFO Principal:**
+   - La tabla de lotes semanales ahora expone directamente:
+     - `Costo Real / kg`
+     - `PVP Menú`
+     - `Margen (%)` con semáforo inteligente y badge `🎯` para lotes en meta óptima (≥60%).
+     - `Ganancia Lote (CLP)` proyectada.
+   - **Resultado:** Cero clics necesarios para comparar la rentabilidad de todos los lotes activos.
+
+2. **Nuevo Módulo "Comparativa de Márgenes (Meta 60%)":**
+   - **Selector de Meta:** Permite conmutar dinámicamente entre 50%, 55%, 60% (ideal) y 65%.
+   - **KPIs Globales:** Margen promedio ponderado, ganancia líquida acumulada en stock, conteo de lotes en meta y potencial de ganancia extra capturable.
+   - **Matriz de Brecha por Lote:** Muestra para cada lote el costo máximo permitido para el 60% (`PVP × 0.40`), el delta en CLP/kg que se debe optimizar, y el dinero extra que ingresa si se logra la meta.
+   - **Guía de Palancas en Cocina:**
+     - *Efecto Escala:* Demostración cuantitativa de que diluir los $50.000 de costos indirectos en batches de 50 kg ($1.000/kg) o 99 kg ($505/kg) eleva el margen del 40% al 54% - 60% sin cambiar materias primas.
+     - *Rateo de Materias Primas:* Estrategia de negociación y compra mayorista sobre las proteínas magras (75% del costo de insumos).
+
+
