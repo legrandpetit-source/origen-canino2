@@ -130,7 +130,13 @@ def create_batch_router(get_current_admin) -> APIRouter:
             adjustments_by_batch: Dict[int, List[Dict[str, Any]]] = {}
             if batch_ids:
                 cursor.execute(
-                    "SELECT * FROM batch_ingredientes WHERE batch_id = ANY(%s) ORDER BY porcentaje_formula DESC, id ASC",
+                    """
+                    SELECT bi.*, COALESCE(i.unit, 'kg') AS unit
+                    FROM batch_ingredientes bi
+                    LEFT JOIN ingredients i ON bi.ingrediente_id = i.id
+                    WHERE bi.batch_id = ANY(%s)
+                    ORDER BY bi.porcentaje_formula DESC, bi.id ASC
+                    """,
                     (batch_ids,),
                 )
                 for ing in cursor.fetchall():
@@ -595,7 +601,13 @@ def create_batch_router(get_current_admin) -> APIRouter:
             if not batch:
                 raise HTTPException(status_code=404, detail="Lote no encontrado.")
             cursor.execute(
-                "SELECT nombre_ingrediente, cantidad_gramos, porcentaje_formula FROM batch_ingredientes WHERE batch_id = %s ORDER BY porcentaje_formula DESC",
+                """
+                SELECT bi.nombre_ingrediente, bi.cantidad_gramos, bi.porcentaje_formula, bi.costo_unitario_clp, COALESCE(i.unit, 'kg') AS unit
+                FROM batch_ingredientes bi
+                LEFT JOIN ingredients i ON bi.ingrediente_id = i.id
+                WHERE bi.batch_id = %s
+                ORDER BY bi.porcentaje_formula DESC
+                """,
                 (batch_id,),
             )
             ings = [dict(r) for r in cursor.fetchall()]

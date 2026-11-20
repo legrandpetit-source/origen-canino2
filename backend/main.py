@@ -1555,6 +1555,15 @@ def create_product(p: ProductCreate, current_user: str = Depends(get_current_adm
                 int(p.isNew), p.image, p.fixed_cost
             ))
             new_id = cursor.fetchone()["id"]
+            
+            # Registrar precio inicial en historial
+            cursor.execute("""
+                INSERT INTO product_price_history (
+                    product_id, product_name, price, previous_price, changed_by, notes
+                )
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (new_id, p.name, int(p.price), None, current_user, "Precio inicial de catálogo"))
+
             conn.commit()
             return {"success": True, "id": new_id, "message": "Producto creado exitosamente."}
     except Exception as e:
@@ -1565,16 +1574,59 @@ def create_product(p: ProductCreate, current_user: str = Depends(get_current_adm
 def update_product(product_id: int, p: ProductUpdate, current_user: str = Depends(get_current_admin)):
     try:
         with get_connection() as conn:
-            conn.cursor().execute("""
+            cursor = conn.cursor()
+            cursor.execute("SELECT price, name FROM products WHERE id = %s", (product_id,))
+            current_row = cursor.fetchone()
+            current_price = int(current_row["price"]) if current_row and current_row.get("price") is not None else None
+            prod_name = current_row["name"] if current_row else p.name
+
+            cursor.execute("""
                 UPDATE products 
                 SET name = %s, type = COALESCE(%s, type), price = %s, weight = %s, description = %s, ingredients = %s, benefits = %s, is_new = %s, image = %s, fixed_cost = %s
                 WHERE id = %s
             """, (p.name, p.type, p.price, p.weight, p.description, json.dumps(p.ingredients), json.dumps(p.benefits), int(p.isNew), p.image, p.fixed_cost, product_id))
+
+            # Si el PVP del producto cambió, registrar trazabilidad en product_price_history
+            if current_price is not None and int(p.price) != current_price:
+                cursor.execute("""
+                    INSERT INTO product_price_history (
+                        product_id, product_name, price, previous_price, changed_by, notes
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (
+                    product_id,
+                    p.name or prod_name,
+                    int(p.price),
+                    current_price,
+                    current_user,
+                    f"Ajuste de precio catálogo: ${current_price:,} -> ${int(p.price):,} CLP (Margen / Costos)"
+                ))
+
             conn.commit()
         return {"success": True}
     except Exception as e:
         print(f"Error updating product: {e}")
         raise HTTPException(status_code=500, detail="Error actualizando el producto.")
+
+@app.get("/api/admin/products/history")
+def get_product_price_history(product_id: Optional[int] = None, current_user: str = Depends(get_current_admin)):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        query = "SELECT * FROM product_price_history WHERE 1=1"
+        params = []
+        if product_id:
+            query += " AND product_id = %s"
+            params.append(product_id)
+        query += " ORDER BY created_at DESC LIMIT 100"
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+        result = []
+        for r in rows:
+            row_dict = dict(r)
+            if hasattr(row_dict.get("created_at"), 'isoformat'):
+                row_dict["created_at"] = row_dict["created_at"].isoformat()
+            result.append(row_dict)
+        return result
 
 @app.post("/api/admin/products/upload-image")
 async def upload_product_image(file: UploadFile = File(...), current_user: str = Depends(get_current_admin)):

@@ -408,6 +408,21 @@ def init_database():
                 );
             """)
 
+            # 21. Tabla de Historial de Precios de Productos (PVP Catálogo)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS product_price_history (
+                    id SERIAL PRIMARY KEY,
+                    product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+                    product_name TEXT NOT NULL,
+                    price INTEGER NOT NULL,
+                    previous_price INTEGER,
+                    changed_by TEXT,
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_product_price_history_product_id ON product_price_history(product_id);
+            """)
+
             # Migraciones Blog SEO enriquecido
             cursor.execute("""
                 ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS meta_title TEXT;

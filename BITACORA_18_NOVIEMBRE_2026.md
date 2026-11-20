@@ -49,3 +49,4 @@ En la ventana de mantenimiento nocturna acordada (00:08 - 00:15 AM), sin presenc
 - `https://origencanino.cl` -> **HTTP 200 OK**
 - `https://origencanino.cl/api/products` -> **HTTP 200 OK**
 - `https://origencanino.cl/admin` -> **HTTP 200 OK**
+

@@ -133,9 +133,13 @@ def compute_batch_nutrition_and_cost(
         if pct <= 0 and total_grams > 0:
             pct = round((qty_g / total_grams) * 100.0, 2)
         unit_cost = int(item.get("costo_unitario_clp") if item.get("costo_unitario_clp") is not None else db_ing.get("cost_per_unit", 0))
-        unit = str(db_ing.get("unit") or "kg").lower()
-        if unit in ("kg", "litro", "l"):
+        unit = str(db_ing.get("unit") or item.get("unit") or "kg").lower().strip()
+        if unit in ("kg", "litro", "l", "lt"):
             ingredients_cost_clp += (qty_g / 1000.0) * unit_cost
+        elif unit in ("unidad", "u", "un", "unidades"):
+            ingredients_cost_clp += (qty_g / 1000.0) * unit_cost
+        elif unit in ("g", "ml"):
+            ingredients_cost_clp += (qty_g / 1000.0) * unit_cost if unit_cost > 100 else qty_g * unit_cost
         else:
             ingredients_cost_clp += (qty_g / 1000.0) * unit_cost
 

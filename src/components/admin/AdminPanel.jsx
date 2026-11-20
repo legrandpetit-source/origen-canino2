@@ -4,7 +4,7 @@ import {
   MessageSquareHeart, Check, XCircle, LogOut, Key, ChefHat, BarChart, 
   Building2, CreditCard, Calculator, Send, Gift, UploadCloud, Upload,
   Image as ImageIcon, Loader2, Sparkles, CheckCircle2, ExternalLink, Menu,
-  Stethoscope, Video, FileText, CheckCheck, ChevronLeft, ChevronRight
+  Stethoscope, Video, FileText, CheckCheck, ChevronLeft, ChevronRight, History
 } from 'lucide-react';
 import AdminLogin from './AdminLogin';
 import IngredientsManager from './IngredientsManager';
@@ -128,6 +128,28 @@ const AdminPanel = () => {
   const [editingTestimonial, setEditingTestimonial] = useState(null);
   const [uploadingTestimonialPhoto, setUploadingTestimonialPhoto] = useState(false);
   const testimonialFileInputRef = useRef(null);
+
+  // Estados Historial de Precios de Productos (PVP)
+  const [productHistoryModal, setProductHistoryModal] = useState(null);
+  const [productPriceHistory, setProductPriceHistory] = useState([]);
+  const [loadingProductHistory, setLoadingProductHistory] = useState(false);
+
+  const openProductPriceHistory = async (product) => {
+    setProductHistoryModal(product);
+    setLoadingProductHistory(true);
+    try {
+      const url = product ? `/api/admin/products/history?product_id=${product.id}` : '/api/admin/products/history';
+      const res = await fetchWithAuth(url);
+      if (res.ok) {
+        const data = await res.json();
+        setProductPriceHistory(data);
+      }
+    } catch (e) {
+      console.error('Error fetching product price history:', e);
+    } finally {
+      setLoadingProductHistory(false);
+    }
+  };
 
   // Estados Agente 2 SEO Engine
   const [showAiBlogModal, setShowAiBlogModal] = useState(false);
@@ -745,6 +767,13 @@ const AdminPanel = () => {
                         </div>
                         <div className="flex gap-2">
                           <button 
+                            onClick={() => openProductPriceHistory(product)}
+                            className="flex items-center justify-center gap-1 text-stone-600 hover:bg-stone-100 px-3 py-1.5 rounded-lg font-semibold transition text-sm"
+                            title="Historial de Precios PVP"
+                          >
+                            <History size={14} /> Historial
+                          </button>
+                          <button 
                             onClick={() => setEditingProduct(product)}
                             className="flex items-center justify-center gap-1 text-primary-green hover:bg-green-50 px-3 py-1.5 rounded-lg font-semibold transition text-sm"
                           >
@@ -1024,6 +1053,88 @@ const AdminPanel = () => {
           )}
         </main>
       </div>
+
+      {/* --- MODAL: HISTORIAL DE PRECIOS DE PRODUCTO (PVP) --- */}
+      {productHistoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-2xl w-full max-w-2xl my-8 relative flex flex-col max-h-[85vh] shadow-2xl">
+            <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <span className="p-2 bg-emerald-100 text-emerald-800 rounded-xl">
+                  <History size={20} />
+                </span>
+                <div>
+                  <h3 className="font-header text-xl text-stone-800">
+                    Historial de Precios (PVP): {productHistoryModal.name}
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    Trazabilidad de modificaciones de precio al público y márgenes comerciales.
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setProductHistoryModal(null)} 
+                className="text-stone-400 hover:text-stone-700 bg-white p-2 rounded-full border border-stone-200"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1">
+              {loadingProductHistory ? (
+                <div className="flex items-center justify-center py-12 text-stone-500 gap-2">
+                  <Loader2 className="animate-spin" size={20} />
+                  <span className="text-sm">Cargando registros históricos...</span>
+                </div>
+              ) : productPriceHistory.length === 0 ? (
+                <div className="text-center py-12 text-stone-400">
+                  <p className="text-sm">No hay registros previos de cambios de precio para este producto.</p>
+                  <p className="text-xs text-stone-500 mt-2">Precio actual en catálogo: <strong>${Number(productHistoryModal.price || 0).toLocaleString('es-CL')} CLP</strong></p>
+                </div>
+              ) : (
+                <div className="space-y-3 font-mono text-xs">
+                  {productPriceHistory.map((h) => {
+                    const diff = h.previous_price ? (h.price - h.previous_price) : 0;
+                    return (
+                      <div key={h.id} className="p-3.5 bg-stone-50 rounded-xl border border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <strong className="text-stone-900 font-bold text-sm">
+                              ${Number(h.price).toLocaleString('es-CL')} CLP
+                            </strong>
+                            {h.previous_price && (
+                              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${diff > 0 ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}`}>
+                                {diff > 0 ? `+${diff.toLocaleString('es-CL')}` : `${diff.toLocaleString('es-CL')}`} CLP
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-stone-600 font-sans text-xs">
+                            {h.notes || 'Ajuste de precio'} {h.changed_by && `(por ${h.changed_by})`}
+                          </p>
+                        </div>
+                        <div className="text-right text-stone-400 text-[11px] font-sans shrink-0">
+                          {h.created_at ? new Date(h.created_at).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-between items-center text-xs text-stone-500">
+              <span>PVP vigente en catálogo: <strong>${Number(productHistoryModal.price || 0).toLocaleString('es-CL')} CLP</strong></span>
+              <button
+                type="button"
+                onClick={() => setProductHistoryModal(null)}
+                className="px-4 py-2 bg-stone-800 text-white rounded-xl font-bold hover:bg-stone-900 transition"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* --- MODAL: RECIPE --- */}
       {recipeProduct && (

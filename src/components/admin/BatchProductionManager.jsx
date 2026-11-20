@@ -1301,83 +1301,109 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                   </div>
                 )
               )}
+              {/* Protocolo Crítico de Inocuidad Cocina */}
+              <div className="p-3.5 bg-amber-50/90 border border-amber-300 rounded-2xl flex items-start gap-3 text-xs shadow-2xs">
+                <span className="text-lg shrink-0">⚠️</span>
+                <div className="space-y-1">
+                  <strong className="text-amber-950 font-bold block">
+                    Protocolo de Inocuidad: Zapallo Camote & Vegetales Sensibles
+                  </strong>
+                  <p className="text-amber-900 leading-relaxed">
+                    Por alta concentración de azúcares y humedad, el <strong>zapallo camote debe cocinarse siempre en olla separada</strong> y someterse a abatimiento/congelación inmediata a -18°C (&lt;45 min). Jamás mezclar en caliente con otros vegetales ni dejar en reposo ambiental para prevenir fermentación acética/picante.
+                  </p>
+                </div>
+              </div>
+
               {formulaRows.length > 0 && (
                 <div className="grid grid-cols-12 gap-2 px-2.5 text-xs font-semibold text-stone-500">
                   <div className="col-span-5">Ingrediente</div>
-                  <div className="col-span-2 text-right">Kilos (Kg)</div>
+                  <div className="col-span-2 text-right">Cantidad (u / L / kg)</div>
                   <div className="col-span-2 text-right">% Fórmula</div>
-                  <div className="col-span-2 text-right">Precio / Kg</div>
+                  <div className="col-span-2 text-right">Precio Unitario</div>
                   <div className="col-span-1"></div>
                 </div>
               )}
               <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                {formulaRows.map((row, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-stone-50 p-2 rounded-xl border border-stone-200">
-                    <div className="col-span-5">
-                      <select
-                        value={row.ingrediente_id || ''}
-                        onChange={(e) => {
-                          const ing = ingredients.find((i) => String(i.id) === e.target.value);
-                          const copy = [...formulaRows];
-                          copy[idx] = {
-                            ...copy[idx],
-                            ingrediente_id: ing ? ing.id : '',
-                            nombre_ingrediente: ing ? ing.name : copy[idx].nombre_ingrediente,
-                            costo_unitario_clp: ing ? ing.cost_per_unit : 0,
-                          };
-                          setFormulaRows(recalcFromKilos(copy));
-                        }}
-                        className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white text-stone-800"
-                      >
-                        <option value="">{row.nombre_ingrediente || '-- Ingrediente --'}</option>
-                        {ingredients.map((ing) => (
-                          <option key={ing.id} value={ing.id}>{ing.name} (${ing.cost_per_unit}/{ing.unit})</option>
-                        ))}
-                      </select>
+                {formulaRows.map((row, idx) => {
+                  const ing = ingredients.find((i) => String(i.id) === String(row.ingrediente_id));
+                  const rowUnit = String(ing?.unit || row.unit || 'kg').toLowerCase().trim();
+                  const displayUnit = (rowUnit === 'unidad' || rowUnit === 'u' || rowUnit === 'unidades') ? 'u' : (rowUnit === 'litro' || rowUnit === 'l') ? 'L' : rowUnit;
+
+                  return (
+                    <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-stone-50 p-2 rounded-xl border border-stone-200">
+                      <div className="col-span-5">
+                        <select
+                          value={row.ingrediente_id || ''}
+                          onChange={(e) => {
+                            const foundIng = ingredients.find((i) => String(i.id) === e.target.value);
+                            const copy = [...formulaRows];
+                            copy[idx] = {
+                              ...copy[idx],
+                              ingrediente_id: foundIng ? foundIng.id : '',
+                              nombre_ingrediente: foundIng ? foundIng.name : copy[idx].nombre_ingrediente,
+                              costo_unitario_clp: foundIng ? foundIng.cost_per_unit : 0,
+                              unit: foundIng ? foundIng.unit : 'kg',
+                            };
+                            setFormulaRows(recalcFromKilos(copy));
+                          }}
+                          className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white text-stone-800"
+                        >
+                          <option value="">{row.nombre_ingrediente || '-- Ingrediente --'}</option>
+                          {ingredients.map((item) => (
+                            <option key={item.id} value={item.id}>{item.name} (${item.cost_per_unit}/{item.unit})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-span-2 relative">
+                        <input
+                          type="number"
+                          step={displayUnit === 'u' ? '1' : '0.1'}
+                          min="0"
+                          value={row.kilos_usados ?? 0}
+                          onChange={(e) => {
+                            const copy = [...formulaRows];
+                            copy[idx].kilos_usados = parseFloat(e.target.value) || 0;
+                            setFormulaRows(recalcFromKilos(copy));
+                          }}
+                          className="w-full pl-2 pr-6 py-2 rounded-xl border border-stone-300 text-xs text-right tabular-nums bg-white font-semibold text-stone-800"
+                          title={`Cantidad usada (${displayUnit})`}
+                        />
+                        <span className="absolute right-2 top-2 text-[10px] font-bold text-stone-400 pointer-events-none">
+                          {displayUnit}
+                        </span>
+                      </div>
+                      <div className="col-span-2 text-xs tabular-nums text-right text-stone-600 font-semibold">
+                        {Number(row.porcentaje_formula || 0).toFixed(1)}%
+                      </div>
+                      <div className="col-span-2 relative">
+                        <input
+                          type="number"
+                          min="0"
+                          value={row.costo_unitario_clp || 0}
+                          onChange={(e) => {
+                            const copy = [...formulaRows];
+                            copy[idx].costo_unitario_clp = parseInt(e.target.value || '0', 10);
+                            setFormulaRows(copy);
+                          }}
+                          className="w-full pl-2 pr-6 py-2 rounded-xl border border-stone-300 text-xs text-right tabular-nums bg-white text-stone-800"
+                          title={`Costo CLP por ${displayUnit} de esta semana`}
+                        />
+                        <span className="absolute right-2 top-2 text-[10px] font-bold text-stone-400 pointer-events-none">
+                          /{displayUnit}
+                        </span>
+                      </div>
+                      <div className="col-span-1 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setFormulaRows(recalcFromKilos(formulaRows.filter((_, i) => i !== idx)))}
+                          className="text-red-500 hover:text-red-700 p-1"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
-                    <div className="col-span-2">
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        value={row.kilos_usados ?? 0}
-                        onChange={(e) => {
-                          const copy = [...formulaRows];
-                          copy[idx].kilos_usados = parseFloat(e.target.value) || 0;
-                          setFormulaRows(recalcFromKilos(copy));
-                        }}
-                        className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs text-right tabular-nums bg-white font-semibold text-stone-800"
-                        title="Kilos usados de este ingrediente"
-                      />
-                    </div>
-                    <div className="col-span-2 text-xs tabular-nums text-right text-stone-600 font-semibold">
-                      {Number(row.porcentaje_formula || 0).toFixed(1)}%
-                    </div>
-                    <div className="col-span-2">
-                      <input
-                        type="number"
-                        min="0"
-                        value={row.costo_unitario_clp || 0}
-                        onChange={(e) => {
-                          const copy = [...formulaRows];
-                          copy[idx].costo_unitario_clp = parseInt(e.target.value || '0', 10);
-                          setFormulaRows(copy);
-                        }}
-                        className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs text-right tabular-nums bg-white text-stone-800"
-                        title="Costo CLP por Kg de esta semana"
-                      />
-                    </div>
-                    <div className="col-span-1 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setFormulaRows(recalcFromKilos(formulaRows.filter((_, i) => i !== idx)))}
-                        className="text-red-500 hover:text-red-700 p-1"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               <button
                 type="button"
@@ -2331,30 +2357,53 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                     <thead className="bg-stone-50 border-b border-stone-200 text-stone-600 font-bold">
                       <tr>
                         <th className="p-3 text-left">Ingrediente</th>
-                        <th className="p-3 text-right">Kilos Usados</th>
+                        <th className="p-3 text-right">Cantidad Usada</th>
                         <th className="p-3 text-right">% Fórmula</th>
-                        <th className="p-3 text-right">Precio Compra</th>
+                        <th className="p-3 text-right">Precio Unitario</th>
                         <th className="p-3 text-right">Subtotal Insumo</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-100 font-mono">
                       {(viewingBatch.ingredientes || []).map((ing, idx) => {
-                        const kg = Number(ing.cantidad_gramos || 0) / 1000;
+                        const grams = Number(ing.cantidad_gramos || 0);
                         const costUnit = Number(ing.costo_unitario_clp || 0);
-                        const subtotal = Math.round(kg * costUnit);
+                        const rawUnit = String(ing.unit || '').toLowerCase().trim();
+
+                        let unitLabel = 'kg';
+                        let qtyFormatted = `${(grams / 1000).toFixed(2)} kg`;
+
+                        if (rawUnit === 'unidad' || rawUnit === 'u' || rawUnit === 'unidades') {
+                          unitLabel = 'u';
+                          const count = grams / 1000;
+                          qtyFormatted = `${count % 1 === 0 ? count.toFixed(0) : count.toFixed(1)} u`;
+                        } else if (rawUnit === 'litro' || rawUnit === 'l' || rawUnit === 'lt') {
+                          unitLabel = 'L';
+                          qtyFormatted = `${(grams / 1000).toFixed(2)} L`;
+                        } else if (rawUnit === 'ml') {
+                          unitLabel = 'ml';
+                          qtyFormatted = `${grams.toLocaleString('es-CL')} ml`;
+                        } else if (rawUnit === 'g') {
+                          unitLabel = 'g';
+                          qtyFormatted = `${grams.toLocaleString('es-CL')} g`;
+                        } else {
+                          unitLabel = 'kg';
+                          qtyFormatted = `${(grams / 1000).toFixed(2)} kg`;
+                        }
+
+                        const subtotal = Math.round((grams / 1000) * costUnit);
                         return (
                           <tr key={idx} className="hover:bg-stone-50/50">
                             <td className="p-2.5 font-sans font-semibold text-stone-800">
                               {ing.nombre_ingrediente}
                             </td>
-                            <td className="p-2.5 text-right text-stone-800">
-                              {kg.toFixed(2)} kg
+                            <td className="p-2.5 text-right font-bold text-stone-900">
+                              {qtyFormatted}
                             </td>
                             <td className="p-2.5 text-right font-bold text-emerald-800">
                               {Number(ing.porcentaje_formula || 0).toFixed(1)}%
                             </td>
                             <td className="p-2.5 text-right text-stone-600">
-                              ${costUnit.toLocaleString('es-CL')} / kg
+                              ${costUnit.toLocaleString('es-CL')} / {unitLabel}
                             </td>
                             <td className="p-2.5 text-right font-bold text-stone-900">
                               ${subtotal.toLocaleString('es-CL')}
@@ -2395,76 +2444,114 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
                   )}
                 </div>
 
-                {/* Resumen Financiero */}
-                <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200 space-y-2 font-mono text-xs">
-                  <h4 className="font-header text-xs font-bold uppercase tracking-wider text-secondary-brown font-sans">
-                    Resumen Financiero del Lote
-                  </h4>
-                  <div className="flex justify-between items-center text-stone-700 pb-1 border-b border-emerald-200/60">
-                    <span className="font-sans text-stone-600">Costo Total del Batch:</span>
-                    <strong className="text-stone-900 text-sm">
-                      ${Number(viewingBatch.costo_total_batch_clp || 0).toLocaleString('es-CL')}
-                    </strong>
-                  </div>
-                  <div className="flex justify-between items-center text-stone-700 pb-1 border-b border-emerald-200/60">
-                    <span className="font-sans text-stone-600">Costo Real por Kilo Envasado:</span>
-                    <strong className="text-emerald-800 text-sm">
-                      ${Math.round(Number(viewingBatch.costo_total_batch_clp || 0) / (Number(viewingBatch.stock_inicial_gramos || 1) / 1000)).toLocaleString('es-CL')} / kg
-                    </strong>
-                  </div>
-                  {viewingBatch.producto_price && (
-                    <div className="flex justify-between items-center text-stone-700">
-                      <span className="font-sans text-stone-600">PVP Menú:</span>
-                      <strong className="text-stone-900">
-                        ${Number(viewingBatch.producto_price).toLocaleString('es-CL')}
-                      </strong>
-                    </div>
-                  )}
+                {/* Resumen Financiero Completo */}
+                {(() => {
+                  const vProd = products.find((p) => String(p.id) === String(viewingBatch.producto_id));
+                  const vUnitG = vProd ? (parseWeightGrams(vProd.weight) || 1000) : 1000;
+                  const vUnitKg = vUnitG / 1000;
+                  const vStockGrams = Number(viewingBatch.stock_inicial_gramos || 0);
+                  const vStockKg = vStockGrams / 1000;
+                  const vTotalUnits = vUnitG > 0 ? Math.floor(vStockGrams / vUnitG) : 0;
 
-                  {(() => {
-                    const vProd = products.find((p) => String(p.id) === String(viewingBatch.producto_id));
-                    const vUnitG = vProd ? (parseWeightGrams(vProd.weight) || 1000) : 1000;
-                    const vUnitKg = vUnitG / 1000;
-                    const vTotalUnits = vUnitG > 0 ? Math.floor((viewingBatch.stock_inicial_gramos || 0) / vUnitG) : 0;
-                    const vCostPerUnit = vTotalUnits > 0 ? Math.round(Number(viewingBatch.costo_total_batch_clp || 0) / vTotalUnits) : 0;
-                    const vPvp = Number(viewingBatch.producto_price || vProd?.price || 0);
-                    const vMarginPerUnit = vPvp - vCostPerUnit;
-                    const vMarginPct = vPvp > 0 ? (((vPvp - vCostPerUnit) / vPvp) * 100).toFixed(1) : '0.0';
-                    const vProjectedRev = vTotalUnits * vPvp;
-                    const vProjectedProfit = vProjectedRev - Number(viewingBatch.costo_total_batch_clp || 0);
+                  // Total real de materia prima (ingredientes)
+                  const vRawIngCost = (viewingBatch.ingredientes || []).reduce((sum, ing) => {
+                    const kg = Number(ing.cantidad_gramos || 0) / 1000;
+                    return sum + Math.round(kg * Number(ing.costo_unitario_clp || 0));
+                  }, 0);
 
-                    if (vUnitKg === 1) return null;
+                  // Costos indirectos prorrateados
+                  const vIndirectCost = viewingBatch.indirect_costs_json && Object.keys(viewingBatch.indirect_costs_json).length > 0
+                    ? Object.values(viewingBatch.indirect_costs_json).reduce((s, v) => s + Number(v || 0), 0)
+                    : Math.max(0, Number(viewingBatch.costo_total_batch_clp || 0) - vRawIngCost);
 
-                    return (
-                      <div className="mt-2 pt-2 border-t border-emerald-300 space-y-1 bg-white/70 p-2.5 rounded-xl">
+                  const vBatchTotalCost = Number(viewingBatch.costo_total_batch_clp || (vRawIngCost + vIndirectCost));
+                  const vCostPerKg = vStockKg > 0 ? Math.round(vBatchTotalCost / vStockKg) : 0;
+                  const vCostPerUnit = vTotalUnits > 0 ? Math.round(vBatchTotalCost / vTotalUnits) : (vUnitKg > 0 ? Math.round(vCostPerKg * vUnitKg) : 0);
+
+                  const vPvp = Number(viewingBatch.producto_price || vProd?.price || 0);
+                  const vMarginPerUnit = vPvp - vCostPerUnit;
+                  const vMarginPct = vPvp > 0 ? (((vPvp - vCostPerUnit) / vPvp) * 100).toFixed(1) : '0.0';
+
+                  const vProjectedRev = vTotalUnits * vPvp;
+                  const vProjectedProfit = vProjectedRev - vBatchTotalCost;
+
+                  return (
+                    <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200 space-y-2 font-mono text-xs">
+                      <div className="flex items-center justify-between pb-1 border-b border-emerald-200">
+                        <h4 className="font-header text-xs font-bold uppercase tracking-wider text-secondary-brown font-sans flex items-center gap-1.5">
+                          <span className="w-2 h-4 rounded-full bg-emerald-600"></span>
+                          Resumen Financiero del Lote
+                        </h4>
+                        <span className="text-[11px] font-sans font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                          {vTotalUnits} {vTotalUnits === 1 ? 'unidad' : 'unidades'} ({vProd?.weight || `${vUnitG}g`})
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center text-stone-700 pb-1 border-b border-emerald-200/60">
+                        <span className="font-sans text-stone-600">Total Materia Prima (Ingredientes):</span>
+                        <strong className="text-stone-900">
+                          ${vRawIngCost.toLocaleString('es-CL')}
+                        </strong>
+                      </div>
+
+                      <div className="flex justify-between items-center text-stone-700 pb-1 border-b border-emerald-200/60">
+                        <span className="font-sans text-stone-600">Total Costos Indirectos:</span>
+                        <strong className="text-stone-900">
+                          ${vIndirectCost.toLocaleString('es-CL')}
+                        </strong>
+                      </div>
+
+                      <div className="flex justify-between items-center text-stone-700 pb-1 border-b border-emerald-200/60">
+                        <span className="font-sans text-stone-800 font-semibold">Costo Total del Batch:</span>
+                        <strong className="text-stone-950 text-sm font-bold">
+                          ${vBatchTotalCost.toLocaleString('es-CL')}
+                        </strong>
+                      </div>
+
+                      <div className="flex justify-between items-center text-stone-700 pb-1 border-b border-emerald-200/60">
+                        <span className="font-sans text-stone-600">Costo Real por Kilo Envasado:</span>
+                        <strong className="text-emerald-800 text-sm font-bold">
+                          ${vCostPerKg.toLocaleString('es-CL')} / kg
+                        </strong>
+                      </div>
+
+                      <div className="flex justify-between items-center text-stone-700 pb-1 border-b border-emerald-200/60">
+                        <span className="font-sans text-stone-600">PVP Menú Vigente:</span>
+                        <strong className="text-stone-900">
+                          ${vPvp.toLocaleString('es-CL')} {vUnitKg !== 1 ? `/ u (${vProd?.weight || `${vUnitG}g`})` : '/ kg'}
+                        </strong>
+                      </div>
+
+                      <div className="flex justify-between items-center text-stone-700 pb-1 border-b border-emerald-200/60">
+                        <span className="font-sans text-stone-600">Margen Bruto Unitario:</span>
+                        <strong className={`font-bold ${vMarginPerUnit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                          {vMarginPerUnit >= 0 ? '+' : ''}${vMarginPerUnit.toLocaleString('es-CL')} / u (+{vMarginPct}%)
+                        </strong>
+                      </div>
+
+                      <div className="mt-2 pt-2 border-t border-emerald-300 space-y-1.5 bg-white/80 p-2.5 rounded-xl">
                         <div className="flex justify-between items-center text-stone-700">
                           <span className="font-sans text-stone-600 font-semibold">Rendimiento Comercial:</span>
-                          <strong className="text-stone-900">
+                          <strong className="text-stone-900 font-sans">
                             {vTotalUnits} {viewingBatch.linea_produccion === 'CALDO' ? 'frascos' : 'bolsas'} ({vProd?.weight || `${vUnitG}g`})
                           </strong>
                         </div>
                         <div className="flex justify-between items-center text-stone-700">
-                          <span className="font-sans text-stone-600">Costo Real por Unidad:</span>
+                          <span className="font-sans text-stone-600">Ventas Totales Proyectadas:</span>
                           <strong className="text-stone-900">
-                            ${vCostPerUnit.toLocaleString('es-CL')} / u
-                          </strong>
-                        </div>
-                        <div className="flex justify-between items-center text-stone-700">
-                          <span className="font-sans text-stone-600">Margen por Unidad:</span>
-                          <strong className={`font-bold ${vMarginPerUnit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                            {vMarginPerUnit >= 0 ? '+' : ''}${vMarginPerUnit.toLocaleString('es-CL')} (+{vMarginPct}%)
+                            ${vProjectedRev.toLocaleString('es-CL')} CLP
                           </strong>
                         </div>
                         <div className="flex justify-between items-center text-stone-700 pt-1 border-t border-emerald-200">
                           <span className="font-sans text-emerald-950 font-bold">Ganancia Líquida Lote:</span>
                           <strong className="text-emerald-800 font-extrabold text-sm">
-                            +{Number(vProjectedProfit).toLocaleString('es-CL')} CLP
+                            +{vProjectedProfit.toLocaleString('es-CL')} CLP
                           </strong>
                         </div>
                       </div>
-                    );
-                  })()}
-                </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* 3. Ficha Bromatológica Recalculada */}
