@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Layers, Plus, Printer, AlertTriangle, TrendingUp, TrendingDown, Scale, Award, Activity, Search, Link2,
   Send, Copy, Check, RefreshCw, ShoppingBag, Clock, XCircle, CheckCircle2, Trash2, Sparkles, X, Info, ArrowUpRight, ArrowDownRight, Eye,
-  Edit3, Sliders, PackageMinus, Gift, Dog
+  Edit3, Sliders, PackageMinus, Gift, Dog, Target, Percent, DollarSign
 } from 'lucide-react';
 import ProductLabelGenerator from './ProductLabelGenerator';
 import { parseWeightGrams } from '../../context/CartContext';
@@ -200,7 +200,8 @@ const generateBatchVerdict = ({
 };
 
 const BatchProductionManager = ({ products = [], ingredients = [], onIngredientsUpdated }) => {
-  const [subTab, setSubTab] = useState('batches'); // 'batches' | 'demand' | 'recall' | 'links'
+  const [subTab, setSubTab] = useState('batches'); // 'batches' | 'margins' | 'demand' | 'recall' | 'links'
+  const [targetMarginPct, setTargetMarginPct] = useState(60);
   const [batches, setBatches] = useState([]);
   const [demandData, setDemandData] = useState(null);
   const [paymentLinks, setPaymentLinks] = useState([]);
@@ -976,6 +977,7 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
       <div className="flex flex-wrap gap-2 bg-white p-2 rounded-2xl border border-stone-200 shadow-xs">
         {[
           { id: 'batches', label: 'Lotes Semanales & FIFO', icon: Layers },
+          { id: 'margins', label: 'Comparativa de Márgenes (Meta 60%)', icon: Percent },
           { id: 'demand', label: 'Demanda, Alertas $30k & BOM', icon: TrendingUp },
           { id: 'recall', label: 'Trazabilidad / Recall', icon: Search },
         ].map((t) => {
@@ -1849,106 +1851,440 @@ const BatchProductionManager = ({ products = [], ingredients = [], onIngredients
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-stone-200 text-stone-500 uppercase">
-                    <th className="py-2.5 pr-3">Código Lote</th>
-                    <th className="py-2.5 pr-3">Menú</th>
-                    <th className="py-2.5 pr-3">Elab / Venc</th>
-                    <th className="py-2.5 pr-3">Stock FIFO</th>
-                    <th className="py-2.5 pr-3">Costo Batch</th>
-                    <th className="py-2.5 pr-3">Estado</th>
+                  <tr className="border-b border-stone-200 text-stone-500 uppercase text-[11px]">
+                    <th className="py-2.5 pr-2.5">Código Lote</th>
+                    <th className="py-2.5 pr-2.5">Menú</th>
+                    <th className="py-2.5 pr-2.5">Elab / Venc</th>
+                    <th className="py-2.5 pr-2.5">Stock FIFO</th>
+                    <th className="py-2.5 pr-2.5">Costo Batch</th>
+                    <th className="py-2.5 pr-2.5">Costo Real</th>
+                    <th className="py-2.5 pr-2.5">PVP Menú</th>
+                    <th className="py-2.5 pr-2.5">Margen (Meta 60%)</th>
+                    <th className="py-2.5 pr-2.5">Ganancia Lote</th>
+                    <th className="py-2.5 pr-2.5">Estado</th>
                     <th className="py-2.5 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
-                  {batches.map((b) => (
-                    <tr key={b.id} className="hover:bg-stone-50">
-                      <td className="py-3 pr-3 tabular-nums font-bold text-secondary-brown">{b.codigo_lote}</td>
-                      <td className="py-3 pr-3 font-semibold">{b.producto_nombre}</td>
-                      <td className="py-3 pr-3 tabular-nums">
-                        <div>{b.fecha_elaboracion}</div>
-                        <div className="text-[10px] text-red-600">Venc: {b.fecha_consumo_preferente}</div>
-                      </td>
-                      <td className="py-3 pr-3 tabular-nums">
-                        {(() => {
-                          const bProd = products.find((p) => String(p.id) === String(b.producto_id));
-                          const bUnitG = bProd ? (parseWeightGrams(bProd.weight) || 1000) : 1000;
-                          const bTotalU = bUnitG > 0 ? Math.floor(b.stock_inicial_gramos / bUnitG) : 0;
-                          const bDispU = bUnitG > 0 ? Math.floor(b.stock_disponible_gramos / bUnitG) : 0;
-                          return (
-                            <>
-                              <div>
-                                <strong>{(b.stock_disponible_gramos / 1000).toFixed(2)} kg</strong>
-                                <span className="text-stone-400"> / {(b.stock_inicial_gramos / 1000).toFixed(2)} kg</span>
-                              </div>
-                              {bUnitG !== 1000 && (
-                                <div className="text-[10px] text-emerald-800 font-semibold">
-                                  {bDispU} / {bTotalU} {b.linea_produccion === 'CALDO' ? 'frascos' : 'bolsas'} ({bProd?.weight || `${bUnitG}g`})
-                                </div>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </td>
-                      <td className="py-3 pr-3 tabular-nums">${Number(b.costo_total_batch_clp || 0).toLocaleString('es-CL')}</td>
-                      <td className="py-3 pr-3">
-                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                          b.estado === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800'
-                            : b.estado === 'AGOTADO' ? 'bg-amber-100 text-amber-800'
-                              : 'bg-stone-200 text-stone-700'
-                        }`}>
-                          {b.estado}
-                        </span>
-                      </td>
-                      <td className="py-3 text-right space-x-1.5 whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => setViewingBatch(b)}
-                          className="inline-flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 font-bold px-2.5 py-1.5 rounded-lg transition shadow-2xs cursor-pointer active:scale-95"
-                          title="Ver composición, nutrición y costos de este lote"
-                        >
-                          <Eye size={12} className="text-emerald-700" /> Ver Lote
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditModal(b)}
-                          className="inline-flex items-center gap-1 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-bold px-2.5 py-1.5 rounded-lg transition shadow-2xs cursor-pointer active:scale-95"
-                          title="Ajustar stock por autoconsumo, muestras, mermas o editar parámetros del lote"
-                        >
-                          <Edit3 size={12} className="text-amber-700" /> Editar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenBatchLabel(b.id)}
-                          className="inline-flex items-center gap-1 bg-stone-800 hover:bg-stone-900 text-white font-bold px-2.5 py-1.5 rounded-lg transition cursor-pointer active:scale-95 shadow-2xs"
-                        >
-                          <Printer size={12} /> Etiqueta
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleBatchStatus(b)}
-                          className="inline-flex items-center gap-1 border border-stone-300 hover:bg-stone-100 text-stone-700 font-bold px-2.5 py-1.5 rounded-lg transition cursor-pointer active:scale-95"
-                          title={b.estado === 'ACTIVO' ? 'Cerrar lote para que no se descuente más stock de él' : 'Reactivar lote'}
-                        >
-                          {b.estado === 'ACTIVO' ? <XCircle size={12} className="text-amber-600" /> : <CheckCircle2 size={12} className="text-emerald-600" />}
-                          {b.estado === 'ACTIVO' ? 'Cerrar' : 'Activar'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteBatch(b)}
-                          className="inline-flex items-center gap-1 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 font-bold px-2.5 py-1.5 rounded-lg transition cursor-pointer active:scale-95"
-                          title="Eliminar este lote para ingresarlo de nuevo"
-                        >
-                          <Trash2 size={12} /> Eliminar
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {batches.map((b) => {
+                    const bProd = products.find((p) => String(p.id) === String(b.producto_id));
+                    const bUnitG = bProd ? (parseWeightGrams(bProd.weight) || 1000) : 1000;
+                    const bStockKg = Number(b.stock_inicial_gramos || 0) / 1000;
+                    const bBatchCost = Number(b.costo_total_batch_clp || 0);
+                    const bCostPerKg = bStockKg > 0 ? Math.round(bBatchCost / bStockKg) : 0;
+                    const bTotalU = bUnitG > 0 ? Math.floor(b.stock_inicial_gramos / bUnitG) : 0;
+                    const bDispU = bUnitG > 0 ? Math.floor(b.stock_disponible_gramos / bUnitG) : 0;
+                    const bPvp = Number(b.producto_price || bProd?.price || 0);
+                    const bCostUnit = bTotalU > 0 ? Math.round(bBatchCost / bTotalU) : bCostPerKg;
+                    const bMarginUnit = bPvp - bCostUnit;
+                    const bMarginPct = bPvp > 0 ? Number((((bPvp - bCostUnit) / bPvp) * 100).toFixed(1)) : 0;
+                    const bProjectedProfit = (bTotalU * bPvp) - bBatchCost;
+
+                    return (
+                      <tr key={b.id} className="hover:bg-stone-50 transition-colors">
+                        <td className="py-3 pr-2.5 tabular-nums font-bold text-secondary-brown">{b.codigo_lote}</td>
+                        <td className="py-3 pr-2.5 font-semibold text-stone-900">{b.producto_nombre}</td>
+                        <td className="py-3 pr-2.5 tabular-nums">
+                          <div>{b.fecha_elaboracion}</div>
+                          <div className="text-[10px] text-red-600">Venc: {b.fecha_consumo_preferente}</div>
+                        </td>
+                        <td className="py-3 pr-2.5 tabular-nums">
+                          <div>
+                            <strong>{(b.stock_disponible_gramos / 1000).toFixed(2)} kg</strong>
+                            <span className="text-stone-400"> / {(b.stock_inicial_gramos / 1000).toFixed(2)} kg</span>
+                          </div>
+                          {bUnitG !== 1000 && (
+                            <div className="text-[10px] text-emerald-800 font-semibold">
+                              {bDispU} / {bTotalU} {b.linea_produccion === 'CALDO' ? 'frascos' : 'bolsas'} ({bProd?.weight || `${bUnitG}g`})
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 pr-2.5 tabular-nums font-bold text-stone-900">
+                          ${bBatchCost.toLocaleString('es-CL')}
+                        </td>
+                        <td className="py-3 pr-2.5 tabular-nums font-medium text-stone-700">
+                          ${bCostPerKg.toLocaleString('es-CL')} / kg
+                        </td>
+                        <td className="py-3 pr-2.5 tabular-nums font-bold text-stone-900">
+                          ${bPvp.toLocaleString('es-CL')}
+                        </td>
+                        <td className="py-3 pr-2.5 tabular-nums whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[11px] ${
+                            bMarginPct >= 60 ? 'bg-emerald-600 text-white shadow-2xs' :
+                            bMarginPct >= 45 ? 'bg-emerald-100 text-emerald-800' :
+                            bMarginPct >= 35 ? 'bg-amber-100 text-amber-800' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {bMarginPct >= 60 && <span>🎯</span>}
+                            {bMarginPct.toFixed(1)}% ({bMarginUnit >= 0 ? '+' : ''}${bMarginUnit.toLocaleString('es-CL')})
+                          </span>
+                        </td>
+                        <td className="py-3 pr-2.5 tabular-nums font-extrabold text-emerald-800 whitespace-nowrap">
+                          +{bProjectedProfit.toLocaleString('es-CL')} CLP
+                        </td>
+                        <td className="py-3 pr-2.5">
+                          <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                            b.estado === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800'
+                              : b.estado === 'AGOTADO' ? 'bg-amber-100 text-amber-800'
+                                : 'bg-stone-200 text-stone-700'
+                          }`}>
+                            {b.estado}
+                          </span>
+                        </td>
+                        <td className="py-3 text-right space-x-1.5 whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => setViewingBatch(b)}
+                            className="inline-flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 font-bold px-2.5 py-1.5 rounded-lg transition shadow-2xs cursor-pointer active:scale-95"
+                            title="Ver composición, nutrición y costos de este lote"
+                          >
+                            <Eye size={12} className="text-emerald-700" /> Ver Lote
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditModal(b)}
+                            className="inline-flex items-center gap-1 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-bold px-2.5 py-1.5 rounded-lg transition shadow-2xs cursor-pointer active:scale-95"
+                            title="Ajustar stock por autoconsumo, muestras, mermas o editar parámetros del lote"
+                          >
+                            <Edit3 size={12} className="text-amber-700" /> Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenBatchLabel(b.id)}
+                            className="inline-flex items-center gap-1 bg-stone-800 hover:bg-stone-900 text-white font-bold px-2.5 py-1.5 rounded-lg transition cursor-pointer active:scale-95 shadow-2xs"
+                          >
+                            <Printer size={12} /> Etiqueta
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleBatchStatus(b)}
+                            className="inline-flex items-center gap-1 border border-stone-300 hover:bg-stone-100 text-stone-700 font-bold px-2.5 py-1.5 rounded-lg transition cursor-pointer active:scale-95"
+                            title={b.estado === 'ACTIVO' ? 'Cerrar lote para que no se descuente más stock de él' : 'Reactivar lote'}
+                          >
+                            {b.estado === 'ACTIVO' ? <XCircle size={12} className="text-amber-600" /> : <CheckCircle2 size={12} className="text-emerald-600" />}
+                            {b.estado === 'ACTIVO' ? 'Cerrar' : 'Activar'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteBatch(b)}
+                            className="inline-flex items-center gap-1 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 font-bold px-2.5 py-1.5 rounded-lg transition cursor-pointer active:scale-95"
+                            title="Eliminar este lote para ingresarlo de nuevo"
+                          >
+                            <Trash2 size={12} /> Eliminar
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {batches.length === 0 && !loading && (
-                    <tr><td colSpan={7} className="py-8 text-center text-stone-400">No hay lotes semanales registrados aún.</td></tr>
+                    <tr><td colSpan={11} className="py-8 text-center text-stone-400">No hay lotes semanales registrados aún.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUBTAB 4: COMPARATIVA DE MÁRGENES Y DELTA DE GANANCIA (META 60%) */}
+      {subTab === 'margins' && (
+        <div className="space-y-6">
+          {/* Header & Selector de Meta Óptima */}
+          <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-xs space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-100 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="p-2 bg-emerald-100 text-emerald-800 rounded-xl">
+                    <Target size={20} />
+                  </span>
+                  <div>
+                    <h2 className="font-header text-lg font-extrabold text-secondary-brown">
+                      Comparativa de Rentabilidad & Optimización de Márgenes por Lote
+                    </h2>
+                    <p className="text-xs text-stone-500">
+                      Análisis lote por lote de margen comercial, delta de costo por kilo y estrategia para alcanzar la meta óptima.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Selector de Meta */}
+              <div className="flex items-center gap-2 bg-stone-50 border border-stone-200 p-1.5 rounded-2xl">
+                <span className="text-xs font-bold text-stone-600 pl-2">Meta Margen:</span>
+                {[50, 55, 60, 65].map((pct) => (
+                  <button
+                    key={pct}
+                    type="button"
+                    onClick={() => setTargetMarginPct(pct)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                      targetMarginPct === pct
+                        ? 'bg-emerald-600 text-white shadow-2xs'
+                        : 'text-stone-600 hover:bg-stone-200'
+                    }`}
+                  >
+                    {pct}% {pct === 60 ? '🎯 Ideal' : ''}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* KPIs Consolidados de la Producción */}
+            {(() => {
+              const activeBatches = batches.filter((b) => b.estado === 'ACTIVO');
+              const listToAnalyze = activeBatches.length > 0 ? activeBatches : batches;
+
+              let totalCostAll = 0;
+              let totalRevenueAll = 0;
+              let countOnTarget = 0;
+              let extraPotentialProfitAll = 0;
+
+              const rows = listToAnalyze.map((b) => {
+                const bProd = products.find((p) => String(p.id) === String(b.producto_id));
+                const bUnitG = bProd ? (parseWeightGrams(bProd.weight) || 1000) : 1000;
+                const bUnitKg = bUnitG / 1000;
+                const bStockKg = Number(b.stock_inicial_gramos || 0) / 1000;
+                const bBatchCost = Number(b.costo_total_batch_clp || 0);
+                const bCostPerKg = bStockKg > 0 ? Math.round(bBatchCost / bStockKg) : 0;
+                const bTotalU = bUnitG > 0 ? Math.floor(b.stock_inicial_gramos / bUnitG) : 0;
+                const bPvp = Number(b.producto_price || bProd?.price || 0);
+                const bCostUnit = bTotalU > 0 ? Math.round(bBatchCost / bTotalU) : bCostPerKg;
+                const bMarginUnit = bPvp - bCostUnit;
+                const bMarginPct = bPvp > 0 ? Number((((bPvp - bCostUnit) / bPvp) * 100).toFixed(1)) : 0;
+                const bRev = bTotalU * bPvp;
+                const bProfit = bRev - bBatchCost;
+
+                // Meta financiera
+                const targetRatio = targetMarginPct / 100.0;
+                const maxCostAllowedPerUnit = Math.round(bPvp * (1.0 - targetRatio));
+                const maxCostAllowedPerKg = bUnitKg > 0 ? Math.round(maxCostAllowedPerUnit / bUnitKg) : maxCostAllowedPerUnit;
+                const deltaCostPerKg = bCostPerKg - maxCostAllowedPerKg; // si es positivo, hay que bajar costos en X / kg
+                const pvpNeededForTarget = (1.0 - targetRatio) > 0 ? Math.round(bCostUnit / (1.0 - targetRatio)) : 0;
+                const profitAtTarget = Math.round(bRev * targetRatio);
+                const extraProfit = Math.max(0, profitAtTarget - bProfit);
+
+                totalCostAll += bBatchCost;
+                totalRevenueAll += bRev;
+                if (bMarginPct >= targetMarginPct) countOnTarget++;
+                extraPotentialProfitAll += extraProfit;
+
+                return {
+                  b,
+                  bProd,
+                  bUnitG,
+                  bUnitKg,
+                  bStockKg,
+                  bBatchCost,
+                  bCostPerKg,
+                  bTotalU,
+                  bPvp,
+                  bCostUnit,
+                  bMarginUnit,
+                  bMarginPct,
+                  bRev,
+                  bProfit,
+                  maxCostAllowedPerKg,
+                  deltaCostPerKg,
+                  pvpNeededForTarget,
+                  extraProfit,
+                };
+              });
+
+              const globalMarginPct = totalRevenueAll > 0 ? Number((((totalRevenueAll - totalCostAll) / totalRevenueAll) * 100).toFixed(1)) : 0;
+              const globalProfit = totalRevenueAll - totalCostAll;
+
+              return (
+                <div className="space-y-6">
+                  {/* Tarjetas Superiores */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                    <div className="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-4">
+                      <span className="text-stone-500 font-sans block mb-1">Margen Promedio Global:</span>
+                      <strong className="text-xl font-extrabold text-emerald-900 font-mono">
+                        {globalMarginPct}%
+                      </strong>
+                      <span className="text-[11px] text-stone-500 block mt-1">
+                        Meta ideal: <strong>{targetMarginPct}%</strong> ({globalMarginPct >= targetMarginPct ? '✅ Cumplida' : `${(targetMarginPct - globalMarginPct).toFixed(1)}% de brecha`})
+                      </span>
+                    </div>
+
+                    <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4">
+                      <span className="text-stone-500 font-sans block mb-1">Ganancia Líquida Proyectada:</span>
+                      <strong className="text-xl font-extrabold text-stone-900 font-mono">
+                        +${globalProfit.toLocaleString('es-CL')} CLP
+                      </strong>
+                      <span className="text-[11px] text-stone-500 block mt-1">
+                        Sobre {rows.length} {rows.length === 1 ? 'lote' : 'lotes'} analizados
+                      </span>
+                    </div>
+
+                    <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4">
+                      <span className="text-amber-900 font-sans font-semibold block mb-1">Lotes en Meta Óptima ({targetMarginPct}%+):</span>
+                      <strong className="text-xl font-extrabold text-amber-950 font-mono">
+                        {countOnTarget} / {rows.length}
+                      </strong>
+                      <span className="text-[11px] text-amber-800 block mt-1">
+                        {countOnTarget === rows.length ? '100% de la producción en meta' : `${rows.length - countOnTarget} lotes por optimizar`}
+                      </span>
+                    </div>
+
+                    <div className="bg-sky-50/70 border border-sky-200 rounded-2xl p-4">
+                      <span className="text-sky-900 font-sans font-semibold block mb-1">Potencial Extra al {targetMarginPct}%:</span>
+                      <strong className="text-xl font-extrabold text-sky-950 font-mono">
+                        +${extraPotentialProfitAll.toLocaleString('es-CL')} CLP
+                      </strong>
+                      <span className="text-[11px] text-sky-800 block mt-1">
+                        Ganancia adicional capturable
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Tabla Comparativa de Rendimiento y Brecha */}
+                  <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-stone-50 border-b border-stone-200 text-stone-600 font-bold uppercase text-[11px]">
+                        <tr>
+                          <th className="p-3">Lote & Menú</th>
+                          <th className="p-3 text-right">Rendimiento</th>
+                          <th className="p-3 text-right">Costo Real / kg</th>
+                          <th className="p-3 text-right">PVP Menú</th>
+                          <th className="p-3 text-center">Margen Actual</th>
+                          <th className="p-3 text-right">Costo Máx ({targetMarginPct}%)</th>
+                          <th className="p-3 text-right">Delta a Optimizar</th>
+                          <th className="p-3 text-right">Ganancia Actual</th>
+                          <th className="p-3 text-right">Extra si llega al {targetMarginPct}%</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-100 font-mono">
+                        {rows.map((r) => {
+                          const meetsTarget = r.bMarginPct >= targetMarginPct;
+                          return (
+                            <tr key={r.b.id} className="hover:bg-stone-50/70 transition-colors">
+                              <td className="p-3">
+                                <div className="font-bold text-secondary-brown">{r.b.codigo_lote}</div>
+                                <div className="text-stone-700 font-sans text-xs">{r.b.producto_nombre}</div>
+                              </td>
+                              <td className="p-3 text-right">
+                                <strong className="text-stone-900 font-sans">{r.bStockKg.toFixed(1)} kg</strong>
+                                <div className="text-[11px] text-stone-500 font-sans">({r.bTotalU} u)</div>
+                              </td>
+                              <td className="p-3 text-right font-medium text-stone-800">
+                                ${r.bCostPerKg.toLocaleString('es-CL')} / kg
+                              </td>
+                              <td className="p-3 text-right font-bold text-stone-900">
+                                ${r.bPvp.toLocaleString('es-CL')}
+                              </td>
+                              <td className="p-3 text-center whitespace-nowrap">
+                                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-bold text-[11px] ${
+                                  meetsTarget
+                                    ? 'bg-emerald-600 text-white'
+                                    : r.bMarginPct >= 45
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : r.bMarginPct >= 35
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-red-100 text-red-700'
+                                }`}>
+                                  {meetsTarget && '🎯'} {r.bMarginPct.toFixed(1)}% (+${r.bMarginUnit.toLocaleString('es-CL')})
+                                </span>
+                              </td>
+                              <td className="p-3 text-right text-stone-700 font-semibold">
+                                ${r.maxCostAllowedPerKg.toLocaleString('es-CL')} / kg
+                              </td>
+                              <td className="p-3 text-right whitespace-nowrap font-sans">
+                                {meetsTarget ? (
+                                  <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 text-[11px]">
+                                    En Meta Óptima
+                                  </span>
+                                ) : (
+                                  <span className="text-amber-800 font-bold text-xs">
+                                    Bajar -${r.deltaCostPerKg.toLocaleString('es-CL')}/kg
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3 text-right font-bold text-emerald-800 whitespace-nowrap">
+                                +${r.bProfit.toLocaleString('es-CL')}
+                              </td>
+                              <td className="p-3 text-right whitespace-nowrap font-bold">
+                                {r.extraProfit > 0 ? (
+                                  <span className="text-sky-800 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200 text-xs">
+                                    +${r.extraProfit.toLocaleString('es-CL')} CLP
+                                  </span>
+                                ) : (
+                                  <span className="text-stone-400 font-normal">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* ESTRATEGIA OPERACIONAL: CÓMO LLEGAR AL 60% EN COCINA */}
+                  <div className="bg-gradient-to-br from-emerald-50/80 via-white to-amber-50/50 p-6 rounded-3xl border border-emerald-200/80 space-y-4">
+                    <h3 className="font-header text-sm font-extrabold text-secondary-brown flex items-center gap-2">
+                      <Sparkles size={16} className="text-emerald-700" />
+                      Palancas Operacionales para Alcanzar el 60% de Margen en Origen Canino
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                      {/* Palanca 1: Efecto Escala */}
+                      <div className="bg-white p-4 rounded-2xl border border-stone-200 space-y-2 shadow-2xs">
+                        <strong className="text-stone-900 font-bold block text-sm flex items-center gap-1.5">
+                          <Scale size={16} className="text-emerald-700" />
+                          1. Efecto Escala (Dilución de Costos Fijos de Cocina)
+                        </strong>
+                        <p className="text-stone-600 leading-relaxed">
+                          Los <strong>$50.000 fijos</strong> de cada cocción (Gas $5k, Luz $20k, Agua $5k, Envases $5k, Mano de Obra $15k) se comportan drásticamente según el tamaño del lote:
+                        </p>
+                        <div className="p-2.5 bg-stone-50 rounded-xl space-y-1 font-mono text-[11px]">
+                          <div className="flex justify-between text-stone-700">
+                            <span>Batch de 23 kg (actual):</span>
+                            <strong>$2.174 / kg en indirectos (Margen: 40.0%)</strong>
+                          </div>
+                          <div className="flex justify-between text-emerald-800 font-bold">
+                            <span>Batch de 50 kg:</span>
+                            <span>$1.000 / kg en indirectos (Margen sube a ~53.8%)</span>
+                          </div>
+                          <div className="flex justify-between text-emerald-900 font-extrabold bg-emerald-100/60 p-1 rounded">
+                            <span>Batch de 99 kg:</span>
+                            <span>$505 / kg en indirectos (Margen sube a ~59.6% 🎯)</span>
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-stone-500 italic">
+                          💡 Conclusión: Solo pasando de 23 kg a 50-99 kg por cocción, el margen roza el 60% sin cambiar ingredientes ni precio al cliente.
+                        </p>
+                      </div>
+
+                      {/* Palanca 2: Rateo de Materia Prima */}
+                      <div className="bg-white p-4 rounded-2xl border border-stone-200 space-y-2 shadow-2xs">
+                        <strong className="text-stone-900 font-bold block text-sm flex items-center gap-1.5">
+                          <Sliders size={16} className="text-amber-700" />
+                          2. Rateo & Negociación de Insumos Críticos
+                        </strong>
+                        <p className="text-stone-600 leading-relaxed">
+                          La carne magra (plateada de cerdo a $2.900/kg) representa el <strong>75% del costo de materia prima</strong> del menú:
+                        </p>
+                        <div className="p-2.5 bg-stone-50 rounded-xl space-y-1 font-mono text-[11px]">
+                          <div className="flex justify-between text-stone-700">
+                            <span>Costo Insumos Actual:</span>
+                            <strong>$2.924 / kg de menú elaborado</strong>
+                          </div>
+                          <div className="flex justify-between text-amber-800">
+                            <span>Negociando carne a $2.500:</span>
+                            <strong>Ahorro de $260 / kg (+3.1% de margen extra)</strong>
+                          </div>
+                          <div className="flex justify-between text-stone-700">
+                            <span>Equilibrio Vísceras/Verduras:</span>
+                            <strong>Ajustar mix según temporada (zapallo/camote/zanahoria)</strong>
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-stone-500 italic">
+                          💡 Conclusión: La combinación de batch grande (50-99kg) + compra por mayor de proteína asegura márgenes consistentes de 60% a 63%.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

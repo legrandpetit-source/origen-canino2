@@ -65,3 +65,4 @@ En la producción del primer batch de 99 kg, el zapallo camote fue cocido conjun
 1. **Cocción Aislada:** El zapallo camote se debe cocinar **SIEMPRE en olla independiente**, separado de cárnicos y otros vegetales.
 2. **Abatimiento Forzado Inmediato:** Una vez finalizada la cocción, no debe dejarse reposar a temperatura ambiente por más de 45 minutos. Debe ingresar a túnel de abatimiento o cámara de congelación a -18°C de forma inmediata.
 3. **Alerta en Sistema:** Se integró un banner preventivo permanente en el módulo de lotes semanales para alertar al personal de cocina ante cualquier preparación que involucre zapallo camote o vegetales fermentables.
+
