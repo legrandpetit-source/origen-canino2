@@ -13,6 +13,7 @@ import BenefitsMarquee from './BenefitsMarquee';
 import SuggestedPlans from './SuggestedPlans';
 import DeliveryArea from './DeliveryArea';
 import Testimonials from './Testimonials';
+import AmbassadorCommunitySection from './AmbassadorCommunitySection';
 import ProductCard from './ProductCard';
 import FloatingFirstOrderPromo from './FloatingFirstOrderPromo';
 
@@ -395,6 +396,9 @@ const Home = () => {
       {/* Testimonios */}
       <Testimonials />
 
+      {/* Familia Origen Canino — Beneficios y Club de Embajadores */}
+      <AmbassadorCommunitySection />
+
       {/* Planes Sugeridos (Guía de Compra Mensual - Stitch Style) */}
       <SuggestedPlans />
 
@@ -410,8 +414,8 @@ const Home = () => {
       {/* Blog */}
       <Blog />
       
-      {/* Widget Flotante de Descuento 1ra Compra */}
-      <FloatingFirstOrderPromo />
+      {/* Widget Flotante de Descuento 1ra Compra (oculto si llegó con código de referido activo) */}
+      {!referralBanner && <FloatingFirstOrderPromo />}
 
       {/* Modal de Calculadora de Raciones */}
       <CalculatorModal 

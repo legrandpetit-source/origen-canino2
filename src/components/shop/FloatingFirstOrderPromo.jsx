@@ -164,7 +164,7 @@ export default function FloatingFirstOrderPromo() {
             >
               <Sparkles size={16} className="text-white animate-spin-slow pointer-events-none shrink-0" />
               <span className="font-extrabold text-xs tracking-wider pointer-events-none whitespace-nowrap">
-                {promo.percent}% OFF 1RA COMPRA
+                {promo.percent}% DESCUENTO · 1RA COMPRA
               </span>
             </motion.button>
           ) : (
@@ -209,7 +209,7 @@ export default function FloatingFirstOrderPromo() {
                     <Sparkles size={10} className="text-[#db994b]" /> Nuevo Cliente
                   </span>
                   <h4 className="font-header font-bold text-base text-stone-800 leading-snug">
-                    {promo.title || `¡${promo.percent}% OFF en tu primera compra!`}
+                    {promo.title || `¡${promo.percent}% de Descuento en tu primera compra!`}
                   </h4>
                 </div>
               </div>

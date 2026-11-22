@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, 
   PawPrint, 
@@ -48,7 +48,11 @@ const CustomerPortal = () => {
   const { addItem, setIsCartOpen, setDogData } = useCart();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState('dogs'); // 'orders', 'dogs', 'profile', 'referrals'
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get('tab');
+    return ['orders', 'dogs', 'profile', 'referrals'].includes(t) ? t : 'dogs';
+  }); // 'orders', 'dogs', 'profile', 'referrals'
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
 
@@ -57,6 +61,8 @@ const CustomerPortal = () => {
   const [loadingReferral, setLoadingReferral] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [downloadingStory, setDownloadingStory] = useState(false);
+  const qrContainerRef = useRef(null);
 
   // Profile edit
   const [profileForm, setProfileForm] = useState({
@@ -174,6 +180,162 @@ const CustomerPortal = () => {
       loadReferralData();
     }
   }, [activeTab, customer]);
+
+  // Genera una Tarjeta Vertical 1080x1920 (PNG) lista para WhatsApp Status / Instagram Stories
+  const handleDownloadStoryCard = async () => {
+    const refCode = referralInfo?.referral_code || customer?.referral_code;
+    if (!refCode) return;
+    setDownloadingStory(true);
+    try {
+      const pct = referralInfo?.discount_percent || 10;
+      const isFounder = Boolean(referralInfo?.is_special_founder);
+      const firstName = (customer?.name || 'Tu amigo').split(' ')[0];
+      const dogName = dogs && dogs.length > 0 ? dogs[0].name : '';
+
+      const W = 1080;
+      const H = 1920;
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d');
+
+      const drawRoundRect = (x, y, w, h, r) => {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+      };
+
+      const loadImage = (src) =>
+        new Promise((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = src;
+        });
+
+      // Fondo degradado crema cálido
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+      bgGrad.addColorStop(0, '#FAF7F2');
+      bgGrad.addColorStop(0.55, '#F3EDE1');
+      bgGrad.addColorStop(1, '#EBF2DA');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, W, H);
+
+      // Franja superior verde oliva
+      ctx.fillStyle = '#556B2F';
+      ctx.fillRect(0, 0, W, 24);
+
+      // Logo Origen Canino centrado arriba
+      try {
+        const logoImg = await loadImage('/logo.webp');
+        const lw = 150;
+        const lh = (logoImg.height / logoImg.width) * lw;
+        ctx.drawImage(logoImg, (W - lw) / 2, 95, lw, lh);
+      } catch {}
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#4A3728';
+      ctx.font = '800 44px "Outfit", sans-serif';
+      ctx.fillText('Origen CANINO', W / 2, 290);
+      ctx.fillStyle = '#556B2F';
+      ctx.font = '700 22px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('COMIDA REAL · VIDA SALUDABLE', W / 2, 330);
+
+      // Pill badge de descuento
+      const badgeText = isFounder
+        ? `INVITACIÓN ESPECIAL · ${pct}% OFF EXCLUSIVO`
+        : `CLUB DE EMBAJADORES · ${pct}% DE DESCUENTO`;
+      drawRoundRect(140, 395, W - 280, 76, 38);
+      ctx.fillStyle = isFounder ? '#15803D' : '#DB994B';
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '800 28px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText(badgeText, W / 2, 443);
+
+      // Titular empático
+      ctx.fillStyle = '#3D2B1F';
+      ctx.font = '800 66px "Outfit", sans-serif';
+      const senderLabel = dogName ? `${firstName} y ${dogName}` : firstName;
+      ctx.fillText(`${senderLabel}`, W / 2, 565);
+      ctx.fillStyle = '#556B2F';
+      ctx.font = '800 58px "Outfit", sans-serif';
+      ctx.fillText(`te regalan ${pct}% OFF`, W / 2, 638);
+
+      ctx.fillStyle = '#5C4B3E';
+      ctx.font = '500 32px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('en comida real 100% grado humano para tu perro', W / 2, 700);
+      ctx.fillText('Sin ultraprocesados · Dietas BARF y Cocinadas', W / 2, 748);
+
+      // Tarjeta blanca central con el QR escaneable
+      drawRoundRect(160, 820, W - 320, 680, 48);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fill();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#E5DACD';
+      ctx.stroke();
+
+      // Convertir QRCodeSVG actual a imagen y dibujarlo nítido
+      const svgEl = qrContainerRef.current?.querySelector('svg');
+      if (svgEl) {
+        const serializer = new XMLSerializer();
+        const svgStr = serializer.serializeToString(svgEl);
+        const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+        const svgUrl = URL.createObjectURL(svgBlob);
+        try {
+          const qrImg = await loadImage(svgUrl);
+          ctx.drawImage(qrImg, (W - 430) / 2, 880, 430, 430);
+        } finally {
+          URL.revokeObjectURL(svgUrl);
+        }
+      }
+
+      ctx.fillStyle = '#6B7280';
+      ctx.font = '700 24px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('ESCANEA EL QR O USA MI CÓDIGO:', W / 2, 1372);
+
+      // Caja con el código en monospace
+      drawRoundRect(260, 1396, W - 520, 76, 22);
+      ctx.fillStyle = '#FAF7F2';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#D6CBB8';
+      ctx.stroke();
+      ctx.fillStyle = '#3D2B1F';
+      ctx.font = '800 40px monospace';
+      ctx.fillText(refCode, W / 2, 1448);
+
+      // Pie de página corporativo
+      drawRoundRect(130, 1585, W - 260, 110, 28);
+      ctx.fillStyle = '#2F3E1E';
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '800 34px "Outfit", sans-serif';
+      ctx.fillText('origencanino.cl', W / 2, 1635);
+      ctx.fillStyle = '#D9E8B8';
+      ctx.font = '600 23px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('Despacho en frío -18°C · Santiago y V Región', W / 2, 1672);
+
+      ctx.fillStyle = '#6B5A4C';
+      ctx.font = '600 24px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('Válido en tu primera compra (mín. $30.000 CLP)', W / 2, 1765);
+
+      const link = document.createElement('a');
+      link.download = `origen-canino-embajador-${refCode.toLowerCase()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      notify('success', '¡Tarjeta descargada! Lista para subir a WhatsApp o Instagram.');
+    } catch (err) {
+      console.error('Error generando tarjeta Story:', err);
+      notify('error', 'No se pudo generar la tarjeta. Intenta nuevamente.');
+    } finally {
+      setDownloadingStory(false);
+    }
+  };
 
   if (!customer) {
     return (
@@ -916,13 +1078,23 @@ const CustomerPortal = () => {
             <div className="bg-gradient-to-br from-[#faf7f2] via-white to-green-50/40 p-6 md:p-8 rounded-3xl border border-[#EBE4DA] shadow-xs relative overflow-hidden">
               <div className="relative z-10 max-w-2xl">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary-green/10 text-primary-green rounded-full text-xs font-bold uppercase tracking-wider mb-2">
-                  <Sparkles size={13} /> Club de Embajadores Origen Canino
+                  <Sparkles size={13} /> {referralInfo?.is_special_founder ? 'Embajador Fundador · Beneficio Exclusivo' : 'Club de Embajadores Origen Canino'}
                 </span>
                 <h2 className="font-header text-2xl md:text-3xl text-secondary-brown font-extrabold">
-                  ¡Recomienda Nutrición Real y Gana Comida Gratis para tu Mascota! 🐾
+                  {referralInfo?.is_special_founder
+                    ? '¡Regala 15% OFF Exclusivo en Nutrición Real! 🐾'
+                    : '¡Recomienda Nutrición Real y Gana Comida Gratis para tu Mascota! 🐾'}
                 </h2>
                 <p className="text-xs md:text-sm text-stone-600 mt-2 leading-relaxed">
-                  Tus amigos y vecinos reciben un <strong>{referralInfo?.discount_percent || 15}% de Descuento</strong> de regalo en su primera compra y tú acumulas <strong>${(referralInfo?.reward_amount || 5000).toLocaleString('es-CL')} CLP</strong> de saldo por cada amigo que compre.
+                  {referralInfo?.is_special_founder ? (
+                    <>
+                      Tu código de fundador entrega un <strong>{referralInfo?.discount_percent || 15}% de Descuento Exclusivo</strong> a tus amigos y vecinos en su primera compra (mínimo ${(referralInfo?.min_order_amount || 30000).toLocaleString('es-CL')} CLP). Al ser un código especial de fundador, no acumula comisión en billetera.
+                    </>
+                  ) : (
+                    <>
+                      Tus amigos y vecinos reciben un <strong>{referralInfo?.discount_percent || 10}% de Descuento</strong> de regalo en su primera compra y tú acumulas <strong>${(referralInfo?.reward_amount || 5000).toLocaleString('es-CL')} CLP</strong> de saldo por cada amigo que compre.
+                    </>
+                  )}
                 </p>
               </div>
             </div>
@@ -989,7 +1161,7 @@ const CustomerPortal = () => {
                   Tu Código QR Personal
                 </span>
                 
-                <div className="bg-white p-3.5 rounded-2xl border-2 border-primary-green/20 shadow-md">
+                <div ref={qrContainerRef} className="bg-white p-3.5 rounded-2xl border-2 border-primary-green/20 shadow-md">
                   <QRCodeSVG 
                     value={referralInfo?.referral_url || `https://origencanino.cl/?ref=${customer?.referral_code || 'ORIGEN'}`}
                     size={175}
@@ -1001,6 +1173,16 @@ const CustomerPortal = () => {
                 <p className="text-xs text-stone-500 mt-3 max-w-xs leading-relaxed">
                   Muestra este QR desde tu teléfono a otros dueños en el parque o condominio para que lo escaneen al instante.
                 </p>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadStoryCard}
+                  disabled={downloadingStory}
+                  className="mt-4 w-full py-2.5 px-4 bg-white hover:bg-primary-green/10 border border-primary-green/30 text-primary-green font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 shadow-2xs cursor-pointer disabled:opacity-60"
+                >
+                  <Download size={15} />
+                  <span>{downloadingStory ? 'Generando tarjeta...' : 'Descargar Tarjeta para Historia (WhatsApp / IG)'}</span>
+                </button>
               </div>
 
               {/* Acciones de Enlace y WhatsApp */}
@@ -1062,7 +1244,9 @@ const CustomerPortal = () => {
                 <div className="pt-2">
                   <a
                     href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                      `¡Hola! Mi perrito come comida 100% natural en Origen Canino y su salud cambió radicalmente 🐾. Te dejo un 15% de descuento exclusivo para tu primera compra con este link: ${
+                      `¡Hola! 🐾 Quería compartirte algo que le hizo increíble a mi perro: dejamos atrás los ultraprocesados y ahora come comida real 100% natural en Origen Canino. Te dejo un ${
+                        referralInfo?.discount_percent || 10
+                      }% de descuento en tu primera compra con este link: ${
                         referralInfo?.referral_url || `https://origencanino.cl/?ref=${customer?.referral_code || ''}`
                       }`
                     )}`}
@@ -1076,7 +1260,15 @@ const CustomerPortal = () => {
                 </div>
 
                 <div className="bg-amber-50/80 border border-amber-200/70 p-3 rounded-xl text-[11px] text-amber-900 leading-relaxed">
-                  💡 <strong>¿Cómo funciona?</strong> Cuando tu amigo realice su primer pedido de mínimo $30.000 con tu código o QR, el sistema te acreditará automáticamente $5.000 CLP en tu billetera. ¡Sin límites de amigos!
+                  {referralInfo?.is_special_founder ? (
+                    <>
+                      💡 <strong>Código Especial de Fundador:</strong> Tus amigos reciben un <strong>15% de descuento exclusivo</strong> en su primera compra (mínimo ${(referralInfo?.min_order_amount || 30000).toLocaleString('es-CL')} CLP) usando tu código o QR.
+                    </>
+                  ) : (
+                    <>
+                      💡 <strong>¿Cómo funciona?</strong> Cuando tu amigo realice su primer pedido de mínimo ${(referralInfo?.min_order_amount || 30000).toLocaleString('es-CL')} CLP con tu código o QR, él recibe un <strong>{referralInfo?.discount_percent || 10}% de descuento</strong> y el sistema te acredita automáticamente <strong>${(referralInfo?.reward_amount || 5000).toLocaleString('es-CL')} CLP</strong> en tu billetera. ¡Sin límites de amigos!
+                    </>
+                  )}
                 </div>
               </div>
             </div>

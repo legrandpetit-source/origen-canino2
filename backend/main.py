@@ -631,6 +631,30 @@ def generate_customer_referral_code(name: str, cursor) -> str:
             return code
     return f"REF-{int(time.time()) % 100000}"
 
+# Código fundador especial: 15% OFF exclusivo para amigos, sin comisión de billetera ($0)
+SPECIAL_FOUNDER_REFERRAL_CODES = {"CANELO-742"}
+
+def get_referral_terms(ref_code: str, settings: dict) -> dict:
+    """Devuelve porcentaje de descuento, recompensa y si es código fundador especial."""
+    clean = (ref_code or "").strip().upper()
+    is_founder = clean in SPECIAL_FOUNDER_REFERRAL_CODES
+    default_pct = int(settings.get("referral_friend_discount_percent", 10))
+    default_reward = int(settings.get("referral_reward_amount", 5000))
+    min_order = int(settings.get("referral_min_order_amount", 30000))
+    if is_founder:
+        return {
+            "discount_percent": 15,
+            "reward_amount": 0,
+            "min_order_amount": min_order,
+            "is_special_founder": True,
+        }
+    return {
+        "discount_percent": default_pct,
+        "reward_amount": default_reward,
+        "min_order_amount": min_order,
+        "is_special_founder": False,
+    }
+
 def check_and_award_referral(cursor, order_id: int):
     """
     Checks if order_id was referred by a customer code and awards the reward if not already awarded.
@@ -647,6 +671,11 @@ def check_and_award_referral(cursor, order_id: int):
 
         ref_code = o['referral_code'].strip().upper()
         coupon_code = (o.get('coupon_code') or '').strip().upper()
+
+        # Código fundador especial (ej. CANELO-742): entrega 15% OFF al amigo pero no acumula comisión en billetera
+        if ref_code in SPECIAL_FOUNDER_REFERRAL_CODES:
+            print(f"Omitiendo comisión de billetera para código fundador {ref_code} (Pedido #{order_id}).")
+            return
 
         # Regla de negocio estricta: Solo recompensar si el amigo canjeó voluntariamente el código como cupón
         if ref_code != coupon_code:
@@ -1455,15 +1484,18 @@ def get_customer_referral_info(customer_id: int = Depends(get_current_customer))
         wallet_bal = float(c.get('wallet_balance') or 0.0)
         total_earned = sum(t['amount'] for t in txs if t['transaction_type'] == 'reward_earned' and t['status'] == 'completed')
         
+        terms = get_referral_terms(ref_code, settings)
+        
         return {
             "referral_code": ref_code,
             "referral_url": f"https://origencanino.cl/?ref={ref_code}",
             "wallet_balance": wallet_bal,
             "total_earned": total_earned,
             "total_friends": len(friends),
-            "discount_percent": int(settings.get('referral_friend_discount_percent', 15)),
-            "reward_amount": int(settings.get('referral_reward_amount', 5000)),
-            "min_order_amount": int(settings.get('referral_min_order_amount', 30000)),
+            "discount_percent": terms["discount_percent"],
+            "reward_amount": terms["reward_amount"],
+            "min_order_amount": terms["min_order_amount"],
+            "is_special_founder": terms["is_special_founder"],
             "program_active": settings.get('referral_program_active', '1') == '1',
             "transactions": txs,
             "friends": friends
@@ -1485,15 +1517,16 @@ def validate_referral_slug(code: str):
         if not row:
             return {"valid": False, "message": "Código de referido no encontrado"}
         
-        cursor.execute("SELECT key, value FROM system_settings WHERE key IN ('referral_program_active', 'referral_friend_discount_percent', 'referral_min_order_amount')")
+        cursor.execute("SELECT key, value FROM system_settings WHERE key IN ('referral_program_active', 'referral_friend_discount_percent', 'referral_reward_amount', 'referral_min_order_amount')")
         s = {r['key']: r['value'] for r in cursor.fetchall()}
         if s.get('referral_program_active', '1') != '1':
             return {"valid": False, "message": "El programa de referidos está temporalmente pausado"}
             
         first_name = (row['name'] or '').split()[0]
         dog_str = f" y {row['dog_name']}" if row.get('dog_name') else ""
-        discount_pct = int(s.get('referral_friend_discount_percent', 15))
-        min_order = int(s.get('referral_min_order_amount', 30000))
+        terms = get_referral_terms(clean_code, s)
+        discount_pct = terms["discount_percent"]
+        min_order = terms["min_order_amount"]
         
         return {
             "valid": True,
@@ -1502,6 +1535,7 @@ def validate_referral_slug(code: str):
             "dog_name": row.get('dog_name'),
             "discount_percent": discount_pct,
             "min_order_amount": min_order,
+            "is_special_founder": terms["is_special_founder"],
             "welcome_message": f"¡Regalo de {first_name}{dog_str}! Tienes un {discount_pct}% OFF en tu primera compra."
         }
 
@@ -3678,11 +3712,12 @@ def validate_coupon_endpoint(req: ValidateCouponRequest):
                     if cnt_row and cnt_row['cnt'] > 0:
                         return {"valid": False, "code": code, "message": "El código de referido es exclusivo para tu primera compra."}
                 
-                min_order = int(s_rows.get('referral_min_order_amount', 30000))
+                terms = get_referral_terms(code, s_rows)
+                min_order = terms["min_order_amount"]
                 if subtotal < min_order:
                     return {"valid": False, "code": code, "message": f"Este código de referido requiere una compra mínima de ${min_order:,} CLP.".replace(",", ".")}
                 
-                ref_percent = float(s_rows.get('referral_friend_discount_percent', 15))
+                ref_percent = float(terms["discount_percent"])
                 discount = int(round(subtotal * (ref_percent / 100)))
                 first_name = (ref_row['name'] or 'un amigo').split()[0]
                 dog_str = f" y {ref_row['dog_name']}" if ref_row.get('dog_name') else ""
@@ -4018,7 +4053,7 @@ def get_admin_referrals_summary(current_user: str = Depends(get_current_admin)):
                 "top_referrers": top_referrers,
                 "settings": {
                     "referral_program_active": settings.get("referral_program_active", "1") == "1",
-                    "referral_friend_discount_percent": int(settings.get("referral_friend_discount_percent", 15)),
+                    "referral_friend_discount_percent": int(settings.get("referral_friend_discount_percent", 10)),
                     "referral_reward_amount": int(settings.get("referral_reward_amount", 5000)),
                     "referral_min_order_amount": int(settings.get("referral_min_order_amount", 30000))
                 }
@@ -4381,7 +4416,7 @@ if os.path.isdir(dist_path):
     app.mount("/assets", StaticFiles(directory=os.path.join(dist_path, "assets")), name="assets")
 
     @app.get("/{full_path:path}")
-    async def serve_frontend(full_path: str):
+    async def serve_frontend(full_path: str, request: Request):
         # 1. Servir archivo estático exacto si existe en /dist
         file_path = os.path.join(dist_path, full_path)
         if os.path.isfile(file_path):
@@ -4390,6 +4425,56 @@ if os.path.isdir(dist_path):
         index_file = os.path.join(dist_path, "index.html")
         if not os.path.isfile(index_file):
             return HTMLResponse("<h1>Sitio en mantenimiento</h1>", status_code=503)
+
+        # 1.5 Inyección Open Graph dinámica para enlaces de Embajadores (?ref=CODIGO)
+        ref_param = (request.query_params.get("ref") or "").strip().upper()
+        if ref_param and full_path.strip("/") == "":
+            try:
+                with get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        SELECT c.name, cd.name as dog_name
+                        FROM customers c
+                        LEFT JOIN customer_dogs cd ON cd.customer_id = c.id
+                        WHERE UPPER(c.referral_code) = %s
+                        ORDER BY cd.id ASC LIMIT 1
+                    """, (ref_param,))
+                    ref_row = cursor.fetchone()
+                    cursor.execute("SELECT key, value FROM system_settings WHERE key IN ('referral_program_active', 'referral_friend_discount_percent', 'referral_reward_amount', 'referral_min_order_amount')")
+                    s_rows = {r['key']: r['value'] for r in cursor.fetchall()}
+
+                if ref_row and s_rows.get('referral_program_active', '1') == '1':
+                    terms = get_referral_terms(ref_param, s_rows)
+                    pct = terms["discount_percent"]
+                    first_name = (ref_row['name'] or 'Un amigo').split()[0]
+                    dog_part = f" y {ref_row['dog_name']}" if ref_row.get('dog_name') else ""
+
+                    og_title = html.escape(f"{first_name}{dog_part} te regalan {pct}% OFF en Origen Canino — Comida Real")
+                    og_desc = html.escape(
+                        f"Deja atrás los ultraprocesados: prueba dietas BARF crudas y cocinadas al vapor 100% grado humano con {pct}% de descuento en tu primera compra usando el código {ref_param}."
+                    )
+                    og_img = (
+                        "https://origencanino.cl/images/og-embajador-canelo.jpg"
+                        if terms["is_special_founder"]
+                        else "https://origencanino.cl/images/og-familia-origen-canino.jpg"
+                    )
+                    og_url = f"https://origencanino.cl/?ref={html.escape(ref_param)}"
+
+                    with open(index_file, "r", encoding="utf-8") as f:
+                        html_content = f.read()
+
+                    html_content = re.sub(r"<title>.*?</title>", f"<title>{og_title}</title>", html_content, flags=re.I)
+                    html_content = re.sub(r'<meta\s+name="description"[^>]*>', f'<meta name="description" content="{og_desc}">', html_content, flags=re.I)
+                    html_content = re.sub(r'<meta\s+property="og:title"[^>]*>', f'<meta property="og:title" content="{og_title}">', html_content, flags=re.I)
+                    html_content = re.sub(r'<meta\s+property="og:description"[^>]*>', f'<meta property="og:description" content="{og_desc}">', html_content, flags=re.I)
+                    html_content = re.sub(r'<meta\s+property="og:image"[^>]*>', f'<meta property="og:image" content="{og_img}">', html_content, flags=re.I)
+                    html_content = re.sub(r'<meta\s+property="og:url"[^>]*>', f'<meta property="og:url" content="{og_url}">', html_content, flags=re.I)
+                    html_content = re.sub(r'<meta\s+name="twitter:title"[^>]*>', f'<meta name="twitter:title" content="{og_title}">', html_content, flags=re.I)
+                    html_content = re.sub(r'<meta\s+name="twitter:description"[^>]*>', f'<meta name="twitter:description" content="{og_desc}">', html_content, flags=re.I)
+                    html_content = re.sub(r'<meta\s+name="twitter:image"[^>]*>', f'<meta name="twitter:image" content="{og_img}">', html_content, flags=re.I)
+                    return HTMLResponse(content=html_content, status_code=200)
+            except Exception as err_og:
+                print(f"Error inyectando OG para referido {ref_param}: {err_og}")
 
         # 2. Inyección SEO dinámica para Googlebot / Redes Sociales en artículos de blog
         clean_path = full_path.strip("/")
