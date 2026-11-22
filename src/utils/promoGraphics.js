@@ -465,14 +465,14 @@ export const generateNfcLamina10x15DataUrl = async (building, qrSvgElement) => {
   ctx.fillStyle = scrim;
   ctx.fillRect(SAFE, photoY, photoW, photoH);
 
-  // Sello superior izquierdo dentro de la foto
-  drawRoundRect(ctx, SAFE + 28, photoY + 26, 400, 46, 23);
+  // Sello superior izquierdo dentro de la foto (padding generoso para cero desborde)
+  drawRoundRect(ctx, SAFE + 28, photoY + 26, 476, 46, 23);
   ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
   ctx.fill();
   ctx.textAlign = 'center';
   ctx.fillStyle = '#3C4F26';
-  ctx.font = '800 20px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText('100% NATURAL · SIN ULTRAPROCESADOS', SAFE + 228, photoY + 56);
+  ctx.font = '800 19px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText('100% NATURAL · SIN ULTRAPROCESADOS', SAFE + 28 + 238, photoY + 56);
 
   // Texto inferior dentro de la foto
   ctx.textAlign = 'left';

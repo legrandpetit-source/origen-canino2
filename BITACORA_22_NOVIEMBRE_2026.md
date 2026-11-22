@@ -49,3 +49,14 @@
 - **Portal de Clientes (`CustomerPortal.jsx`):** Modal con **Fecha de Nacimiento** + modo 1-clic *"¿No sabes la fecha exacta?"* (edad aproximada en meses/años), selector de **Dieta Habitual (BARF vs Cocinada)** con cálculo diferenciado de porción diaria, aviso suave para completar fecha en perros antiguos y recordatorio mensual de peso para cachorros.
 - **CRM Admin (`CustomersManager.jsx`):** Muestra edad exacta y dieta de cada perro en tabla/Ficha 360°, más bloque **🎂 Próximos Cumpleaños Perrunos (30 días)** con botón de saludo por WhatsApp en 1 clic.
 
+## 6. Motor de Cupones Avanzados, Kit de Difusión QR/Story, `?promo=` Directo y Lámina 10×15 SELPHY NFC
+- **Cupones Avanzados (`coupons` + `backend/main.py` + `PromotionsManager.jsx`):**
+  - Nuevas reglas opcionales: `min_kg` (suma solo dietas BARF + Cocinada, excluye snacks), `applicable_scope` (`all`, `diets`, `barf`, `cocinada`, `snack`), `customer_eligibility` (`all`, `first_order`, `returning`), `campaign_title` y `story_theme`.
+  - Nuevo endpoint público `GET /api/promotions/public/{code}` + Open Graph dinámico en `serve_frontend` para `?promo=CODIGO`.
+  - Pre-aplicación automática en `Home.jsx` / `CartContext.jsx` / `CheckoutModal.jsx` al entrar por `?promo=CODIGO` (ocultando `BIENVENIDO10`).
+- **Kit de Difusión en 1 Clic (`src/utils/promoGraphics.js`):**
+  - En cada cupón: link directo `?promo=CODIGO`, QR descargable PNG, Tarjeta Vertical Story `1080×1920` (4 temas visuales) y botón compartir por WhatsApp.
+  - Integrado en **Clientes (CRM) → Marketing Directo** con selector **"Cargar Promoción Activa"** que rellena WhatsApp y Email HTML automáticamente.
+- **Lámina Imprimible 10×15 cm (`NfcManager.jsx`):**
+  - Botón **Lámina 10×15** en cada edificio NFC con vista previa y descarga PNG `1200×1800 px` (300 DPI) para **Canon SELPHY CP1500** (pedestal acrílico en L vertical), con círculo guía exacto de **25 mm (`300 px`)** arriba a la derecha para tag NTAG213, foto editorial, descuento exclusivo y QR de respaldo.
+
