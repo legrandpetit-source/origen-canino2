@@ -29,7 +29,8 @@ import {
   Wallet,
   QrCode,
   Download,
-  Share2
+  Share2,
+  Upload
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { generateCouponStoryDataUrl, generateQrPngDataUrl, STORY_THEMES } from '../../utils/promoGraphics';
@@ -95,8 +96,34 @@ export default function PromotionsManager({ fetchWithAuth }) {
   // Modal Kit de Difusión (QR / Story / Link ?promo=CODIGO)
   const [shareCoupon, setShareCoupon] = useState(null);
   const [shareTheme, setShareTheme] = useState('olive');
+  const [storyPreviewUrl, setStoryPreviewUrl] = useState('');
+  const [customStoryHero, setCustomStoryHero] = useState(null);
   const [downloadingAsset, setDownloadingAsset] = useState(false);
   const shareQrRef = useRef(null);
+
+  // Vista previa en vivo de la Tarjeta Story cuando cambia el cupón, el tema o la foto
+  useEffect(() => {
+    if (!shareCoupon) {
+      setStoryPreviewUrl('');
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const svgEl = shareQrRef.current?.querySelector('svg');
+        const url = await generateCouponStoryDataUrl(shareCoupon, svgEl, shareTheme, {
+          customHeroSrc: customStoryHero
+        });
+        if (!cancelled) setStoryPreviewUrl(url);
+      } catch (err) {
+        console.error('Error previsualizando Story:', err);
+      }
+    }, 100);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [shareCoupon, shareTheme, customStoryHero]);
 
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState(null);
@@ -1509,7 +1536,7 @@ export default function PromotionsManager({ fetchWithAuth }) {
       {/* ========================================================================= */}
       {shareCoupon && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-xl max-h-[92vh] overflow-y-auto p-6 shadow-2xl border border-[#EBE4DA] space-y-5">
+          <div className="bg-white rounded-3xl w-full max-w-3xl max-h-[94vh] overflow-y-auto p-6 shadow-2xl border border-[#EBE4DA] space-y-5">
             <div className="flex items-start justify-between border-b border-stone-100 pb-3">
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[#677333] bg-[#EBF2DA] px-2.5 py-0.5 rounded-full">
@@ -1519,7 +1546,7 @@ export default function PromotionsManager({ fetchWithAuth }) {
                   {shareCoupon.campaign_title || `Campaña ${shareCoupon.code}`}
                 </h3>
                 <p className="text-xs text-stone-500">
-                  Enlace con pre-aplicación directa al carrito, QR imprimible y Tarjeta Vertical Story.
+                  Vista previa en vivo por tema, foto personalizable, enlace directo y QR imprimible.
                 </p>
               </div>
               <button
@@ -1530,41 +1557,33 @@ export default function PromotionsManager({ fetchWithAuth }) {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-5 items-center">
-              <div className="sm:col-span-5 flex flex-col items-center p-4 bg-[#FAF7F2] rounded-2xl border border-[#EBE4DA]">
-                <div ref={shareQrRef} className="bg-white p-3 rounded-2xl border border-stone-200 shadow-xs">
-                  <QRCodeSVG
-                    value={`https://origencanino.cl/?promo=${shareCoupon.code}`}
-                    size={160}
-                    level="H"
-                    includeMargin={false}
+            {/* QR oculto para vectorización nítida */}
+            <div ref={shareQrRef} className="hidden">
+              <QRCodeSVG
+                value={`https://origencanino.cl/?promo=${shareCoupon.code}`}
+                size={280}
+                level="H"
+                includeMargin={false}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+              {/* Vista Previa en Vivo de la Tarjeta Story */}
+              <div className="md:col-span-5 flex flex-col items-center p-3 bg-[#FAF7F2] rounded-2xl border border-[#EBE4DA]">
+                {storyPreviewUrl ? (
+                  <img
+                    src={storyPreviewUrl}
+                    alt={`Vista previa Story ${shareCoupon.code}`}
+                    className="max-h-[54vh] w-auto rounded-2xl shadow-lg border border-stone-200"
                   />
-                </div>
-                <span className="font-mono font-extrabold text-sm text-[#3c2716] mt-2.5 tracking-wider">
-                  {shareCoupon.code}
-                </span>
-                <button
-                  type="button"
-                  disabled={downloadingAsset}
-                  onClick={async () => {
-                    setDownloadingAsset(true);
-                    try {
-                      const url = await generateQrPngDataUrl(shareQrRef.current?.querySelector('svg'), shareCoupon.code);
-                      const a = document.createElement('a');
-                      a.download = `qr-promo-${shareCoupon.code.toLowerCase()}.png`;
-                      a.href = url;
-                      a.click();
-                    } finally {
-                      setDownloadingAsset(false);
-                    }
-                  }}
-                  className="mt-2.5 w-full py-1.5 px-3 bg-white hover:bg-stone-100 border border-stone-200 rounded-xl text-[11px] font-bold text-stone-700 flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Download size={13} /> Descargar QR PNG
-                </button>
+                ) : (
+                  <div className="py-24 text-xs text-stone-400">Generando vista previa...</div>
+                )}
+                <span className="text-[10px] text-stone-500 mt-2 font-mono">1080 × 1920 px · Historia WhatsApp / IG</span>
               </div>
 
-              <div className="sm:col-span-7 space-y-3.5 text-xs">
+              {/* Controles de Tema, Foto, Enlace y Descargas */}
+              <div className="md:col-span-7 space-y-4 text-xs">
                 <div>
                   <label className="font-bold text-stone-600 uppercase text-[10px] tracking-wider block mb-1">
                     Enlace Directo (pre-aplica el cupón al carrito)
@@ -1592,69 +1611,109 @@ export default function PromotionsManager({ fetchWithAuth }) {
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-600 uppercase text-[10px] tracking-wider block mb-1">
-                    Tema Visual de la Tarjeta Story (1080×1920)
+                  <label className="font-bold text-stone-600 uppercase text-[10px] tracking-wider block mb-1.5">
+                    Tema Editorial de la Tarjeta Story
                   </label>
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="grid grid-cols-2 gap-2">
                     {Object.entries(STORY_THEMES).map(([k, t]) => (
                       <button
                         key={k}
                         type="button"
                         onClick={() => setShareTheme(k)}
-                        className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition cursor-pointer ${
+                        className={`px-3 py-2 rounded-xl text-[11px] font-bold border transition flex items-center gap-2 cursor-pointer ${
                           shareTheme === k
-                            ? 'bg-[#677333] text-white border-[#677333]'
-                            : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100'
+                            ? 'bg-[#677333] text-white border-[#677333] shadow-xs'
+                            : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
                         }`}
                       >
-                        {t.label}
+                        <span
+                          className="w-3.5 h-3.5 rounded-full border border-white/60 shrink-0"
+                          style={{ background: t.baseColor }}
+                        />
+                        <span>{t.label}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  disabled={downloadingAsset}
-                  onClick={async () => {
-                    setDownloadingAsset(true);
-                    try {
-                      const url = await generateCouponStoryDataUrl(
-                        shareCoupon,
-                        shareQrRef.current?.querySelector('svg'),
-                        shareTheme
-                      );
+                <label className="flex items-center justify-between gap-2 p-2.5 bg-[#FAF7F2] hover:bg-[#F2ECE1] border border-[#E6DCCB] rounded-xl cursor-pointer transition">
+                  <div>
+                    <span className="font-bold text-secondary-brown block">Cambiar Foto de Fondo (Opcional)</span>
+                    <span className="text-[10px] text-stone-500">Sugerido: 1080 × 980 px (JPG/PNG)</span>
+                  </div>
+                  <span className="px-2.5 py-1 bg-white border border-stone-200 rounded-lg font-bold text-[#677333] flex items-center gap-1 shrink-0">
+                    <Upload size={12} /> Subir
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (!f || !f.type.startsWith('image/')) return;
+                      const reader = new FileReader();
+                      reader.onload = (ev) => setCustomStoryHero(ev.target.result);
+                      reader.readAsDataURL(f);
+                    }}
+                  />
+                </label>
+
+                <div className="space-y-2 pt-1">
+                  <button
+                    type="button"
+                    disabled={downloadingAsset || !storyPreviewUrl}
+                    onClick={() => {
                       const a = document.createElement('a');
-                      a.download = `story-promo-${shareCoupon.code.toLowerCase()}.png`;
-                      a.href = url;
+                      a.download = `story-promo-${shareCoupon.code.toLowerCase()}-${shareTheme}.png`;
+                      a.href = storyPreviewUrl;
                       a.click();
                       notify('success', '¡Tarjeta Story 1080×1920 descargada!');
-                    } finally {
-                      setDownloadingAsset(false);
-                    }
-                  }}
-                  className="w-full py-2.5 px-4 bg-[#677333] hover:bg-[#556029] text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
-                >
-                  <Download size={15} />
-                  <span>{downloadingAsset ? 'Generando...' : 'Descargar Tarjeta Story (WhatsApp / IG)'}</span>
-                </button>
+                    }}
+                    className="w-full py-3 px-4 bg-[#677333] hover:bg-[#556029] text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={15} />
+                    <span>Descargar Tarjeta Story (WhatsApp / IG)</span>
+                  </button>
 
-                <a
-                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                    `🐾 ¡${shareCoupon.campaign_title || `Promoción Especial ${shareCoupon.code}`} en Origen Canino! ${
-                      shareCoupon.discount_type === 'percentage'
-                        ? `${shareCoupon.discount_value}% OFF`
-                        : `$${Number(shareCoupon.discount_value).toLocaleString('es-CL')} OFF`
-                    } en comida real 100% natural para tu perro${
-                      Number(shareCoupon.min_kg || 0) > 0 ? ` (mínimo ${Number(shareCoupon.min_kg)} kg en dietas)` : ''
-                    }. Entra directo aquí: https://origencanino.cl/?promo=${shareCoupon.code}`
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-xs"
-                >
-                  <Share2 size={15} /> Compartir por WhatsApp 💬
-                </a>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      disabled={downloadingAsset}
+                      onClick={async () => {
+                        setDownloadingAsset(true);
+                        try {
+                          const url = await generateQrPngDataUrl(shareQrRef.current?.querySelector('svg'), shareCoupon.code);
+                          const a = document.createElement('a');
+                          a.download = `qr-promo-${shareCoupon.code.toLowerCase()}.png`;
+                          a.href = url;
+                          a.click();
+                        } finally {
+                          setDownloadingAsset(false);
+                        }
+                      }}
+                      className="py-2.5 px-3 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <QrCode size={14} /> Solo QR PNG
+                    </button>
+
+                    <a
+                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                        `🐾 ¡${shareCoupon.campaign_title || `Promoción Especial ${shareCoupon.code}`} en Origen Canino! ${
+                          shareCoupon.discount_type === 'percentage'
+                            ? `${shareCoupon.discount_value}% OFF`
+                            : `$${Number(shareCoupon.discount_value).toLocaleString('es-CL')} OFF`
+                        } en comida real 100% natural para tu perro${
+                          Number(shareCoupon.min_kg || 0) > 0 ? ` (mínimo ${Number(shareCoupon.min_kg)} kg en dietas)` : ''
+                        }. Entra directo aquí: https://origencanino.cl/?promo=${shareCoupon.code}`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-xs"
+                    >
+                      <Share2 size={14} /> WhatsApp 💬
+                    </a>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

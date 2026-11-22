@@ -58,71 +58,64 @@ const svgElementToImage = async (svgEl) => {
 export const STORY_THEMES = {
   olive: {
     label: 'Oliva Origen',
-    bgStops: ['#FAF7F2', '#F2ECE1', '#EBF2DA'],
-    topBar: '#556B2F',
-    badgeBg: '#556B2F',
-    badgeText: '#FFFFFF',
-    titleColor: '#3D2B1F',
-    accentColor: '#556B2F',
-    subColor: '#5C4B3E',
-    cardBg: '#FFFFFF',
-    cardBorder: '#E5DACD',
-    codeBg: '#FAF7F2',
-    codeText: '#3D2B1F',
-    footerBg: '#2F3E1E',
-    footerText: '#FFFFFF',
-    footerSub: '#D9E8B8'
+    baseColor: '#233016',
+    baseRgb: '35, 48, 22',
+    accentColor: '#E5A956',
+    badgeBg: '#E5A956',
+    badgeText: '#1F2A14',
+    titleColor: '#FAF7F2',
+    subColor: '#D9E4C8',
+    codeBg: 'rgba(255, 255, 255, 0.08)',
+    codeBorder: 'rgba(229, 169, 86, 0.65)',
+    codeText: '#FAF7F2',
+    divider: 'rgba(229, 169, 86, 0.35)',
+    sparkle: false
   },
   honey: {
     label: 'Naranjo Miel',
-    bgStops: ['#FFFBF5', '#FDF2E2', '#F8E3C4'],
-    topBar: '#DB994B',
-    badgeBg: '#DB994B',
+    baseColor: '#362012',
+    baseRgb: '54, 32, 18',
+    accentColor: '#F2AE52',
+    badgeBg: '#E3973B',
     badgeText: '#FFFFFF',
-    titleColor: '#3D2B1F',
-    accentColor: '#C57E2C',
-    subColor: '#5C4B3E',
-    cardBg: '#FFFFFF',
-    cardBorder: '#F0D5B0',
-    codeBg: '#FFF8EE',
-    codeText: '#3D2B1F',
-    footerBg: '#4A3728',
-    footerText: '#FFFFFF',
-    footerSub: '#F7D7A8'
+    titleColor: '#FFF9F2',
+    subColor: '#F3D8B8',
+    codeBg: 'rgba(255, 255, 255, 0.08)',
+    codeBorder: 'rgba(242, 174, 82, 0.70)',
+    codeText: '#FFF9F2',
+    divider: 'rgba(242, 174, 82, 0.35)',
+    sparkle: false
   },
   christmas: {
     label: 'Especial Navidad',
-    bgStops: ['#FFFDF9', '#F9F3EA', '#E9F1E4'],
-    topBar: '#9B1C1C',
-    badgeBg: '#9B1C1C',
+    baseColor: '#152B1D',
+    baseRgb: '21, 43, 29',
+    accentColor: '#F4C869',
+    badgeBg: '#B92525',
     badgeText: '#FFFFFF',
-    titleColor: '#1E3A1E',
-    accentColor: '#9B1C1C',
-    subColor: '#4A4A42',
-    cardBg: '#FFFFFF',
-    cardBorder: '#E4D5C7',
-    codeBg: '#FEF2F2',
-    codeText: '#9B1C1C',
-    footerBg: '#1E3A1E',
-    footerText: '#FFFFFF',
-    footerSub: '#FDE68A'
+    titleColor: '#FFFDF8',
+    subColor: '#D7E6D9',
+    codeBg: 'rgba(185, 37, 37, 0.28)',
+    codeBorder: 'rgba(244, 200, 105, 0.75)',
+    codeText: '#FFFDF8',
+    divider: 'rgba(244, 200, 105, 0.42)',
+    sparkle: true
   },
   vip: {
     label: 'VIP Oscuro & Dorado',
-    bgStops: ['#1C1917', '#292524', '#1C1917'],
-    topBar: '#D9A441',
-    badgeBg: '#D9A441',
-    badgeText: '#1C1917',
+    baseColor: '#141210',
+    baseRgb: '20, 18, 16',
+    accentColor: '#E6B85C',
+    badgeBg: '#E6B85C',
+    badgeText: '#141210',
     titleColor: '#FAF7F2',
-    accentColor: '#F2C56B',
-    subColor: '#D6D3D1',
-    cardBg: '#FFFFFF',
-    cardBorder: '#D9A441',
-    codeBg: '#1C1917',
-    codeText: '#F2C56B',
-    footerBg: '#D9A441',
-    footerText: '#1C1917',
-    footerSub: '#292524'
+    subColor: '#D4CEC4',
+    codeBg: 'rgba(230, 184, 92, 0.12)',
+    codeBorder: 'rgba(230, 184, 92, 0.75)',
+    codeText: '#F5D284',
+    divider: 'rgba(230, 184, 92, 0.38)',
+    sparkle: false,
+    vipFrame: true
   }
 };
 
@@ -148,124 +141,279 @@ export const generateQrPngDataUrl = async (qrSvgElement, labelText = '') => {
   return canvas.toDataURL('image/png');
 };
 
-export const generateCouponStoryDataUrl = async (coupon, qrSvgElement, themeKeyOverride = null) => {
+/**
+ * Tarjeta Vertical Story (1080 × 1920 px) de estilo editorial full-bleed
+ * con 4 temas diferenciados (Oliva Origen, Naranjo Miel, Especial Navidad, VIP Oscuro & Dorado).
+ */
+export const generateCouponStoryDataUrl = async (
+  coupon,
+  qrSvgElement,
+  themeKeyOverride = null,
+  options = {}
+) => {
   const theme = STORY_THEMES[themeKeyOverride || coupon.story_theme || 'olive'] || STORY_THEMES.olive;
   const W = 1080;
   const H = 1920;
+  const SAFE = 68;
+  const PHOTO_H = 980;
+
+  const heroSrc = options.customHeroSrc || '/images/nfc-lamina-hero.jpg';
+  const logoSrc = options.customLogoSrc || '/logo.webp';
+
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d');
 
-  const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
-  bgGrad.addColorStop(0, theme.bgStops[0]);
-  bgGrad.addColorStop(0.55, theme.bgStops[1]);
-  bgGrad.addColorStop(1, theme.bgStops[2]);
-  ctx.fillStyle = bgGrad;
+  // 1. Base profunda del tema
+  ctx.fillStyle = theme.baseColor;
   ctx.fillRect(0, 0, W, H);
 
-  ctx.fillStyle = theme.topBar;
-  ctx.fillRect(0, 0, W, 26);
-
-  // Logo Origen Canino
+  // 2. Fotografía editorial a sangre (0 -> 980 px)
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, W, PHOTO_H);
+  ctx.clip();
   try {
-    const logo = await loadImage('/logo.webp');
-    const lw = 148;
-    const lh = (logo.height / logo.width) * lw;
-    drawRoundRect(ctx, (W - 180) / 2, 82, 180, 180, 38);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fill();
-    ctx.drawImage(logo, (W - lw) / 2, 98, lw, lh);
-  } catch {}
+    const heroImg = await loadImage(heroSrc);
+    const ratio = Math.max(W / heroImg.width, PHOTO_H / heroImg.height);
+    const dw = heroImg.width * ratio;
+    const dh = heroImg.height * ratio;
+    ctx.drawImage(heroImg, (W - dw) / 2, (PHOTO_H - dh) / 2, dw, dh);
+  } catch {
+    ctx.fillStyle = theme.baseColor;
+    ctx.fillRect(0, 0, W, PHOTO_H);
+  }
 
-  ctx.textAlign = 'center';
-  ctx.fillStyle = theme.titleColor;
-  ctx.font = '800 44px "Outfit", sans-serif';
-  ctx.fillText('Origen CANINO', W / 2, 316);
-  ctx.fillStyle = theme.accentColor;
-  ctx.font = '700 22px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText('COMIDA REAL · VIDA SALUDABLE', W / 2, 354);
+  // Viñeta superior sutil para legibilidad de logo y badge de campaña
+  const topVig = ctx.createLinearGradient(0, 0, 0, 290);
+  topVig.addColorStop(0, `rgba(${theme.baseRgb}, 0.55)`);
+  topVig.addColorStop(1, `rgba(${theme.baseRgb}, 0)`);
+  ctx.fillStyle = topVig;
+  ctx.fillRect(0, 0, W, 290);
 
-  // Pill de campaña
-  const campTitle = (coupon.campaign_title || '').trim() || 'PROMOCIÓN ESPECIAL';
-  drawRoundRect(ctx, 130, 405, W - 260, 72, 36);
-  ctx.fillStyle = theme.badgeBg;
+  // Fundido impecable de la base de la foto al color del tema
+  const botFade = ctx.createLinearGradient(0, PHOTO_H - 360, 0, PHOTO_H);
+  botFade.addColorStop(0, `rgba(${theme.baseRgb}, 0)`);
+  botFade.addColorStop(0.55, `rgba(${theme.baseRgb}, 0.78)`);
+  botFade.addColorStop(1, `rgba(${theme.baseRgb}, 1)`);
+  ctx.fillStyle = botFade;
+  ctx.fillRect(0, PHOTO_H - 360, W, 360);
+  ctx.restore();
+
+  // Detalle sutil de marco dorado para tema VIP
+  if (theme.vipFrame) {
+    ctx.save();
+    drawRoundRect(ctx, 28, 28, W - 56, H - 56, 36);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(230, 184, 92, 0.42)';
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Detalles sutiles de destellos dorados minimalistas para Especial Navidad
+  if (theme.sparkle) {
+    ctx.save();
+    const stars = [
+      [130, 1020, 12], [945, 960, 14], [880, 1135, 9],
+      [115, 1690, 10], [970, 1680, 12], [540, 915, 8]
+    ];
+    stars.forEach(([sx, sy, sr]) => {
+      ctx.fillStyle = 'rgba(244, 200, 105, 0.52)';
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - sr);
+      ctx.quadraticCurveTo(sx, sy, sx + sr, sy);
+      ctx.quadraticCurveTo(sx, sy, sx, sy + sr);
+      ctx.quadraticCurveTo(sx, sy, sx - sr, sy);
+      ctx.quadraticCurveTo(sx, sy, sx, sy - sr);
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  // 3. Medallón circular protagonista con el Logo oficial (arriba izquierda, sin texto duplicado)
+  const logoR = 112;
+  const logoCx = SAFE + logoR;
+  const logoCy = SAFE + logoR + 12;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(logoCx, logoCy, logoR, 0, Math.PI * 2);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.30)';
+  ctx.shadowBlur = 28;
+  ctx.shadowOffsetY = 8;
   ctx.fill();
-  ctx.fillStyle = theme.badgeText;
-  ctx.font = '800 28px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText(campTitle.toUpperCase().slice(0, 34), W / 2, 451);
+  ctx.shadowColor = 'transparent';
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = theme.vipFrame ? '#E6B85C' : 'rgba(255, 255, 255, 0.92)';
+  ctx.stroke();
 
-  // Beneficio gigante
+  ctx.beginPath();
+  ctx.arc(logoCx, logoCy, logoR - 6, 0, Math.PI * 2);
+  ctx.clip();
+  try {
+    const logo = await loadImage(logoSrc);
+    const maxS = (logoR - 14) * 2;
+    const lr = Math.min(maxS / logo.width, maxS / logo.height);
+    const lw = logo.width * lr;
+    const lh = logo.height * lr;
+    ctx.drawImage(logo, logoCx - lw / 2, logoCy - lh / 2, lw, lh);
+  } catch {}
+  ctx.restore();
+
+  // 4. Pill editorial superior derecha (Título de campaña)
+  const campTitle = (coupon.campaign_title || '').trim() || 'PROMOCIÓN ESPECIAL';
+  const badgeLabel = campTitle.toUpperCase().slice(0, 26);
+  ctx.font = '800 22px "Outfit", sans-serif';
+  const badgeW = Math.min(540, Math.max(280, ctx.measureText(badgeLabel).width + 64));
+  const badgeX = W - SAFE - badgeW;
+  const badgeY = SAFE + 26;
+
+  ctx.save();
+  drawRoundRect(ctx, badgeX, badgeY, badgeW, 56, 28);
+  ctx.fillStyle = theme.badgeBg;
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.28)';
+  ctx.shadowBlur = 20;
+  ctx.shadowOffsetY = 6;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = theme.badgeText;
+  ctx.font = '800 22px "Outfit", sans-serif';
+  ctx.fillText(badgeLabel, badgeX + badgeW / 2, badgeY + 36);
+  ctx.restore();
+
+  // 5. Bloque Editorial Principal (UNA sola fuente: Outfit)
+  ctx.textAlign = 'left';
+  ctx.fillStyle = theme.accentColor;
+  ctx.font = '700 26px "Outfit", sans-serif';
+  ctx.fillText('BENEFICIO EXCLUSIVO · COMIDA REAL 100% NATURAL', SAFE, 932);
+
+  // Beneficio protagonista gigante
   const val = Number(coupon.discount_value || 0);
   const benefitBig =
     coupon.discount_type === 'percentage'
       ? `${val}% OFF`
       : `$${Math.round(val).toLocaleString('es-CL')} OFF`;
-  ctx.fillStyle = theme.accentColor;
-  ctx.font = '900 124px "Outfit", sans-serif';
-  ctx.fillText(benefitBig, W / 2, 608);
+  ctx.fillStyle = theme.titleColor;
+  ctx.font = '900 144px "Outfit", sans-serif';
+  ctx.fillText(benefitBig, SAFE, 1072);
 
-  // Subtítulo / descripción
+  // Descripción limpia (máx 2 líneas)
   ctx.fillStyle = theme.subColor;
-  ctx.font = '600 32px "Plus Jakarta Sans", sans-serif';
-  const desc = (coupon.description || 'Comida real 100% natural para tu perro · BARF y Cocinada').trim();
-  drawWrappedCenteredText(ctx, desc, W / 2, 672, W - 160, 44, 2);
-
-  // Tarjeta blanca central con QR + código
-  drawRoundRect(ctx, 150, 795, W - 300, 700, 48);
-  ctx.fillStyle = theme.cardBg;
-  ctx.fill();
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = theme.cardBorder;
-  ctx.stroke();
-
-  const qrImg = await svgElementToImage(qrSvgElement);
-  if (qrImg) {
-    ctx.drawImage(qrImg, (W - 430) / 2, 855, 430, 430);
+  ctx.font = '500 34px "Outfit", sans-serif';
+  const desc = (coupon.description || 'Dietas BARF crudas y recetas cocinadas al vapor para tu perro.').trim();
+  const words = desc.split(/\s+/).filter(Boolean);
+  const descLines = [];
+  let curLine = '';
+  for (const w of words) {
+    const test = curLine ? `${curLine} ${w}` : w;
+    if (ctx.measureText(test).width > W - SAFE * 2 && curLine) {
+      descLines.push(curLine);
+      curLine = w;
+      if (descLines.length >= 2) break;
+    } else {
+      curLine = test;
+    }
   }
+  if (curLine && descLines.length < 2) descLines.push(curLine);
+  descLines.forEach((ln, idx) => ctx.fillText(ln, SAFE, 1138 + idx * 44));
 
-  ctx.fillStyle = '#6B7280';
-  ctx.font = '700 24px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText('ESCANEA EL QR O USA EL CÓDIGO:', W / 2, 1350);
+  // Separador fino
+  const sepY = 1236;
+  ctx.fillStyle = theme.divider;
+  ctx.fillRect(SAFE, sepY, W - SAFE * 2, 2);
 
-  drawRoundRect(ctx, 230, 1378, W - 460, 82, 24);
+  // 6. Zona de Acción: Código a la Izquierda + QR a la Derecha (equilibrio geométrico)
+  const blockY = 1295;
+  const qrBox = 310;
+  const qrX = W - SAFE - qrBox;
+  const qrY = blockY;
+
+  // Izquierda: Etiqueta + Código + Condiciones
+  const leftMaxW = qrX - SAFE - 40;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = theme.accentColor;
+  ctx.font = '700 23px "Outfit", sans-serif';
+  ctx.fillText('USA ESTE CÓDIGO AL COMPRAR', SAFE, blockY + 38);
+
+  const codeStr = String(coupon.code || '').toUpperCase();
+  drawRoundRect(ctx, SAFE, blockY + 62, leftMaxW, 108, 26);
   ctx.fillStyle = theme.codeBg;
   ctx.fill();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = theme.cardBorder;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = theme.codeBorder;
   ctx.stroke();
-  ctx.fillStyle = theme.codeText;
-  ctx.font = '800 44px monospace';
-  ctx.fillText(String(coupon.code || '').toUpperCase(), W / 2, 1434);
 
-  // Condiciones claras
-  const condParts = [];
-  if (Number(coupon.min_kg || 0) > 0) condParts.push(`Mínimo ${Number(coupon.min_kg)} kg en dietas`);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = theme.codeText;
+  const codeFontSize = codeStr.length > 11 ? 42 : 52;
+  ctx.font = `800 ${codeFontSize}px "Outfit", sans-serif`;
+  ctx.fillText(codeStr, SAFE + leftMaxW / 2, blockY + 132);
+
+  // Condiciones limpias debajo del código
+  const condLines = [];
+  if (Number(coupon.min_kg || 0) > 0) condLines.push(`• Mínimo ${Number(coupon.min_kg)} kg en dietas`);
   if (Number(coupon.min_order_amount || 0) > 0) {
-    condParts.push(`Compra mín. $${Number(coupon.min_order_amount).toLocaleString('es-CL')}`);
+    condLines.push(`• Compra mínima $${Number(coupon.min_order_amount).toLocaleString('es-CL')} CLP`);
   }
   if (coupon.end_date) {
     const d = new Date(coupon.end_date);
     if (!isNaN(d.getTime())) {
-      condParts.push(`Hasta ${d.toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })}`);
+      condLines.push(`• Válido hasta el ${d.toLocaleDateString('es-CL', { day: '2-digit', month: 'long' })}`);
     }
   }
-  const condLine = condParts.length > 0 ? condParts.join('  ·  ') : '100% Natural · Sin Ultraprocesados';
+  if (condLines.length === 0) {
+    condLines.push('• Dietas BARF y Cocinadas al vapor');
+    condLines.push('• Sin ultraprocesados ni harinas');
+  }
 
-  // Footer
-  drawRoundRect(ctx, 130, 1565, W - 260, 114, 28);
-  ctx.fillStyle = theme.footerBg;
-  ctx.fill();
-  ctx.fillStyle = theme.footerText;
-  ctx.font = '800 34px "Outfit", sans-serif';
-  ctx.fillText('origencanino.cl', W / 2, 1617);
-  ctx.fillStyle = theme.footerSub;
-  ctx.font = '600 23px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText('Despacho en frío -18°C · Santiago y V Región', W / 2, 1656);
-
+  ctx.textAlign = 'left';
   ctx.fillStyle = theme.subColor;
-  ctx.font = '700 24px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText(condLine, W / 2, 1748);
+  ctx.font = '500 25px "Outfit", sans-serif';
+  condLines.slice(0, 3).forEach((cl, idx) => {
+    ctx.fillText(cl, SAFE + 4, blockY + 218 + idx * 38);
+  });
+
+  // Derecha: Tarjeta blanca limpia con QR escaneable
+  ctx.save();
+  drawRoundRect(ctx, qrX, qrY, qrBox, qrBox, 32);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.30)';
+  ctx.shadowBlur = 28;
+  ctx.shadowOffsetY = 10;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  if (theme.vipFrame) {
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#E6B85C';
+    ctx.stroke();
+  }
+  const qrImg = await svgElementToImage(qrSvgElement);
+  if (qrImg) {
+    ctx.drawImage(qrImg, qrX + 22, qrY + 22, qrBox - 44, qrBox - 44);
+  }
+  ctx.restore();
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = theme.subColor;
+  ctx.font = '600 22px "Outfit", sans-serif';
+  ctx.fillText('Escanea para aplicar', qrX + qrBox / 2, qrY + qrBox + 38);
+
+  // 7. Pie editorial minimalista (sobre margen seguro)
+  ctx.fillStyle = theme.divider;
+  ctx.fillRect(SAFE, H - SAFE - 102, W - SAFE * 2, 2);
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = theme.titleColor;
+  ctx.font = '800 34px "Outfit", sans-serif';
+  ctx.fillText('origencanino.cl', SAFE, H - SAFE - 40);
+
+  ctx.textAlign = 'right';
+  ctx.fillStyle = theme.accentColor;
+  ctx.font = '600 24px "Outfit", sans-serif';
+  ctx.fillText('Frío -18°C · Santiago y V Región', W - SAFE, H - SAFE - 42);
 
   return canvas.toDataURL('image/png');
 };
