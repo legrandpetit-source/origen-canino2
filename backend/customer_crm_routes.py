@@ -161,7 +161,7 @@ def create_customer_crm_router(get_current_admin, get_password_hash, log_securit
                 SELECT
                     id, customer_id, LOWER(TRIM(COALESCE(customer_email, ''))) AS clean_email,
                     customer_name, customer_phone, customer_address, customer_city,
-                    dog_name, total, payment_status, status, referral_code, created_at
+                    dog_name, total, payment_status, delivery_status AS status, referral_code, created_at
                 FROM orders
                 ORDER BY id DESC
             """)
@@ -567,7 +567,9 @@ def create_customer_crm_router(get_current_admin, get_password_hash, log_securit
             clean_email = (customer["email"] or "").strip().lower()
             cursor.execute(
                 """
-                SELECT id, total, discount, coupon_code, wallet_discount, payment_status, status, payment_method, created_at
+                SELECT id, total, COALESCE(discount_amount, 0) AS discount, coupon_code,
+                       COALESCE(wallet_discount, 0) AS wallet_discount,
+                       payment_status, delivery_status AS status, payment_method, created_at
                 FROM orders
                 WHERE customer_id = %s OR LOWER(TRIM(COALESCE(customer_email, ''))) = %s
                 ORDER BY id DESC
@@ -588,7 +590,7 @@ def create_customer_crm_router(get_current_admin, get_password_hash, log_securit
 
             if order_ids:
                 cursor.execute(
-                    "SELECT order_id, product_name, quantity, price FROM order_items WHERE order_id = ANY(%s)",
+                    "SELECT order_id, product_name, quantity, price_at_purchase AS price FROM order_items WHERE order_id = ANY(%s)",
                     (order_ids,),
                 )
                 items_by_order = {}
@@ -850,3 +852,4 @@ def create_customer_crm_router(get_current_admin, get_password_hash, log_securit
         return {"status": "ok", "mode": mode, "message": msg}
 
     return router
+
