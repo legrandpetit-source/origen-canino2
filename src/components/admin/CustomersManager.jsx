@@ -103,6 +103,77 @@ export default function CustomersManager({ fetchWithAuth }) {
   const [walletReason, setWalletReason] = useState('');
   const [blockReason, setBlockReason] = useState('');
 
+  // Modal Ficha & Edición de Mascota (desde tabla o Ficha 360°)
+  const [dogModal, setDogModal] = useState(null); // { customerId, customerName, dog (null si nuevo) }
+  const [dogEditForm, setDogEditForm] = useState({
+    name: '',
+    weight: '',
+    favorite_diet: 'barf',
+    birth_date: '',
+    birth_date_approx: false,
+    notes: ''
+  });
+  const [savingDogAdmin, setSavingDogAdmin] = useState(false);
+
+  const openDogAdminModal = (customerId, customerName, dog = null) => {
+    setDogModal({ customerId, customerName, dog });
+    if (dog) {
+      setDogEditForm({
+        name: dog.name || '',
+        weight: dog.weight ?? '',
+        favorite_diet: dog.favorite_diet || 'barf',
+        birth_date: dog.birth_date || '',
+        birth_date_approx: Boolean(dog.birth_date_approx),
+        notes: dog.notes || ''
+      });
+    } else {
+      setDogEditForm({
+        name: '',
+        weight: '',
+        favorite_diet: 'barf',
+        birth_date: '',
+        birth_date_approx: false,
+        notes: ''
+      });
+    }
+  };
+
+  const handleSaveDogAdmin = async (e) => {
+    e.preventDefault();
+    if (!dogModal) return;
+    setSavingDogAdmin(true);
+    try {
+      const isEdit = Boolean(dogModal.dog?.id);
+      const url = isEdit
+        ? `/api/admin/customers/${dogModal.customerId}/dogs/${dogModal.dog.id}`
+        : `/api/admin/customers/${dogModal.customerId}/dogs`;
+      const res = await fetchWithAuth(url, {
+        method: isEdit ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: dogEditForm.name.trim(),
+          weight: parseFloat(dogEditForm.weight || '0'),
+          favorite_diet: dogEditForm.favorite_diet || 'barf',
+          birth_date: dogEditForm.birth_date || null,
+          birth_date_approx: Boolean(dogEditForm.birth_date_approx),
+          notes: dogEditForm.notes || ''
+        })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail || 'Error guardando mascota');
+      showToast('success', `Ficha de ${json.dog.name} guardada correctamente.`);
+      setDogModal(null);
+      await loadCustomers();
+      if (detailData && detailData.customer.id === dogModal.customerId) {
+        openCustomer360(dogModal.customerId);
+      }
+    } catch (err) {
+      showToast('error', err.message);
+    } finally {
+      setSavingDogAdmin(false);
+    }
+  };
+
   // Marketing Directo
   const [campaignAudience, setCampaignAudience] = useState('selected'); // selected, all_filtered, no_orders, inactive, vip, ambassadors, guests
   const [selectedTemplateId, setSelectedTemplateId] = useState('reposicion');
@@ -826,21 +897,34 @@ export default function CustomersManager({ fetchWithAuth }) {
                         </td>
                         <td className="p-3">
                           {c.dogs && c.dogs.length > 0 ? (
-                            <div className="space-y-0.5">
+                            <div className="flex flex-wrap gap-1.5">
                               {c.dogs.map((d) => (
-                                <div key={d.id} className="inline-flex items-center gap-1 bg-stone-100 px-2 py-0.5 rounded-full text-[11px] text-stone-700 mr-1">
-                                  <PawPrint size={11} className="text-primary-green" />
+                                <button
+                                  key={d.id}
+                                  type="button"
+                                  onClick={() => openDogAdminModal(c.id, c.name, d)}
+                                  className="inline-flex items-center gap-1.5 bg-stone-100 hover:bg-primary-green/15 border border-stone-200 hover:border-primary-green/40 px-2.5 py-1 rounded-full text-[11px] text-stone-700 transition cursor-pointer group"
+                                  title={`Ver / editar ficha de ${d.name}`}
+                                >
+                                  <PawPrint size={11} className="text-primary-green shrink-0" />
                                   <span className="font-semibold">{d.name}</span>
                                   {d.age_label ? <span className="text-primary-green font-semibold">· {d.age_label}</span> : null}
-                                  {d.weight ? <span className="text-stone-400">({d.weight}kg)</span> : null}
+                                  <span className="text-stone-400">({d.weight ?? 0}kg)</span>
                                   {d.days_to_birthday !== null && d.days_to_birthday !== undefined && d.days_to_birthday <= 14 ? (
                                     <span title={`Cumpleaños en ${d.days_to_birthday} días`}>🎂</span>
                                   ) : null}
-                                </div>
+                                  <Eye size={11} className="text-stone-400 group-hover:text-primary-green ml-0.5" />
+                                </button>
                               ))}
                             </div>
                           ) : (
-                            <span className="text-stone-400 italic">Sin perro registrado</span>
+                            <button
+                              type="button"
+                              onClick={() => openDogAdminModal(c.id, c.name, null)}
+                              className="text-[11px] text-stone-400 hover:text-primary-green italic inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <Plus size={11} /> Agregar perro
+                            </button>
                           )}
                         </td>
                         <td className="p-3">
@@ -1257,9 +1341,18 @@ export default function CustomersManager({ fetchWithAuth }) {
 
                 {/* Mascotas */}
                 <div className="bg-white p-4 rounded-2xl border border-[#EBE4DA] space-y-2.5">
-                  <h4 className="font-header font-bold text-sm text-secondary-brown flex items-center gap-1.5">
-                    <PawPrint size={15} className="text-primary-green" /> Mascotas Registradas ({detailData.dogs.length})
-                  </h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-header font-bold text-sm text-secondary-brown flex items-center gap-1.5">
+                      <PawPrint size={15} className="text-primary-green" /> Mascotas Registradas ({detailData.dogs.length})
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => openDogAdminModal(detailData.customer.id, detailData.customer.name, null)}
+                      className="text-[11px] font-bold text-primary-green hover:underline inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus size={12} /> Agregar Mascota
+                    </button>
+                  </div>
                   {detailData.dogs.length === 0 ? (
                     <p className="text-xs text-stone-400">Sin mascotas registradas todavía.</p>
                   ) : (
@@ -1268,14 +1361,26 @@ export default function CustomersManager({ fetchWithAuth }) {
                         <div key={d.id} className="p-3 bg-[#FAF7F2] rounded-xl border border-[#EBE4DA] text-xs">
                           <div className="font-bold text-secondary-brown flex items-center justify-between gap-2">
                             <span>{d.name} · {d.weight} kg</span>
-                            <span className="text-[10px] px-2 py-0.5 bg-primary-green/10 text-primary-green rounded-full">
-                              {d.age_label ? `${d.age_label} (${formatStageBadge(d.computed_stage || d.age_stage)})` : formatStageBadge(d.age_stage)}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] px-2 py-0.5 bg-primary-green/10 text-primary-green rounded-full">
+                                {d.age_label ? `${d.age_label} (${formatStageBadge(d.computed_stage || d.age_stage)})` : formatStageBadge(d.age_stage)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => openDogAdminModal(detailData.customer.id, detailData.customer.name, d)}
+                                className="p-1 text-stone-400 hover:text-primary-green rounded-lg hover:bg-white transition cursor-pointer"
+                                title={`Editar ficha de ${d.name}`}
+                              >
+                                <Eye size={13} />
+                              </button>
+                            </div>
                           </div>
                           <div className="text-[11px] text-stone-500 mt-1 flex flex-wrap gap-2">
                             <span>Dieta: <strong className="uppercase">{d.favorite_diet || 'BARF'}</strong></span>
-                            {d.birth_date && (
+                            {d.birth_date ? (
                               <span>· Nac: {formatShortDate(d.birth_date)}{d.birth_date_approx ? ' (aprox)' : ''}</span>
+                            ) : (
+                              <span className="text-amber-700">· Sin fecha de nac.</span>
                             )}
                           </div>
                           {d.notes && <div className="text-[11px] text-stone-500 mt-1">{d.notes}</div>}
@@ -1532,6 +1637,118 @@ export default function CustomersManager({ fetchWithAuth }) {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+      {/* === MODAL FICHA & EDICIÓN DE MASCOTA (ADMIN) === */}
+      {dogModal && (
+        <div className="fixed inset-0 z-[60] bg-black/55 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl border border-[#EBE4DA] space-y-4">
+            <div className="flex items-start justify-between gap-3 border-b border-[#EBE4DA] pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#FAF7F2] border border-[#EBE4DA] text-primary-green flex items-center justify-center shrink-0">
+                  <PawPrint size={20} />
+                </div>
+                <div>
+                  <h4 className="font-header text-xl font-extrabold text-secondary-brown">
+                    {dogModal.dog ? `Ficha de ${dogModal.dog.name}` : 'Agregar Mascota'}
+                  </h4>
+                  <p className="text-[11px] text-stone-500">Tutor: {dogModal.customerName}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDogModal(null)}
+                className="p-1.5 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDogAdmin} className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-stone-700 block mb-1">Nombre del Perro *</label>
+                <input
+                  type="text"
+                  required
+                  value={dogEditForm.name}
+                  onChange={(e) => setDogEditForm({ ...dogEditForm, name: e.target.value })}
+                  className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-green/30"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-stone-700 block mb-1">Peso (kg) *</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    required
+                    value={dogEditForm.weight}
+                    onChange={(e) => setDogEditForm({ ...dogEditForm, weight: e.target.value })}
+                    className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl outline-none focus:ring-2 focus:ring-primary-green/30"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-stone-700 block mb-1">Dieta Habitual</label>
+                  <select
+                    value={dogEditForm.favorite_diet}
+                    onChange={(e) => setDogEditForm({ ...dogEditForm, favorite_diet: e.target.value })}
+                    className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl outline-none cursor-pointer"
+                  >
+                    <option value="barf">BARF Cruda</option>
+                    <option value="cocinada">Cocinada al Vapor</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="p-3 bg-[#FAF7F2] rounded-2xl border border-[#EBE4DA] space-y-2">
+                <label className="font-bold text-stone-700 block">🎂 Fecha de Nacimiento</label>
+                <input
+                  type="date"
+                  max={new Date().toISOString().slice(0, 10)}
+                  value={dogEditForm.birth_date || ''}
+                  onChange={(e) => setDogEditForm({ ...dogEditForm, birth_date: e.target.value })}
+                  className="w-full p-2.5 bg-white border border-stone-200 rounded-xl outline-none"
+                />
+                <label className="flex items-center gap-2 text-[11px] text-stone-500">
+                  <input
+                    type="checkbox"
+                    checked={dogEditForm.birth_date_approx}
+                    onChange={(e) => setDogEditForm({ ...dogEditForm, birth_date_approx: e.target.checked })}
+                  />
+                  Fecha aproximada (perro adoptado / estimada)
+                </label>
+              </div>
+
+              <div>
+                <label className="font-bold text-stone-700 block mb-1">Notas de Salud / Alergias</label>
+                <textarea
+                  rows={2}
+                  value={dogEditForm.notes}
+                  onChange={(e) => setDogEditForm({ ...dogEditForm, notes: e.target.value })}
+                  placeholder="Ej. Alérgico al pollo, castrado, etc."
+                  className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#EBE4DA]">
+                <button
+                  type="button"
+                  onClick={() => setDogModal(null)}
+                  className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 font-bold rounded-xl cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingDogAdmin}
+                  className="px-4 py-2 bg-primary-green hover:bg-primary-green-dark text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Save size={14} /> {savingDogAdmin ? 'Guardando...' : 'Guardar Mascota'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

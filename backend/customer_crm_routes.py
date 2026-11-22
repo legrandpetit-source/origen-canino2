@@ -39,6 +39,15 @@ class WalletAdjustRequest(BaseModel):
     reason: str
 
 
+class AdminDogUpsertRequest(BaseModel):
+    name: str
+    weight: float
+    favorite_diet: Optional[str] = "barf"
+    birth_date: Optional[str] = None
+    birth_date_approx: Optional[bool] = False
+    notes: Optional[str] = ""
+
+
 class CrmEventCreate(BaseModel):
     customer_id: int
     event_type: str = "whatsapp_sent"
@@ -797,6 +806,99 @@ def create_customer_crm_router(get_current_admin, get_password_hash, log_securit
                 )
                 conn.commit()
         return {"status": "ok", "message": "Cliente actualizado correctamente."}
+
+    @router.post("/{customer_id}/dogs")
+    def admin_add_customer_dog(
+        customer_id: int,
+        payload: AdminDogUpsertRequest,
+        current_user: str = Depends(get_current_admin),
+    ):
+        bdate = parse_birth_date(payload.birth_date)
+        preview = enrich_dog_dict({"weight": payload.weight, "birth_date": bdate, "age_stage": "adulto"})
+        stage_to_save = preview["computed_stage"] if bdate else "adulto"
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM customers WHERE id = %s", (customer_id,))
+            if not cursor.fetchone():
+                raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+            cursor.execute(
+                """
+                INSERT INTO customer_dogs (customer_id, name, weight, age_stage, favorite_diet, notes, birth_date, birth_date_approx, weight_updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                RETURNING id, customer_id, name, weight, age_stage, favorite_diet, notes, photo_url, birth_date, birth_date_approx, weight_updated_at
+                """,
+                (
+                    customer_id,
+                    payload.name.strip(),
+                    payload.weight,
+                    stage_to_save,
+                    payload.favorite_diet or "barf",
+                    (payload.notes or "").strip(),
+                    bdate,
+                    bool(payload.birth_date_approx),
+                ),
+            )
+            dog = enrich_dog_dict(cursor.fetchone())
+            cursor.execute(
+                "INSERT INTO customer_crm_events (customer_id, event_type, details, created_by) VALUES (%s, 'dog_added', %s, %s)",
+                (customer_id, f"Mascota agregada por admin: {dog['name']} ({dog['weight']} kg)", current_user),
+            )
+            conn.commit()
+        return {"status": "ok", "dog": dog}
+
+    @router.put("/{customer_id}/dogs/{dog_id}")
+    def admin_update_customer_dog(
+        customer_id: int,
+        dog_id: int,
+        payload: AdminDogUpsertRequest,
+        current_user: str = Depends(get_current_admin),
+    ):
+        bdate = parse_birth_date(payload.birth_date)
+        preview = enrich_dog_dict({"weight": payload.weight, "birth_date": bdate, "age_stage": "adulto"})
+        stage_to_save = preview["computed_stage"] if bdate else None
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE customer_dogs
+                SET name = %s,
+                    weight = %s,
+                    age_stage = COALESCE(%s, age_stage),
+                    favorite_diet = %s,
+                    notes = %s,
+                    birth_date = %s,
+                    birth_date_approx = %s,
+                    weight_updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s AND customer_id = %s
+                RETURNING id, customer_id, name, weight, age_stage, favorite_diet, notes, photo_url, birth_date, birth_date_approx, weight_updated_at
+                """,
+                (
+                    payload.name.strip(),
+                    payload.weight,
+                    stage_to_save,
+                    payload.favorite_diet or "barf",
+                    (payload.notes or "").strip(),
+                    bdate,
+                    bool(payload.birth_date_approx),
+                    dog_id,
+                    customer_id,
+                ),
+            )
+            row = cursor.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Mascota no encontrada")
+            dog = enrich_dog_dict(row)
+            cursor.execute(
+                "INSERT INTO customer_crm_events (customer_id, event_type, details, created_by) VALUES (%s, 'dog_updated', %s, %s)",
+                (
+                    customer_id,
+                    f"Ficha de {dog['name']} actualizada por admin ({dog['weight']} kg{', nac: ' + dog['birth_date'] if dog.get('birth_date') else ''})",
+                    current_user,
+                ),
+            )
+            conn.commit()
+        return {"status": "ok", "dog": dog}
 
     @router.post("/{customer_id}/reset-password")
     def reset_customer_password(
