@@ -108,6 +108,7 @@ export default function CustomersManager({ fetchWithAuth }) {
   const [dogEditForm, setDogEditForm] = useState({
     name: '',
     weight: '',
+    age_stage: 'adulto',
     favorite_diet: 'barf',
     birth_date: '',
     birth_date_approx: false,
@@ -118,9 +119,11 @@ export default function CustomersManager({ fetchWithAuth }) {
   const openDogAdminModal = (customerId, customerName, dog = null) => {
     setDogModal({ customerId, customerName, dog });
     if (dog) {
+      const rawStage = dog.computed_stage || dog.age_stage || 'adulto';
       setDogEditForm({
         name: dog.name || '',
         weight: dog.weight ?? '',
+        age_stage: rawStage === 'senior' ? 'adult_low' : (rawStage === 'adult_normal' ? 'adulto' : rawStage),
         favorite_diet: dog.favorite_diet || 'barf',
         birth_date: dog.birth_date || '',
         birth_date_approx: Boolean(dog.birth_date_approx),
@@ -130,6 +133,7 @@ export default function CustomersManager({ fetchWithAuth }) {
       setDogEditForm({
         name: '',
         weight: '',
+        age_stage: 'adulto',
         favorite_diet: 'barf',
         birth_date: '',
         birth_date_approx: false,
@@ -153,6 +157,7 @@ export default function CustomersManager({ fetchWithAuth }) {
         body: JSON.stringify({
           name: dogEditForm.name.trim(),
           weight: parseFloat(dogEditForm.weight || '0'),
+          age_stage: dogEditForm.age_stage || 'adulto',
           favorite_diet: dogEditForm.favorite_diet || 'barf',
           birth_date: dogEditForm.birth_date || null,
           birth_date_approx: Boolean(dogEditForm.birth_date_approx),
@@ -1690,16 +1695,29 @@ export default function CustomersManager({ fetchWithAuth }) {
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Dieta Habitual</label>
+                  <label className="font-bold text-stone-700 block mb-1">Etapa de Vida</label>
                   <select
-                    value={dogEditForm.favorite_diet}
-                    onChange={(e) => setDogEditForm({ ...dogEditForm, favorite_diet: e.target.value })}
+                    value={dogEditForm.age_stage}
+                    onChange={(e) => setDogEditForm({ ...dogEditForm, age_stage: e.target.value })}
                     className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl outline-none cursor-pointer"
                   >
-                    <option value="barf">BARF Cruda</option>
-                    <option value="cocinada">Cocinada al Vapor</option>
+                    <option value="adulto">Adulto</option>
+                    <option value="cachorro">Cachorro</option>
+                    <option value="adult_low">Adulto / Senior</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-stone-700 block mb-1">Dieta Habitual</label>
+                <select
+                  value={dogEditForm.favorite_diet}
+                  onChange={(e) => setDogEditForm({ ...dogEditForm, favorite_diet: e.target.value })}
+                  className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl outline-none cursor-pointer"
+                >
+                  <option value="barf">BARF Cruda</option>
+                  <option value="cocinada">Cocinada al Vapor</option>
+                </select>
               </div>
 
               <div className="p-3 bg-[#FAF7F2] rounded-2xl border border-[#EBE4DA] space-y-2">

@@ -1482,19 +1482,32 @@ const CustomerPortal = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-stone-700 mb-1">Dieta Habitual</label>
+                    <label className="block text-xs font-bold text-stone-700 mb-1">Etapa de Vida</label>
                     <select
-                      value={dogForm.favorite_diet || 'barf'}
-                      onChange={(e) => setDogForm({ ...dogForm, favorite_diet: e.target.value })}
+                      value={dogForm.age_stage === 'senior' ? 'adult_low' : (dogForm.age_stage || 'adulto')}
+                      onChange={(e) => setDogForm({ ...dogForm, age_stage: e.target.value })}
                       className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white cursor-pointer"
                     >
-                      <option value="barf">BARF Cruda</option>
-                      <option value="cocinada">Cocinada al Vapor</option>
+                      <option value="adulto">Adulto</option>
+                      <option value="cachorro">Cachorro</option>
+                      <option value="adult_low">Adulto / Senior</option>
                     </select>
                   </div>
                 </div>
 
-                {/* Fecha de Nacimiento (calcula edad y etapa automáticamente) */}
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 mb-1">Dieta Habitual</label>
+                  <select
+                    value={dogForm.favorite_diet || 'barf'}
+                    onChange={(e) => setDogForm({ ...dogForm, favorite_diet: e.target.value })}
+                    className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white cursor-pointer"
+                  >
+                    <option value="barf">BARF Cruda</option>
+                    <option value="cocinada">Cocinada al Vapor</option>
+                  </select>
+                </div>
+
+                {/* Fecha de Nacimiento (calcula edad y auto-sugiere etapa) */}
                 <div className="p-3.5 bg-[#FAF7F2] rounded-2xl border border-[#EBE4DA] space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <label className="text-xs font-bold text-stone-700">
@@ -1516,13 +1529,25 @@ const CustomerPortal = () => {
                         min="1"
                         max="25"
                         value={approxAgeNum}
-                        onChange={(e) => setApproxAgeNum(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setApproxAgeNum(val);
+                          const est = computeApproxBirthDate(val, approxAgeUnit);
+                          const prev = getDogNutritionProfile({ weight: parseFloat(dogForm.weight) || 10, favorite_diet: dogForm.favorite_diet, birth_date: est });
+                          setDogForm((f) => ({ ...f, age_stage: prev.stage === 'senior' ? 'adult_low' : prev.stage }));
+                        }}
                         className="border border-stone-300 rounded-xl p-2.5 text-sm bg-white outline-none"
                         placeholder="Ej. 3"
                       />
                       <select
                         value={approxAgeUnit}
-                        onChange={(e) => setApproxAgeUnit(e.target.value)}
+                        onChange={(e) => {
+                          const unit = e.target.value;
+                          setApproxAgeUnit(unit);
+                          const est = computeApproxBirthDate(approxAgeNum, unit);
+                          const prev = getDogNutritionProfile({ weight: parseFloat(dogForm.weight) || 10, favorite_diet: dogForm.favorite_diet, birth_date: est });
+                          setDogForm((f) => ({ ...f, age_stage: prev.stage === 'senior' ? 'adult_low' : prev.stage }));
+                        }}
                         className="border border-stone-300 rounded-xl p-2.5 text-sm bg-white outline-none cursor-pointer"
                       >
                         <option value="months">Meses aprox.</option>
@@ -1534,7 +1559,15 @@ const CustomerPortal = () => {
                       type="date"
                       max={new Date().toISOString().slice(0, 10)}
                       value={dogForm.birth_date || ''}
-                      onChange={(e) => setDogForm({ ...dogForm, birth_date: e.target.value, birth_date_approx: false })}
+                      onChange={(e) => {
+                        const bd = e.target.value;
+                        if (bd) {
+                          const prev = getDogNutritionProfile({ weight: parseFloat(dogForm.weight) || 10, favorite_diet: dogForm.favorite_diet, birth_date: bd });
+                          setDogForm({ ...dogForm, birth_date: bd, birth_date_approx: false, age_stage: prev.stage === 'senior' ? 'adult_low' : prev.stage });
+                        } else {
+                          setDogForm({ ...dogForm, birth_date: '', birth_date_approx: false });
+                        }
+                      }}
                       className="w-full border border-stone-300 rounded-xl p-2.5 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white"
                     />
                   )}

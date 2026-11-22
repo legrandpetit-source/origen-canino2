@@ -42,6 +42,7 @@ class WalletAdjustRequest(BaseModel):
 class AdminDogUpsertRequest(BaseModel):
     name: str
     weight: float
+    age_stage: Optional[str] = None
     favorite_diet: Optional[str] = "barf"
     birth_date: Optional[str] = None
     birth_date_approx: Optional[bool] = False
@@ -814,8 +815,8 @@ def create_customer_crm_router(get_current_admin, get_password_hash, log_securit
         current_user: str = Depends(get_current_admin),
     ):
         bdate = parse_birth_date(payload.birth_date)
-        preview = enrich_dog_dict({"weight": payload.weight, "birth_date": bdate, "age_stage": "adulto"})
-        stage_to_save = preview["computed_stage"] if bdate else "adulto"
+        preview = enrich_dog_dict({"weight": payload.weight, "birth_date": bdate, "age_stage": payload.age_stage or "adulto"})
+        stage_to_save = payload.age_stage or (preview["computed_stage"] if bdate else "adulto")
         with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT id FROM customers WHERE id = %s", (customer_id,))
@@ -855,8 +856,8 @@ def create_customer_crm_router(get_current_admin, get_password_hash, log_securit
         current_user: str = Depends(get_current_admin),
     ):
         bdate = parse_birth_date(payload.birth_date)
-        preview = enrich_dog_dict({"weight": payload.weight, "birth_date": bdate, "age_stage": "adulto"})
-        stage_to_save = preview["computed_stage"] if bdate else None
+        preview = enrich_dog_dict({"weight": payload.weight, "birth_date": bdate, "age_stage": payload.age_stage or "adulto"})
+        stage_to_save = payload.age_stage or (preview["computed_stage"] if bdate else None)
         with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(

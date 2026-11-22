@@ -1328,7 +1328,7 @@ def update_customer_profile(req: CustomerProfileUpdate, customer_id: int = Depen
 def add_customer_dog(dog: CustomerDogCreateUpdate, customer_id: int = Depends(get_current_customer)):
     bdate = parse_birth_date(dog.birth_date)
     preview = enrich_dog_dict({"weight": dog.weight, "birth_date": bdate, "age_stage": dog.age_stage or "adulto"})
-    stage_to_save = preview["computed_stage"] if bdate else (dog.age_stage or "adulto")
+    stage_to_save = dog.age_stage or (preview["computed_stage"] if bdate else "adulto")
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -1354,7 +1354,7 @@ def add_customer_dog(dog: CustomerDogCreateUpdate, customer_id: int = Depends(ge
 def update_customer_dog(dog_id: int, dog: CustomerDogCreateUpdate, customer_id: int = Depends(get_current_customer)):
     bdate = parse_birth_date(dog.birth_date)
     preview = enrich_dog_dict({"weight": dog.weight, "birth_date": bdate, "age_stage": dog.age_stage or "adulto"})
-    stage_to_save = preview["computed_stage"] if bdate else (dog.age_stage or "adulto")
+    stage_to_save = dog.age_stage or (preview["computed_stage"] if bdate else "adulto")
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
