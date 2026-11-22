@@ -21,9 +21,10 @@
   - En `FloatingFirstOrderPromo.jsx` se explicita **"10% de Descuento en tu primera compra"** y **"10% DESCUENTO · 1RA COMPRA"**.
 
 ## 3. Vista Previa Corporativa en Redes (Open Graph Dinámico) y Tarjeta Vertical para Historias
-- **Imágenes OG corporativas (1200×630 JPEG optimizado):**
+- **Imágenes OG corporativas (1200×630 JPEG optimizado, renderizadas con Chrome Headless + Outfit / Plus Jakarta Sans):**
   - `public/images/og-familia-origen-canino.jpg` (10% OFF / Home y embajadores generales).
   - `public/images/og-embajador-canelo.jpg` (15% OFF Exclusivo para `CANELO-742`).
+  - Copy corregido con rigor nutricional a **"100% Natural · Sin Ultraprocesados"** en OG, Home Embajadores y tarjeta Story (reservando "grado humano" exclusivamente para dieta cocinada).
 - **Meta tags Open Graph base y dinámicos (`index.html` + `backend/main.py`):**
   - `index.html` incorpora meta tags `og:*` y `twitter:*` corporativos por defecto.
   - `serve_frontend` en `backend/main.py` detecta `?ref=CODIGO` en la raíz e inyecta dinámicamente `og:title`, `og:description`, `og:image` y `og:url` personalizados con el nombre del embajador, su perro y el porcentaje exacto (`15%` o `10%`).
@@ -31,3 +32,4 @@
   - Textos dinámicos para `10%` vs `15%` (modo Embajador Fundador para `CANELO-742`).
   - Mensaje de WhatsApp 1-Toque corregido para usar `${referralInfo?.discount_percent || 10}%` con redacción cálida y empática.
   - Nuevo botón **"Descargar Tarjeta para Historia (WhatsApp / IG)"** que renderiza un PNG vertical `1080×1920` con branding de Origen Canino, el descuento del embajador, su código y su QR escaneable.
+

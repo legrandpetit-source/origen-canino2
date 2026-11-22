@@ -18,6 +18,7 @@ import urllib.error
 from server_db import get_connection, init_database
 import batch_service
 from batch_routes import create_batch_router
+from customer_crm_routes import create_customer_crm_router, ensure_crm_schema
 from PIL import Image, UnidentifiedImageError, ImageOps
 import io
 import uuid
@@ -498,6 +499,7 @@ def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(securi
         raise HTTPException(status_code=401, detail="Token inválido")
 
 app.include_router(create_batch_router(get_current_admin))
+ensure_crm_schema()
 
 def get_current_customer(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
@@ -506,6 +508,17 @@ def get_current_customer(credentials: HTTPAuthorizationCredentials = Depends(sec
         customer_id = payload.get("customer_id")
         if not customer_id:
             raise HTTPException(status_code=401, detail="Token no corresponde a un cliente")
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT COALESCE(is_blocked, FALSE) AS is_blocked, COALESCE(is_deleted, FALSE) AS is_deleted FROM customers WHERE id = %s",
+                (customer_id,),
+            )
+            row = cursor.fetchone()
+            if not row or row["is_deleted"]:
+                raise HTTPException(status_code=401, detail="Cuenta no encontrada o desactivada")
+            if row["is_blocked"]:
+                raise HTTPException(status_code=403, detail="Tu cuenta se encuentra suspendida. Contáctanos por WhatsApp para ayudarte.")
         return customer_id
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Sesión expirada")
@@ -1201,8 +1214,29 @@ def customer_login(req: CustomerLoginRequest):
         customer = cursor.fetchone()
         if not customer or not verify_password(req.password, customer["password_hash"]):
             raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos")
+        if customer.get("is_deleted"):
+            raise HTTPException(status_code=403, detail="Esta cuenta fue desactivada. Contáctanos por WhatsApp si necesitas ayuda.")
+        if customer.get("is_blocked"):
+            raise HTTPException(status_code=403, detail="Tu cuenta se encuentra temporalmente suspendida. Contáctanos por WhatsApp.")
             
         customer_id = customer["id"]
+        # Registrar login + visita en métricas CRM
+        try:
+            cursor.execute("""
+                UPDATE customers
+                SET login_count = COALESCE(login_count, 0) + 1,
+                    visit_count = COALESCE(visit_count, 0) + 1,
+                    last_login_at = CURRENT_TIMESTAMP,
+                    last_seen_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (customer_id,))
+            cursor.execute(
+                "INSERT INTO customer_crm_events (customer_id, event_type, details, created_by) VALUES (%s, 'login', 'Inicio de sesión en la tienda', 'customer')",
+                (customer_id,),
+            )
+            conn.commit()
+        except Exception as e_trk:
+            print("Error registrando login CRM:", e_trk)
         cursor.execute("SELECT id, name, weight, age_stage, favorite_diet, notes, photo_url FROM customer_dogs WHERE customer_id = %s ORDER BY id ASC", (customer_id,))
         dogs = cursor.fetchall()
         for d in dogs:
@@ -1228,10 +1262,27 @@ def customer_login(req: CustomerLoginRequest):
 def get_customer_profile(customer_id: int = Depends(get_current_customer)):
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, email, phone, address, city, region, referral_code, wallet_balance, created_at FROM customers WHERE id = %s", (customer_id,))
+        cursor.execute("SELECT id, name, email, phone, address, city, region, referral_code, wallet_balance, last_seen_at, created_at FROM customers WHERE id = %s", (customer_id,))
         customer = cursor.fetchone()
         if not customer:
             raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+        # Contar 1 visita por día activo cuando vuelve con sesión recordada
+        try:
+            last_seen = customer.get("last_seen_at")
+            today_date = datetime.now().date()
+            is_new_day = (last_seen is None) or (isinstance(last_seen, datetime) and last_seen.date() < today_date)
+            if is_new_day:
+                cursor.execute(
+                    "UPDATE customers SET visit_count = COALESCE(visit_count, 0) + 1, last_seen_at = CURRENT_TIMESTAMP WHERE id = %s",
+                    (customer_id,),
+                )
+            else:
+                cursor.execute("UPDATE customers SET last_seen_at = CURRENT_TIMESTAMP WHERE id = %s", (customer_id,))
+            conn.commit()
+        except Exception as e_visit:
+            print("Error actualizando visita diaria CRM:", e_visit)
+        customer.pop("last_seen_at", None)
             
         if not customer.get("referral_code"):
             ref_code = generate_customer_referral_code(customer["name"], cursor)
@@ -4409,6 +4460,9 @@ def get_product_nutrition(product_id: int, current_user: str = Depends(get_curre
     except Exception as e:
         print(f"Error calculating nutrition: {e}")
         raise HTTPException(status_code=500, detail="Error calculando nutricion")
+
+# --- Router CRM de Clientes, Soporte y Marketing Directo ---
+app.include_router(create_customer_crm_router(get_current_admin, get_password_hash, log_security_event))
 
 # --- Serve Frontend con Pre-renderizado SEO (FastAPI & Googlebot / Redes Sociales) ---
 dist_path = os.path.join(os.path.dirname(__file__), "..", "dist")

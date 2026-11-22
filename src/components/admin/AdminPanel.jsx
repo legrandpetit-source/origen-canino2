@@ -4,7 +4,7 @@ import {
   MessageSquareHeart, Check, XCircle, LogOut, Key, ChefHat, BarChart, 
   Building2, CreditCard, Calculator, Send, Gift, UploadCloud, Upload,
   Image as ImageIcon, Loader2, Sparkles, CheckCircle2, ExternalLink, Menu,
-  Stethoscope, Video, FileText, CheckCheck, ChevronLeft, ChevronRight, History
+  Stethoscope, Video, FileText, CheckCheck, ChevronLeft, ChevronRight, History, Users
 } from 'lucide-react';
 import AdminLogin from './AdminLogin';
 import IngredientsManager from './IngredientsManager';
@@ -21,6 +21,7 @@ import PromotionsManager from './PromotionsManager';
 import KitchenProductionManager from './KitchenProductionManager';
 import PartnersManager from './PartnersManager';
 import BatchProductionManager from './BatchProductionManager';
+import CustomersManager from './CustomersManager';
 
 // Comprime y convierte una imagen a WebP en el navegador antes de enviarla
 const compressImageToWebP = (file, maxDim = 1200, quality = 0.82) => {
@@ -80,6 +81,7 @@ const NAV_TABS = [
   { id: 'batches', label: 'Lotes FIFO & Demanda', icon: Package, group: 'Producción e Inventario' },
   { id: 'ingredients', label: 'Ingredientes', icon: Package, group: 'Producción e Inventario' },
   // 3. Marketing y Clientes
+  { id: 'customers', label: 'Clientes (CRM)', icon: Users, group: 'Marketing y Clientes' },
   { id: 'partners', label: 'Alianzas Vet & Pet', icon: Stethoscope, group: 'Marketing y Clientes' },
   { id: 'promotions', label: 'Promociones & 1ra Compra', icon: Gift, group: 'Marketing y Clientes' },
   { id: 'retention', label: 'Retención', icon: MessageSquareHeart, group: 'Marketing y Clientes' },
@@ -705,6 +707,11 @@ const AdminPanel = () => {
                   ingredients={ingredients}
                   onIngredientsUpdated={refreshIngredients}
                 />
+              )}
+
+              {/* --- CUSTOMERS CRM TAB --- */}
+              {activeTab === 'customers' && (
+                <CustomersManager fetchWithAuth={fetchWithAuth} />
               )}
 
               {/* --- PARTNERS TAB (AGENTE 1: ALIANZAS VET & PET B2B) --- */}
