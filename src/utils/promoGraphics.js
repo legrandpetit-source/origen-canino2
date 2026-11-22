@@ -271,314 +271,264 @@ export const generateCouponStoryDataUrl = async (coupon, qrSvgElement, themeKeyO
 };
 
 /**
- * Lámina Imprimible Vertical 10×15 cm a 300 DPI (1200 × 1800 px) para Canon SELPHY CP1500.
- * - Margen de seguridad borderless: 5 mm (60 px) en los 4 bordes.
- * - Círculo guía NFC en esquina superior derecha: 25 mm exactos = 300 px de diámetro (radio 150 px).
- * - Diseño editorial ultra-pulcro y de alto contraste para pedestales acrílicos en L.
+ * Rutas y medidas oficiales editables de la Lámina NFC 10×15 cm (Canon SELPHY CP1500):
+ *  - Lienzo total: 1200 × 1800 px (10 × 15 cm exactos a 300 DPI, 12 px/mm)
+ *  - Imagen principal (fondo superior a sangre): /images/nfc-lamina-hero.jpg  -> 1200 × 1120 px
+ *  - Logo oficial: /logo.webp -> 512 × 512 px (cuadrado fondo blanco o transparente)
+ *  - Círculo guía tag NFC NTAG213: 25 mm exactos = 300 px de diámetro (esquina superior derecha)
+ *  - Margen seguro anti-recorte borderless SELPHY: 5.5 mm = 66 px en los 4 bordes
  */
-export const generateNfcLamina10x15DataUrl = async (building, qrSvgElement) => {
-  const W = 1200; // 100 mm @ 300 DPI (12 px/mm)
-  const H = 1800; // 150 mm @ 300 DPI (12 px/mm)
-  const SAFE = 66; // 5.5 mm margen seguro anti-recorte SELPHY
+export const NFC_LAMINA_SPECS = {
+  canvasWidth: 1200,
+  canvasHeight: 1800,
+  heroImagePath: '/images/nfc-lamina-hero.jpg',
+  heroRecommendedSize: '1200 × 1120 px',
+  logoImagePath: '/logo.webp',
+  logoRecommendedSize: '512 × 512 px (cuadrado)',
+  nfcDiameterMm: 25,
+  nfcDiameterPx: 300
+};
+
+export const generateNfcLamina10x15DataUrl = async (
+  building,
+  qrSvgElement,
+  options = {}
+) => {
+  const W = NFC_LAMINA_SPECS.canvasWidth;
+  const H = NFC_LAMINA_SPECS.canvasHeight;
+  const SAFE = 66; // 5.5 mm margen seguro borderless SELPHY CP1500
+  const PHOTO_H = 1120; // Mitad superior a sangre (full-bleed)
+
+  const heroSrc = options.customHeroSrc || NFC_LAMINA_SPECS.heroImagePath;
+  const logoSrc = options.customLogoSrc || NFC_LAMINA_SPECS.logoImagePath;
 
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d');
 
-  // 1. Fondo editorial crema cálido con degradado radial ultra limpio
-  const bgGrad = ctx.createLinearGradient(0, 0, W, H);
-  bgGrad.addColorStop(0, '#FFFFFF');
-  bgGrad.addColorStop(0.45, '#FAF7F2');
-  bgGrad.addColorStop(1, '#EFE8DA');
-  ctx.fillStyle = bgGrad;
+  // 1. Base editorial Verde Bosque Profundo en todo el lienzo
+  ctx.fillStyle = '#233016';
   ctx.fillRect(0, 0, W, H);
 
-  // Franja superior arquitectónica verde oliva oscuro + línea fina dorada
-  ctx.fillStyle = '#3C4F26';
-  ctx.fillRect(0, 0, W, 22);
-  ctx.fillStyle = '#DB994B';
-  ctx.fillRect(0, 22, W, 6);
-
   // =========================================================================
-  // 2. ZONA SUPERIOR: LOGO IZQUIERDA + CÍRCULO GUÍA NFC 25mm (300px) DERECHA
+  // 2. FOTOGRAFÍA EDITORIAL FULL-BLEED (0 -> 1120 px)
   // =========================================================================
-  // Logo + Marca a la izquierda (alineado al margen seguro)
-  try {
-    const logo = await loadImage('/logo.webp');
-    const boxSize = 152;
-    drawRoundRect(ctx, SAFE, SAFE + 16, boxSize, boxSize, 32);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.shadowColor = 'rgba(61, 43, 31, 0.10)';
-    ctx.shadowBlur = 24;
-    ctx.shadowOffsetY = 8;
-    ctx.fill();
-    ctx.shadowColor = 'transparent';
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#EAE0D0';
-    ctx.stroke();
-
-    const lw = 128;
-    const lh = (logo.height / logo.width) * lw;
-    ctx.drawImage(logo, SAFE + (boxSize - lw) / 2, SAFE + 16 + (boxSize - lh) / 2, lw, lh);
-  } catch {}
-
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#3D2B1F';
-  ctx.font = '900 44px "Outfit", sans-serif';
-  ctx.fillText('Origen', SAFE + 174, SAFE + 82);
-  ctx.fillStyle = '#556B2F';
-  ctx.font = '900 44px "Outfit", sans-serif';
-  ctx.fillText('CANINO', SAFE + 174, SAFE + 128);
-  ctx.fillStyle = '#7A6A5B';
-  ctx.font = '800 17px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText('COMIDA REAL · VIDA SALUDABLE', SAFE + 176, SAFE + 160);
-
-  // Círculo Guía NFC 25 mm EXACTOS (diámetro 300 px → radio 150 px) en esquina superior derecha
-  const nfcR = 150; // 25 mm exactos a 12 px/mm
-  const nfcCx = W - SAFE - nfcR; // 1200 - 66 - 150 = 984
-  const nfcCy = SAFE + nfcR + 12; // 66 + 150 + 12 = 228
-
-  // Halo exterior llamativo (invita a acercar el celular)
   ctx.save();
   ctx.beginPath();
-  ctx.arc(nfcCx, nfcCy, nfcR + 14, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(219, 153, 75, 0.16)';
+  ctx.rect(0, 0, W, PHOTO_H);
+  ctx.clip();
+  try {
+    const heroImg = await loadImage(heroSrc);
+    const ratio = Math.max(W / heroImg.width, PHOTO_H / heroImg.height);
+    const dw = heroImg.width * ratio;
+    const dh = heroImg.height * ratio;
+    ctx.drawImage(heroImg, (W - dw) / 2, (PHOTO_H - dh) / 2, dw, dh);
+  } catch {
+    const fb = ctx.createLinearGradient(0, 0, 0, PHOTO_H);
+    fb.addColorStop(0, '#3B4D26');
+    fb.addColorStop(1, '#233016');
+    ctx.fillStyle = fb;
+    ctx.fillRect(0, 0, W, PHOTO_H);
+  }
+
+  // Viñeta superior muy sutil para que el logo y el círculo NFC respiren con contraste
+  const topVignette = ctx.createLinearGradient(0, 0, 0, 320);
+  topVignette.addColorStop(0, 'rgba(20, 26, 14, 0.42)');
+  topVignette.addColorStop(1, 'rgba(20, 26, 14, 0)');
+  ctx.fillStyle = topVignette;
+  ctx.fillRect(0, 0, W, 320);
+
+  // Fundido impecable de la base de la foto hacia el bloque inferior (#233016)
+  const bottomFade = ctx.createLinearGradient(0, PHOTO_H - 340, 0, PHOTO_H);
+  bottomFade.addColorStop(0, 'rgba(35, 48, 22, 0)');
+  bottomFade.addColorStop(0.55, 'rgba(35, 48, 22, 0.72)');
+  bottomFade.addColorStop(1, 'rgba(35, 48, 22, 1)');
+  ctx.fillStyle = bottomFade;
+  ctx.fillRect(0, PHOTO_H - 340, W, 340);
+  ctx.restore();
+
+  // =========================================================================
+  // 3. LOGO PROTAGONISTA ARRIBA IZQUIERDA (SIN TEXTO DUPLICADO)
+  // =========================================================================
+  const logoR = 128; // Diámetro 256 px — grande, nítido y balanceado con el círculo NFC
+  const logoCx = SAFE + logoR;
+  const logoCy = SAFE + logoR + 6;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(logoCx, logoCy, logoR, 0, Math.PI * 2);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.28)';
+  ctx.shadowBlur = 28;
+  ctx.shadowOffsetY = 8;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(logoCx, logoCy, logoR - 6, 0, Math.PI * 2);
+  ctx.clip();
+  try {
+    const logo = await loadImage(logoSrc);
+    const pad = 16;
+    const maxS = (logoR - pad) * 2;
+    const lr = Math.min(maxS / logo.width, maxS / logo.height);
+    const lw = logo.width * lr;
+    const lh = logo.height * lr;
+    ctx.drawImage(logo, logoCx - lw / 2, logoCy - lh / 2, lw, lh);
+  } catch {}
+  ctx.restore();
+
+  // =========================================================================
+  // 4. CÍRCULO GUÍA NFC 25 mm EXACTOS (300 px) — ESQUINA SUPERIOR DERECHA
+  // =========================================================================
+  const nfcR = 150; // 25 mm exactos @ 300 DPI (12 px/mm)
+  const nfcCx = W - SAFE - nfcR; // 984
+  const nfcCy = SAFE + nfcR + 4; // 220
+
+  ctx.save();
+  // Halo luminoso exterior para llamar la mirada al instante
+  ctx.beginPath();
+  ctx.arc(nfcCx, nfcCy, nfcR + 12, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
   ctx.fill();
 
-  // Cuerpo del círculo 25mm (guía exacta para pegar el tag NTAG213)
+  // Base del sello NFC 25 mm
   ctx.beginPath();
   ctx.arc(nfcCx, nfcCy, nfcR, 0, Math.PI * 2);
   const nfcGrad = ctx.createLinearGradient(nfcCx - nfcR, nfcCy - nfcR, nfcCx + nfcR, nfcCy + nfcR);
-  nfcGrad.addColorStop(0, '#2F3E1E');
-  nfcGrad.addColorStop(1, '#4A612E');
+  nfcGrad.addColorStop(0, '#E39F4B');
+  nfcGrad.addColorStop(1, '#C57B27');
   ctx.fillStyle = nfcGrad;
-  ctx.shadowColor = 'rgba(47, 62, 30, 0.25)';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.36)';
+  ctx.shadowBlur = 30;
+  ctx.shadowOffsetY = 10;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+
+  // Anillo blanco interior fino (calce exacto del tag NTAG213 de 25mm)
+  ctx.beginPath();
+  ctx.arc(nfcCx, nfcCy, nfcR - 10, 0, Math.PI * 2);
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+  ctx.stroke();
+
+  // Ícono vectorial limpio de ondas NFC centrado arriba
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineCap = 'round';
+  const waveCy = nfcCy - 24;
+  [18, 36, 54].forEach((r, idx) => {
+    ctx.lineWidth = 6.5 - idx * 0.6;
+    ctx.beginPath();
+    ctx.arc(nfcCx, waveCy, r, -Math.PI * 0.78, -Math.PI * 0.22);
+    ctx.stroke();
+  });
+  ctx.beginPath();
+  ctx.arc(nfcCx, waveCy, 6.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fill();
+
+  // Texto ultra-limpio dentro del sello NFC (UNA sola fuente: Outfit)
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '800 28px "Outfit", sans-serif';
+  ctx.fillText('ACERCA TU', nfcCx, nfcCy + 28);
+  ctx.fillText('TELÉFONO', nfcCx, nfcCy + 60);
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+  ctx.font = '700 18px "Outfit", sans-serif';
+  ctx.fillText('NFC · SIN APPS', nfcCx, nfcCy + 94);
+  ctx.restore();
+
+  // =========================================================================
+  // 5. BLOQUE EDITORIAL INFERIOR (UNA SOLA FUENTE: OUTFIT · JERARQUÍA LIMPIA)
+  // =========================================================================
+  const bName = String(building.name || 'Tu Comunidad').trim().toUpperCase();
+  const discPct = Number(building.discount_percent || 15);
+
+  // Eyebrow elegante sobre la transición de la foto
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#E5A956';
+  ctx.font = '700 24px "Outfit", sans-serif';
+  ctx.fillText(`BENEFICIO EXCLUSIVO · ${bName.slice(0, 30)}`, SAFE, 1025);
+
+  // Titular único limpio y sobrio (2 palabras fuertes en 1 línea o 2 líneas muy limpias)
+  ctx.fillStyle = '#FAF7F2';
+  ctx.font = '800 72px "Outfit", sans-serif';
+  ctx.fillText('Comida real para tu perro', SAFE, 1106);
+
+  // Línea sutil separadora dorada
+  ctx.fillStyle = 'rgba(229, 169, 86, 0.35)';
+  ctx.fillRect(SAFE, 1142, W - SAFE * 2, 2);
+
+  // Columna Izquierda: Descuento protagonista (centrado verticalmente entre y=1142 y y=1642)
+  const offerY = 1365;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#E5A956';
+  ctx.font = '900 156px "Outfit", sans-serif';
+  ctx.fillText(`${discPct}%`, SAFE, offerY);
+
+  const pctWidth = ctx.measureText(`${discPct}%`).width;
+  ctx.fillStyle = '#FAF7F2';
+  ctx.font = '800 58px "Outfit", sans-serif';
+  ctx.fillText('OFF', SAFE + pctWidth + 16, offerY - 56);
+
+  ctx.fillStyle = '#D9E4C8';
+  ctx.font = '600 32px "Outfit", sans-serif';
+  ctx.fillText('en tu primera compra', SAFE + pctWidth + 16, offerY - 12);
+
+  // Subtítulo único y directo debajo de la oferta
+  ctx.fillStyle = '#FAF7F2';
+  ctx.font = '600 30px "Outfit", sans-serif';
+  ctx.fillText('Dietas BARF crudas y cocinadas al vapor', SAFE, 1460);
+
+  ctx.fillStyle = 'rgba(217, 228, 200, 0.82)';
+  ctx.font = '500 25px "Outfit", sans-serif';
+  ctx.fillText('100% natural · Despacho a tu edificio en frío -18°C', SAFE, 1506);
+
+  // Columna Derecha: Código QR de respaldo en tarjeta blanca impoluta
+  const qrBox = 276;
+  const qrX = W - SAFE - qrBox;
+  const qrY = 1236;
+
+  ctx.save();
+  drawRoundRect(ctx, qrX, qrY, qrBox, qrBox, 28);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.28)';
   ctx.shadowBlur = 24;
   ctx.shadowOffsetY = 8;
   ctx.fill();
   ctx.shadowColor = 'transparent';
 
-  // Borde punteado sutil interior para calce exacto del sticker 25mm
-  ctx.beginPath();
-  ctx.arc(nfcCx, nfcCy, nfcR - 10, 0, Math.PI * 2);
-  ctx.setLineDash([8, 7]);
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = 'rgba(247, 215, 168, 0.78)';
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Ícono vectorial limpio de ondas NFC centrado arriba
-  ctx.strokeStyle = '#F7D7A8';
-  ctx.lineCap = 'round';
-  const waveY = nfcCy - 38;
-  [18, 34, 50].forEach((r, idx) => {
-    ctx.lineWidth = 6 - idx * 0.5;
-    ctx.beginPath();
-    ctx.arc(nfcCx, waveY + 14, r, -Math.PI * 0.78, -Math.PI * 0.22);
-    ctx.stroke();
-  });
-  ctx.beginPath();
-  ctx.arc(nfcCx, waveY + 14, 6, 0, Math.PI * 2);
-  ctx.fillStyle = '#F7D7A8';
-  ctx.fill();
-
-  // Texto dentro del círculo NFC
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '900 26px "Outfit", sans-serif';
-  ctx.fillText('ACERCA TU', nfcCx, nfcCy + 28);
-  ctx.fillText('CELULAR AQUÍ', nfcCx, nfcCy + 58);
-
-  // Pill mini "NFC" debajo
-  drawRoundRect(ctx, nfcCx - 46, nfcCy + 74, 92, 30, 15);
-  ctx.fillStyle = '#DB994B';
-  ctx.fill();
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '800 17px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText('NFC', nfcCx, nfcCy + 95);
-  ctx.restore();
-
-  // Flechita / nota sutil debajo del círculo invitando al toque
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#556B2F';
-  ctx.font = '800 18px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText('▲ TOCA AQUÍ SIN APPS', nfcCx, nfcCy + nfcR + 36);
-
-  // =========================================================================
-  // 3. BLOQUE PROTAGONISTA: BENEFICIO EXCLUSIVO DEL EDIFICIO + DESCUENTO
-  // =========================================================================
-  const heroTop = 426;
-
-  // Pill de exclusividad del edificio
-  const bName = String(building.name || 'Tu Comunidad').trim();
-  drawRoundRect(ctx, SAFE, heroTop, W - SAFE * 2, 54, 27);
-  ctx.fillStyle = '#EBF2DA';
-  ctx.fill();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = '#C9DC9F';
-  ctx.stroke();
-
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#3C4F26';
-  ctx.font = '800 22px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText(`BENEFICIO EXCLUSIVO VECINOS · ${bName.toUpperCase().slice(0, 34)}`, W / 2, heroTop + 35);
-
-  // Titular editorial principal
-  ctx.fillStyle = '#3D2B1F';
-  ctx.font = '900 64px "Outfit", sans-serif';
-  ctx.fillText('Comida Real para', W / 2, heroTop + 132);
-  ctx.fillStyle = '#556B2F';
-  ctx.font = '900 64px "Outfit", sans-serif';
-  ctx.fillText('la Salud de tu Perro', W / 2, heroTop + 200);
-
-  // Foto editorial del plato + Tarjeta de Descuento integrada (composición de alto impacto)
-  const photoY = heroTop + 236;
-  const photoW = W - SAFE * 2;
-  const photoH = 445;
-
-  ctx.save();
-  drawRoundRect(ctx, SAFE, photoY, photoW, photoH, 38);
-  ctx.shadowColor = 'rgba(61, 43, 31, 0.16)';
-  ctx.shadowBlur = 32;
-  ctx.shadowOffsetY = 12;
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fill();
-  ctx.shadowColor = 'transparent';
-  ctx.clip();
-
-  try {
-    const foodImg = await loadImage('/images/products/dieta-barf.jpg');
-    const ratio = Math.max(photoW / foodImg.width, photoH / foodImg.height);
-    const dw = foodImg.width * ratio;
-    const dh = foodImg.height * ratio;
-    ctx.drawImage(foodImg, SAFE + (photoW - dw) / 2, photoY + (photoH - dh) / 2, dw, dh);
-  } catch {
-    ctx.fillStyle = '#EBF2DA';
-    ctx.fillRect(SAFE, photoY, photoW, photoH);
-  }
-
-  // Degradado sutil oscuro en la parte inferior de la foto para legibilidad total
-  const scrim = ctx.createLinearGradient(0, photoY + photoH * 0.45, 0, photoY + photoH);
-  scrim.addColorStop(0, 'rgba(28, 22, 16, 0)');
-  scrim.addColorStop(1, 'rgba(28, 22, 16, 0.78)');
-  ctx.fillStyle = scrim;
-  ctx.fillRect(SAFE, photoY, photoW, photoH);
-
-  // Sello superior izquierdo dentro de la foto (padding generoso para cero desborde)
-  drawRoundRect(ctx, SAFE + 28, photoY + 26, 476, 46, 23);
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
-  ctx.fill();
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#3C4F26';
-  ctx.font = '800 19px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText('100% NATURAL · SIN ULTRAPROCESADOS', SAFE + 28 + 238, photoY + 56);
-
-  // Texto inferior dentro de la foto
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '800 32px "Outfit", sans-serif';
-  ctx.fillText('Dietas BARF Crudas y Cocinadas al Vapor', SAFE + 34, photoY + photoH - 64);
-  ctx.fillStyle = '#F3E8D4';
-  ctx.font = '600 22px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText('Despacho directo a tu edificio con cadena de frío -18°C', SAFE + 34, photoY + photoH - 28);
-  ctx.restore();
-
-  // Borde blanco nítido alrededor de la foto
-  drawRoundRect(ctx, SAFE, photoY, photoW, photoH, 38);
-  ctx.lineWidth = 5;
-  ctx.strokeStyle = '#FFFFFF';
-  ctx.stroke();
-
-  // =========================================================================
-  // 4. BANNER DE DESCUENTO PROTAGONISTA (NARANJO MIEL DE ALTO IMPACTO)
-  // =========================================================================
-  const discY = photoY + photoH + 34;
-  const discH = 172;
-  const discPct = Number(building.discount_percent || 15);
-
-  const discGrad = ctx.createLinearGradient(SAFE, discY, W - SAFE, discY + discH);
-  discGrad.addColorStop(0, '#DB994B');
-  discGrad.addColorStop(1, '#C47B2B');
-  drawRoundRect(ctx, SAFE, discY, photoW, discH, 34);
-  ctx.fillStyle = discGrad;
-  ctx.shadowColor = 'rgba(196, 123, 43, 0.28)';
-  ctx.shadowBlur = 24;
-  ctx.shadowOffsetY = 10;
-  ctx.fill();
-  ctx.shadowColor = 'transparent';
-
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '900 108px "Outfit", sans-serif';
-  ctx.fillText(`${discPct}%`, SAFE + 48, discY + 124);
-
-  const pctW = ctx.measureText(`${discPct}%`).width;
-  ctx.font = '900 44px "Outfit", sans-serif';
-  ctx.fillText('DE DESCUENTO', SAFE + 66 + pctW, discY + 76);
-  ctx.fillStyle = '#FFF5E4';
-  ctx.font = '700 27px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText('EN TU PRIMERA COMPRA', SAFE + 66 + pctW, discY + 116);
-  ctx.font = '600 20px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText('Aplicado automáticamente al tocar el chip NFC o escanear el QR', SAFE + 66 + pctW, discY + 148);
-
-  // =========================================================================
-  // 5. ZONA INFERIOR: RESPALDO QR + INSTRUCCIÓN LIMPIA + DOMINIO
-  // =========================================================================
-  const botY = discY + discH + 32;
-  const botH = H - botY - SAFE;
-
-  drawRoundRect(ctx, SAFE, botY, photoW, botH, 34);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.shadowColor = 'rgba(61, 43, 31, 0.08)';
-  ctx.shadowBlur = 20;
-  ctx.shadowOffsetY = 6;
-  ctx.fill();
-  ctx.shadowColor = 'transparent';
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = '#E6DCCB';
-  ctx.stroke();
-
-  // QR a la izquierda de la tarjeta inferior
-  const qrSize = Math.min(240, botH - 44);
-  const qrX = SAFE + 34;
-  const qrY = botY + (botH - qrSize) / 2;
-
   const qrImg = await svgElementToImage(qrSvgElement);
   if (qrImg) {
-    drawRoundRect(ctx, qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 20);
-    ctx.fillStyle = '#FAF7F2';
-    ctx.fill();
-    ctx.strokeStyle = '#E6DCCB';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+    ctx.drawImage(qrImg, qrX + 20, qrY + 20, qrBox - 40, qrBox - 40);
   }
+  ctx.restore();
 
-  // Texto explicativo a la derecha del QR
-  const infoX = qrX + qrSize + 44;
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#556B2F';
-  ctx.font = '800 22px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText('¿SIN NFC ACTIVADO EN TU TELÉFONO?', infoX, botY + 68);
-
-  ctx.fillStyle = '#3D2B1F';
-  ctx.font = '800 38px "Outfit", sans-serif';
-  ctx.fillText('Escanea este código QR', infoX, botY + 116);
-
-  ctx.fillStyle = '#6B5A4C';
-  ctx.font = '600 23px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText('Calcula la ración exacta de tu perro en 30 seg', infoX, botY + 158);
-  ctx.fillText('y activa el descuento de tu comunidad al instante.', infoX, botY + 190);
-
-  // Pill inferior con dominio oficial
-  drawRoundRect(ctx, infoX, botY + botH - 76, 360, 48, 16);
-  ctx.fillStyle = '#2F3E1E';
-  ctx.fill();
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '800 25px "Outfit", sans-serif';
-  ctx.fillText('www.origencanino.cl', infoX + 180, botY + botH - 43);
+  ctx.fillStyle = 'rgba(217, 228, 200, 0.88)';
+  ctx.font = '600 21px "Outfit", sans-serif';
+  ctx.fillText('¿Sin NFC? Escanea', qrX + qrBox / 2, qrY + qrBox + 34);
+
+  // =========================================================================
+  // 6. PIE MINIMALISTA CON DOMINIO OFICIAL (SOBRE MARGEN SEGURO)
+  // =========================================================================
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.14)';
+  ctx.fillRect(SAFE, H - SAFE - 92, W - SAFE * 2, 2);
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#FAF7F2';
+  ctx.font = '700 32px "Outfit", sans-serif';
+  ctx.fillText('origencanino.cl', SAFE, H - SAFE - 34);
+
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#E5A956';
+  ctx.font = '600 24px "Outfit", sans-serif';
+  ctx.fillText('Toca el sello NFC o escanea el QR', W - SAFE, H - SAFE - 36);
 
   return canvas.toDataURL('image/png');
 };

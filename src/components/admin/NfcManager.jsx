@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Building2, Plus, Copy, Check, Edit2, Trash2, MapPin, Sparkles, Navigation, 
   Phone, ExternalLink, Shield, ShieldCheck, ShieldAlert, Key, Lock, Unlock, 
-  Eye, EyeOff, Radio, Smartphone, AlertTriangle, RefreshCw, X, Download, Printer 
+  Eye, EyeOff, Radio, Smartphone, AlertTriangle, RefreshCw, X, Download, Printer, Upload 
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { generateNfcLamina10x15DataUrl } from '../../utils/promoGraphics';
+import { generateNfcLamina10x15DataUrl, NFC_LAMINA_SPECS } from '../../utils/promoGraphics';
 
 const NfcManager = ({ fetchWithAuth }) => {
   const [buildings, setBuildings] = useState([]);
@@ -47,6 +47,8 @@ const NfcManager = ({ fetchWithAuth }) => {
   const [laminaBuilding, setLaminaBuilding] = useState(null);
   const [laminaPreviewUrl, setLaminaPreviewUrl] = useState('');
   const [generatingLamina, setGeneratingLamina] = useState(false);
+  const [customHeroSrc, setCustomHeroSrc] = useState(null);
+  const [customLogoSrc, setCustomLogoSrc] = useState(null);
   const laminaQrRef = useRef(null);
 
   useEffect(() => {
@@ -59,7 +61,10 @@ const NfcManager = ({ fetchWithAuth }) => {
     const timer = setTimeout(async () => {
       try {
         const svgEl = laminaQrRef.current?.querySelector('svg');
-        const dataUrl = await generateNfcLamina10x15DataUrl(laminaBuilding, svgEl);
+        const dataUrl = await generateNfcLamina10x15DataUrl(laminaBuilding, svgEl, {
+          customHeroSrc,
+          customLogoSrc
+        });
         if (!cancelled) setLaminaPreviewUrl(dataUrl);
       } catch (err) {
         console.error('Error generando lámina 10x15:', err);
@@ -71,7 +76,14 @@ const NfcManager = ({ fetchWithAuth }) => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [laminaBuilding]);
+  }, [laminaBuilding, customHeroSrc, customLogoSrc]);
+
+  const handleLocalImagePick = (file, setter) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (e) => setter(e.target.result);
+    reader.readAsDataURL(file);
+  };
 
   const handleDownloadLamina = () => {
     if (!laminaPreviewUrl || !laminaBuilding) return;
@@ -583,6 +595,41 @@ const NfcManager = ({ fetchWithAuth }) => {
                 level="H"
                 includeMargin={false}
               />
+            </div>
+
+            {/* Controles rápidos para reemplazar Foto Principal o Logo con tus propias imágenes */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+              <label className="flex items-center justify-between gap-2 p-2.5 bg-[#FAF7F2] hover:bg-[#F2ECE1] border border-[#E6DCCB] rounded-xl cursor-pointer transition">
+                <div className="min-w-0">
+                  <span className="font-bold text-secondary-brown block truncate">Cambiar Foto Principal</span>
+                  <span className="text-[10px] text-stone-500">Sugerido: {NFC_LAMINA_SPECS.heroRecommendedSize}</span>
+                </div>
+                <span className="px-2.5 py-1 bg-white border border-stone-200 rounded-lg font-bold text-primary-green flex items-center gap-1 shrink-0">
+                  <Upload size={12} /> Subir
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleLocalImagePick(e.target.files?.[0], setCustomHeroSrc)}
+                />
+              </label>
+
+              <label className="flex items-center justify-between gap-2 p-2.5 bg-[#FAF7F2] hover:bg-[#F2ECE1] border border-[#E6DCCB] rounded-xl cursor-pointer transition">
+                <div className="min-w-0">
+                  <span className="font-bold text-secondary-brown block truncate">Cambiar Logo del Afiche</span>
+                  <span className="text-[10px] text-stone-500">Sugerido: {NFC_LAMINA_SPECS.logoRecommendedSize}</span>
+                </div>
+                <span className="px-2.5 py-1 bg-white border border-stone-200 rounded-lg font-bold text-primary-green flex items-center gap-1 shrink-0">
+                  <Upload size={12} /> Subir
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleLocalImagePick(e.target.files?.[0], setCustomLogoSrc)}
+                />
+              </label>
             </div>
 
             <div className="bg-[#FAF7F2] rounded-2xl p-4 border border-[#EBE4DA] flex justify-center">
