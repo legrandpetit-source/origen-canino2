@@ -21,7 +21,7 @@ const AmbassadorCommunitySection = () => {
     {
       icon: ShieldCheck,
       title: 'Adiós al ultraprocesado',
-      text: 'Ingredientes frescos, visibles y 100% grado humano. Cero harinas de desecho, cero preservantes químicos ni colorantes.'
+      text: 'Ingredientes frescos, reales y visibles. Cero harinas de desecho, cero preservantes químicos ni colorantes.'
     },
     {
       icon: Sparkles,
@@ -220,3 +220,4 @@ const AmbassadorCommunitySection = () => {
 };
 
 export default AmbassadorCommunitySection;
+

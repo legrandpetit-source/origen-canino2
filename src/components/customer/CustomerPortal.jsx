@@ -268,7 +268,7 @@ const CustomerPortal = () => {
 
       ctx.fillStyle = '#5C4B3E';
       ctx.font = '500 32px "Plus Jakarta Sans", sans-serif';
-      ctx.fillText('en comida real 100% grado humano para tu perro', W / 2, 700);
+      ctx.fillText('en comida real 100% natural para tu perro', W / 2, 700);
       ctx.fillText('Sin ultraprocesados · Dietas BARF y Cocinadas', W / 2, 748);
 
       // Tarjeta blanca central con el QR escaneable

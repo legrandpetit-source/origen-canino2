@@ -4451,7 +4451,7 @@ if os.path.isdir(dist_path):
 
                     og_title = html.escape(f"{first_name}{dog_part} te regalan {pct}% OFF en Origen Canino — Comida Real")
                     og_desc = html.escape(
-                        f"Deja atrás los ultraprocesados: prueba dietas BARF crudas y cocinadas al vapor 100% grado humano con {pct}% de descuento en tu primera compra usando el código {ref_param}."
+                        f"Deja atrás los ultraprocesados: prueba dietas BARF crudas y cocinadas al vapor 100% naturales con {pct}% de descuento en tu primera compra usando el código {ref_param}."
                     )
                     og_img = (
                         "https://origencanino.cl/images/og-embajador-canelo.jpg"
