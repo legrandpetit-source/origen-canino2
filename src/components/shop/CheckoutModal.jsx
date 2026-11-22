@@ -25,7 +25,8 @@ const CHILEAN_BANKS = [
 
 const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
   const { 
-    items, total, clearCart, dogData, nfcCommunity, nfcDiscount, 
+    items, total, dietKg, clearCart, dogData, nfcCommunity, nfcDiscount, 
+    activePromo, clearActivePromo,
     firstOrderPromo, isFirstPurchaseEligible, markAsPurchased, directLinkToken 
   } = useCart();
   const { customer, dogs, openAuthModal, login, register } = useCustomer();
@@ -277,7 +278,14 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
         body: JSON.stringify({
           code: clean,
           email: formData.customer_email.trim(),
-          subtotal: total
+          subtotal: total,
+          diet_kg: dietKg || 0,
+          items: items.map((it) => ({
+            id: it.id,
+            type: it.type || 'barf',
+            price: it.price,
+            quantity: it.quantity
+          }))
         })
       });
       const data = await res.json();
@@ -304,14 +312,23 @@ const CheckoutModal = ({ isOpen, onClose, onBack, isSubscription = false }) => {
     setCouponInput('');
     setCouponSuccess('');
     setCouponError('');
+    clearActivePromo();
   };
 
-  // Re-validar cupón automáticamente SOLO si el usuario ya lo aplicó voluntariamente y cambia el subtotal
+  // Pre-aplicación directa de campaña (?promo=CODIGO) al abrir Checkout si no hay otro cupón activo
+  useEffect(() => {
+    if (isOpen && !directLinkToken && activePromo?.code && !appliedCoupon && total > 0) {
+      setCouponInput(activePromo.code);
+      validateAndApplyCoupon(activePromo.code);
+    }
+  }, [isOpen, activePromo?.code, total, dietKg]);
+
+  // Re-validar cupón automáticamente si el usuario ya lo aplicó y cambia el subtotal o los kilos de dieta
   useEffect(() => {
     if (isOpen && appliedCoupon && total > 0) {
       validateAndApplyCoupon(appliedCoupon);
     }
-  }, [total]);
+  }, [total, dietKg]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });

@@ -312,9 +312,14 @@ class OrderCreate(BaseModel):
 class CouponCreate(BaseModel):
     code: str
     description: Optional[str] = ""
+    campaign_title: Optional[str] = ""
+    story_theme: Optional[str] = "olive"
     discount_type: str = "percentage"  # "percentage" or "fixed"
     discount_value: float
     min_order_amount: Optional[int] = 0
+    min_kg: Optional[float] = 0
+    applicable_scope: Optional[str] = "all"  # all | diets | barf | cocinada | snack
+    customer_eligibility: Optional[str] = "all"  # all | first_order | returning
     max_discount_amount: Optional[int] = None
     usage_limit: Optional[int] = None
     usage_per_customer: Optional[int] = 1
@@ -324,9 +329,14 @@ class CouponCreate(BaseModel):
 
 class CouponUpdate(BaseModel):
     description: Optional[str] = None
+    campaign_title: Optional[str] = None
+    story_theme: Optional[str] = None
     discount_type: Optional[str] = None
     discount_value: Optional[float] = None
     min_order_amount: Optional[int] = None
+    min_kg: Optional[float] = None
+    applicable_scope: Optional[str] = None
+    customer_eligibility: Optional[str] = None
     max_discount_amount: Optional[int] = None
     usage_limit: Optional[int] = None
     usage_per_customer: Optional[int] = None
@@ -338,6 +348,8 @@ class ValidateCouponRequest(BaseModel):
     code: str
     email: Optional[str] = ""
     subtotal: int
+    diet_kg: Optional[float] = 0.0
+    items: Optional[List[dict]] = None
 
 class OrderStatusUpdate(BaseModel):
     payment_status: Optional[str] = None
@@ -3842,14 +3854,43 @@ def validate_coupon_endpoint(req: ValidateCouponRequest):
             if now > e_date:
                 return {"valid": False, "code": code, "message": "Este cupón ha expirado."}
 
-        # Validar compra mínima
+        # Validar compra mínima en pesos
         min_order = coupon.get("min_order_amount") or 0
         if subtotal < min_order:
+            missing_clp = min_order - subtotal
             return {
                 "valid": False,
                 "code": code,
-                "message": f"Este cupón requiere una compra mínima de ${min_order:,} CLP.".replace(",", ".")
+                "missing_amount": missing_clp,
+                "message": f"Este cupón requiere una compra mínima de ${min_order:,} CLP (te faltan ${missing_clp:,} CLP).".replace(",", ".")
             }
+
+        # Validar kilos mínimos en dietas (BARF + Cocinada; excluye snacks)
+        min_kg = float(coupon.get("min_kg") or 0)
+        diet_kg = float(req.diet_kg or 0)
+        if min_kg > 0 and diet_kg + 1e-6 < min_kg:
+            missing_kg = round(max(0.0, min_kg - diet_kg), 1)
+            return {
+                "valid": False,
+                "code": code,
+                "missing_kg": missing_kg,
+                "min_kg": min_kg,
+                "diet_kg": round(diet_kg, 1),
+                "message": f"Este cupón requiere mínimo {min_kg:g} kg en dietas (BARF/Cocinada). Llevas {round(diet_kg, 1):g} kg — te faltan {missing_kg:g} kg."
+            }
+
+        # Validar elegibilidad de cliente (primera compra / recurrente)
+        eligibility = (coupon.get("customer_eligibility") or "all").strip().lower()
+        if eligibility in ("first_order", "returning") and clean_email:
+            cursor.execute(
+                "SELECT COUNT(*) as cnt FROM orders WHERE LOWER(customer_email) = %s AND payment_status != 'Cancelado'",
+                (clean_email,),
+            )
+            ord_cnt = (cursor.fetchone() or {}).get("cnt", 0)
+            if eligibility == "first_order" and ord_cnt > 0:
+                return {"valid": False, "code": code, "message": "Este cupón es exclusivo para tu primera compra."}
+            if eligibility == "returning" and ord_cnt == 0:
+                return {"valid": False, "code": code, "message": "Este cupón es exclusivo para clientes recurrentes de Origen Canino."}
 
         # Validar límite de usos totales en la tienda
         usage_limit = coupon.get("usage_limit")
@@ -3873,28 +3914,93 @@ def validate_coupon_endpoint(req: ValidateCouponRequest):
                     "message": f"Ya has utilizado este cupón el máximo de veces permitido ({usage_per_cust})."
                 }
 
+        # Calcular base elegible según alcance de categoría (all | diets | barf | cocinada | snack)
+        scope = (coupon.get("applicable_scope") or "all").strip().lower()
+        eligible_subtotal = subtotal
+        if scope != "all" and req.items:
+            eligible_subtotal = 0
+            for it in req.items:
+                p_type = (it.get("type") or "barf").strip().lower()
+                line_total = int(round(float(it.get("price") or 0) * int(it.get("quantity") or 0)))
+                if scope == "diets" and p_type != "snack":
+                    eligible_subtotal += line_total
+                elif scope == p_type:
+                    eligible_subtotal += line_total
+            if eligible_subtotal <= 0:
+                scope_labels = {
+                    "diets": "dietas (BARF o Cocinada)",
+                    "barf": "dieta BARF cruda",
+                    "cocinada": "dieta Cocinada al vapor",
+                    "snack": "snacks naturales",
+                }
+                return {
+                    "valid": False,
+                    "code": code,
+                    "message": f"Este cupón aplica solo para {scope_labels.get(scope, scope)}."
+                }
+
         # Calcular descuento
         disc_type = coupon.get("discount_type") or "percentage"
         disc_val = float(coupon.get("discount_value") or 0)
 
         if disc_type == "percentage":
-            calculated = int(round(subtotal * (disc_val / 100)))
+            calculated = int(round(eligible_subtotal * (disc_val / 100)))
             max_disc = coupon.get("max_discount_amount")
             if max_disc and calculated > max_disc:
                 calculated = max_disc
         else: # "fixed"
-            calculated = min(int(disc_val), subtotal)
+            calculated = min(int(disc_val), eligible_subtotal)
 
         return {
             "valid": True,
             "code": code,
             "coupon_id": coupon["id"],
+            "campaign_title": coupon.get("campaign_title") or "",
             "discount_type": disc_type,
             "discount_value": disc_val,
             "discount_amount": calculated,
+            "min_kg": min_kg,
+            "applicable_scope": scope,
             "description": coupon.get("description") or "",
             "message": f"¡Cupón {code} aplicado! -${calculated:,} CLP".replace(",", ".")
         }
+
+@app.get("/api/promotions/public/{code}")
+def get_public_promotion(code: str):
+    clean = (code or "").strip().upper()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM coupons WHERE UPPER(code) = %s", (clean,))
+        row = cursor.fetchone()
+    if not row or not row.get("is_active"):
+        return {"valid": False, "message": "Promoción no encontrada o inactiva."}
+    now = datetime.now(timezone.utc)
+    if row.get("start_date"):
+        sd = row["start_date"]
+        if hasattr(sd, "tzinfo") and sd.tzinfo is None:
+            sd = sd.replace(tzinfo=timezone.utc)
+        if now < sd:
+            return {"valid": False, "message": "Esta promoción aún no comienza."}
+    if row.get("end_date"):
+        ed = row["end_date"]
+        if hasattr(ed, "tzinfo") and ed.tzinfo is None:
+            ed = ed.replace(tzinfo=timezone.utc)
+        if now > ed:
+            return {"valid": False, "message": "Esta promoción ya finalizó."}
+    return {
+        "valid": True,
+        "code": row["code"],
+        "campaign_title": row.get("campaign_title") or "",
+        "description": row.get("description") or "",
+        "discount_type": row.get("discount_type") or "percentage",
+        "discount_value": float(row.get("discount_value") or 0),
+        "min_order_amount": int(row.get("min_order_amount") or 0),
+        "min_kg": float(row.get("min_kg") or 0),
+        "applicable_scope": row.get("applicable_scope") or "all",
+        "customer_eligibility": row.get("customer_eligibility") or "all",
+        "story_theme": row.get("story_theme") or "olive",
+        "end_date": row["end_date"].isoformat() if isinstance(row.get("end_date"), datetime) else None,
+    }
 
 @app.get("/api/admin/promotions")
 def get_admin_promotions(current_user: str = Depends(get_current_admin)):
@@ -3909,6 +4015,8 @@ def get_admin_promotions(current_user: str = Depends(get_current_admin)):
                 c = dict(r)
                 if "discount_value" in c and c["discount_value"] is not None:
                     c["discount_value"] = float(c["discount_value"])
+                if "min_kg" in c and c["min_kg"] is not None:
+                    c["min_kg"] = float(c["min_kg"])
                 if isinstance(c.get("start_date"), datetime):
                     c["start_date"] = c["start_date"].isoformat()
                 if isinstance(c.get("end_date"), datetime):
@@ -3936,15 +4044,19 @@ def create_admin_promotion(payload: CouponCreate, current_user: str = Depends(ge
 
             cursor.execute("""
                 INSERT INTO coupons (
-                    code, description, discount_type, discount_value, 
-                    min_order_amount, max_discount_amount, usage_limit, 
+                    code, description, campaign_title, story_theme,
+                    discount_type, discount_value,
+                    min_order_amount, min_kg, applicable_scope, customer_eligibility,
+                    max_discount_amount, usage_limit,
                     usage_per_customer, start_date, end_date, is_active
                 ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                 ) RETURNING *
             """, (
-                code, (payload.description or "").strip(), payload.discount_type, payload.discount_value,
-                payload.min_order_amount or 0, payload.max_discount_amount, payload.usage_limit,
+                code, (payload.description or "").strip(), (payload.campaign_title or "").strip(), payload.story_theme or "olive",
+                payload.discount_type, payload.discount_value,
+                payload.min_order_amount or 0, payload.min_kg or 0, payload.applicable_scope or "all", payload.customer_eligibility or "all",
+                payload.max_discount_amount, payload.usage_limit,
                 payload.usage_per_customer or 1, payload.start_date, payload.end_date, payload.is_active
             ))
             new_row = cursor.fetchone()
@@ -3952,6 +4064,8 @@ def create_admin_promotion(payload: CouponCreate, current_user: str = Depends(ge
             new_c = dict(new_row)
             if "discount_value" in new_c and new_c["discount_value"] is not None:
                 new_c["discount_value"] = float(new_c["discount_value"])
+            if "min_kg" in new_c and new_c["min_kg"] is not None:
+                new_c["min_kg"] = float(new_c["min_kg"])
             return {"success": True, "coupon": new_c}
     except HTTPException:
         raise
@@ -4565,6 +4679,43 @@ if os.path.isdir(dist_path):
                     return HTMLResponse(content=html_content, status_code=200)
             except Exception as err_og:
                 print(f"Error inyectando OG para referido {ref_param}: {err_og}")
+
+        # 1.6 Inyección Open Graph dinámica para enlaces de Cupones Promocionales (?promo=CODIGO)
+        promo_param = (request.query_params.get("promo") or "").strip().upper()
+        if promo_param and full_path.strip("/") == "":
+            try:
+                with get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT * FROM coupons WHERE UPPER(code) = %s AND is_active = TRUE", (promo_param,))
+                    cp = cursor.fetchone()
+                if cp:
+                    d_val = float(cp.get("discount_value") or 0)
+                    benefit_str = f"{int(d_val)}% OFF" if cp.get("discount_type") == "percentage" else f"${int(d_val):,} OFF".replace(",", ".")
+                    camp_title = (cp.get("campaign_title") or "").strip() or f"Promoción Especial {promo_param}"
+                    conds = []
+                    if float(cp.get("min_kg") or 0) > 0:
+                        conds.append(f"Mínimo {float(cp['min_kg']):g} kg en dietas")
+                    if int(cp.get("min_order_amount") or 0) > 0:
+                        conds.append(f"Compra mínima ${int(cp['min_order_amount']):,} CLP".replace(",", "."))
+                    cond_txt = (" · " + " · ".join(conds)) if conds else ""
+
+                    og_title = html.escape(f"{camp_title} · {benefit_str} en Origen Canino")
+                    og_desc = html.escape(
+                        f"{(cp.get('description') or 'Comida real 100% natural para tu perro.')} Usa el código {promo_param}{cond_txt}."
+                    )
+                    og_url = f"https://origencanino.cl/?promo={html.escape(promo_param)}"
+                    with open(index_file, "r", encoding="utf-8") as f:
+                        html_content = f.read()
+                    html_content = re.sub(r"<title>.*?</title>", f"<title>{og_title}</title>", html_content, flags=re.I)
+                    html_content = re.sub(r'<meta\s+name="description"[^>]*>', f'<meta name="description" content="{og_desc}">', html_content, flags=re.I)
+                    html_content = re.sub(r'<meta\s+property="og:title"[^>]*>', f'<meta property="og:title" content="{og_title}">', html_content, flags=re.I)
+                    html_content = re.sub(r'<meta\s+property="og:description"[^>]*>', f'<meta property="og:description" content="{og_desc}">', html_content, flags=re.I)
+                    html_content = re.sub(r'<meta\s+property="og:url"[^>]*>', f'<meta property="og:url" content="{og_url}">', html_content, flags=re.I)
+                    html_content = re.sub(r'<meta\s+name="twitter:title"[^>]*>', f'<meta name="twitter:title" content="{og_title}">', html_content, flags=re.I)
+                    html_content = re.sub(r'<meta\s+name="twitter:description"[^>]*>', f'<meta name="twitter:description" content="{og_desc}">', html_content, flags=re.I)
+                    return HTMLResponse(content=html_content, status_code=200)
+            except Exception as err_og_p:
+                print(f"Error inyectando OG para promo {promo_param}: {err_og_p}")
 
         # 2. Inyección SEO dinámica para Googlebot / Redes Sociales en artículos de blog
         clean_path = full_path.strip("/")

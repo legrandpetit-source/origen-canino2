@@ -18,13 +18,14 @@ import ProductCard from './ProductCard';
 import FloatingFirstOrderPromo from './FloatingFirstOrderPromo';
 
 const Home = () => {
-  const { addItem, nfcCommunity, setNfcCommunity } = useCart();
+  const { addItem, nfcCommunity, setNfcCommunity, activePromo, setActivePromo } = useCart();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [nfcBannerOpen, setNfcBannerOpen] = useState(true);
   const [referralBanner, setReferralBanner] = useState(null);
   const [referralBannerOpen, setReferralBannerOpen] = useState(true);
+  const [promoBannerOpen, setPromoBannerOpen] = useState(true);
   const [copiedRefCode, setCopiedRefCode] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all'); // 'all', 'barf', 'cocinada', 'snack'
 
@@ -68,6 +69,20 @@ const Home = () => {
           }
         })
         .catch(err => console.error("Error validando referido:", err));
+    }
+
+    // Detectar si el usuario ingresó por un enlace directo de campaña (?promo=codigo)
+    const promoParam = params.get('promo');
+    if (promoParam) {
+      fetch(`/api/promotions/public/${encodeURIComponent(promoParam)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.valid) {
+            setActivePromo(data);
+            setPromoBannerOpen(true);
+          }
+        })
+        .catch(err => console.error("Error validando promoción directa:", err));
     }
 
     // Escuchar eventos de filtro desde otras secciones (e.g. Especialidades)
@@ -215,6 +230,56 @@ const Home = () => {
                 <button 
                   onClick={() => setReferralBannerOpen(false)}
                   className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition"
+                  title="Cerrar aviso"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Banner de Campaña Promocional Directa (?promo=CODIGO) */}
+      <AnimatePresence>
+        {activePromo && promoBannerOpen && !referralBanner && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="bg-[#3C4F26] text-white px-4 py-3 shadow-md border-b border-white/20 relative z-30"
+          >
+            <div className="container mx-auto flex flex-col md:flex-row items-center justify-between gap-3 max-w-6xl">
+              <div className="flex items-center gap-3">
+                <div className="bg-amber-400/20 p-2 rounded-full text-amber-300">
+                  <Sparkles size={20} />
+                </div>
+                <div>
+                  <p className="font-header font-bold text-sm sm:text-base flex flex-wrap items-center gap-2">
+                    <span>{activePromo.campaign_title || `Promoción Especial ${activePromo.code}`}</span>
+                    <span className="bg-amber-400 text-[#2F3E1E] text-xs font-extrabold px-2.5 py-0.5 rounded-full">
+                      {activePromo.discount_type === 'percentage'
+                        ? `${activePromo.discount_value}% OFF`
+                        : `$${Number(activePromo.discount_value || 0).toLocaleString('es-CL')} OFF`}
+                    </span>
+                  </p>
+                  <p className="text-xs text-white/90 mt-0.5">
+                    Código <strong className="font-mono bg-white/15 px-1.5 py-0.5 rounded">{activePromo.code}</strong> pre-activado para tu carrito
+                    {activePromo.min_kg > 0 ? ` · Mínimo ${activePromo.min_kg} kg en dietas` : ''}
+                    {activePromo.min_order_amount > 0 ? ` · Compra mín. $${Number(activePromo.min_order_amount).toLocaleString('es-CL')}` : ''}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href="#tienda"
+                  className="bg-white text-[#3C4F26] font-header font-bold text-xs uppercase tracking-wider px-3.5 py-1.5 rounded-xl hover:bg-[#FAF7F2] transition"
+                >
+                  Aprovechar Promo
+                </a>
+                <button
+                  onClick={() => setPromoBannerOpen(false)}
+                  className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition cursor-pointer"
                   title="Cerrar aviso"
                 >
                   <X size={16} />
@@ -414,8 +479,8 @@ const Home = () => {
       {/* Blog */}
       <Blog />
       
-      {/* Widget Flotante de Descuento 1ra Compra (oculto si llegó con código de referido activo) */}
-      {!referralBanner && <FloatingFirstOrderPromo />}
+      {/* Widget Flotante de Descuento 1ra Compra (oculto si llegó con código de referido o campaña ?promo activa) */}
+      {!referralBanner && !activePromo && <FloatingFirstOrderPromo />}
 
       {/* Modal de Calculadora de Raciones */}
       <CalculatorModal 

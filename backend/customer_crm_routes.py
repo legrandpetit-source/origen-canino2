@@ -92,6 +92,11 @@ def ensure_crm_schema():
                 "ALTER TABLE customer_dogs ADD COLUMN IF NOT EXISTS birth_date DATE;",
                 "ALTER TABLE customer_dogs ADD COLUMN IF NOT EXISTS birth_date_approx BOOLEAN DEFAULT FALSE;",
                 "ALTER TABLE customer_dogs ADD COLUMN IF NOT EXISTS weight_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
+                "ALTER TABLE coupons ADD COLUMN IF NOT EXISTS campaign_title TEXT DEFAULT '';",
+                "ALTER TABLE coupons ADD COLUMN IF NOT EXISTS story_theme TEXT DEFAULT 'olive';",
+                "ALTER TABLE coupons ADD COLUMN IF NOT EXISTS min_kg NUMERIC DEFAULT 0;",
+                "ALTER TABLE coupons ADD COLUMN IF NOT EXISTS applicable_scope TEXT DEFAULT 'all';",
+                "ALTER TABLE coupons ADD COLUMN IF NOT EXISTS customer_eligibility TEXT DEFAULT 'all';",
             ]
             for stmt in alter_cols:
                 cursor.execute(stmt)

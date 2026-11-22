@@ -183,6 +183,8 @@ export default function CustomersManager({ fetchWithAuth }) {
   const [campaignAudience, setCampaignAudience] = useState('selected'); // selected, all_filtered, no_orders, inactive, vip, ambassadors, guests
   const [selectedTemplateId, setSelectedTemplateId] = useState('reposicion');
   const [waMessageText, setWaMessageText] = useState(WHATSAPP_TEMPLATES[1].text);
+  const [activeCoupons, setActiveCoupons] = useState([]);
+  const [selectedPromoCode, setSelectedPromoCode] = useState('');
   const [openedWaKeys, setOpenedWaKeys] = useState({});
   const [sentWaKeys, setSentWaKeys] = useState({});
   const [pendingWaConfirm, setPendingWaConfirm] = useState(null); // { person, text, key }
@@ -246,10 +248,48 @@ export default function CustomersManager({ fetchWithAuth }) {
     }
   };
 
+  const loadActiveCoupons = async () => {
+    try {
+      const res = await fetchWithAuth('/api/admin/promotions');
+      if (res.ok) {
+        const json = await res.json();
+        setActiveCoupons((json.coupons || []).filter((c) => c.is_active));
+      }
+    } catch {}
+  };
+
   useEffect(() => {
     loadCustomers();
     loadSmtpSettings();
+    loadActiveCoupons();
   }, []);
+
+  const handleApplyPromoToCampaign = (codeVal) => {
+    setSelectedPromoCode(codeVal);
+    const cp = activeCoupons.find((c) => c.code === codeVal);
+    if (!cp) return;
+    const benefit =
+      cp.discount_type === 'percentage'
+        ? `${cp.discount_value}% OFF`
+        : `$${Math.round(Number(cp.discount_value || 0)).toLocaleString('es-CL')} OFF`;
+    const conds = [];
+    if (Number(cp.min_kg || 0) > 0) conds.push(`mínimo ${Number(cp.min_kg)} kg en dietas`);
+    if (Number(cp.min_order_amount || 0) > 0) {
+      conds.push(`compra mín. $${Number(cp.min_order_amount).toLocaleString('es-CL')}`);
+    }
+    const condTxt = conds.length ? ` (${conds.join(', ')})` : '';
+    const promoUrl = `https://origencanino.cl/?promo=${cp.code}`;
+    const titleStr = cp.campaign_title || `Promoción Especial ${cp.code}`;
+
+    setSelectedTemplateId('libre');
+    setWaMessageText(
+      `¡Hola {nombre}! 🐾 En Origen Canino activamos *${titleStr}* con *${benefit}* para {perro}${condTxt}. Entra directo con tu descuento pre-aplicado aquí: ${promoUrl}`
+    );
+    setEmailSubject(`${titleStr}: ${benefit} para {perro} 🐾`);
+    setEmailBody(
+      `Hola {nombre},\n\nActivamos nuestra campaña ${titleStr} con ${benefit}${condTxt} en comida real 100% natural para {perro}.\n\nUsa el código ${cp.code} o entra directo con el descuento pre-aplicado en este enlace:\n${promoUrl}\n\n¡Un abrazo de todo el equipo de Origen Canino!`
+    );
+  };
 
   const openCustomer360 = async (customerId) => {
     setDetailLoading(true);
@@ -1094,6 +1134,25 @@ export default function CustomersManager({ fetchWithAuth }) {
                 <p className="text-[11px] text-stone-500 mt-0.5">
                   Variables automáticas: <code>{'{nombre}'}</code>, <code>{'{perro}'}</code>, <code>{'{codigo_embajador}'}</code>.
                 </p>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#FAF7F2] rounded-xl border border-[#EBE4DA]">
+                <span className="text-[11px] font-bold text-secondary-brown flex items-center gap-1.5">
+                  <Sparkles size={13} className="text-secondary-orange" /> Cargar Promoción Activa (auto-rellena WA + Email):
+                </span>
+                <select
+                  value={selectedPromoCode}
+                  onChange={(e) => handleApplyPromoToCampaign(e.target.value)}
+                  className="px-3 py-1.5 bg-white border border-stone-200 rounded-lg text-xs font-bold text-secondary-brown cursor-pointer"
+                >
+                  <option value="">— Seleccionar cupón activo ({activeCoupons.length}) —</option>
+                  {activeCoupons.map((cp) => (
+                    <option key={cp.id} value={cp.code}>
+                      {cp.code} · {cp.discount_type === 'percentage' ? `${cp.discount_value}% OFF` : `$${Number(cp.discount_value).toLocaleString('es-CL')} OFF`}
+                      {cp.campaign_title ? ` (${cp.campaign_title})` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="flex flex-wrap gap-1.5">

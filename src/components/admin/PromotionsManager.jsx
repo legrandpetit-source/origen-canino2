@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Tag, 
   Sparkles, 
@@ -26,8 +26,13 @@ import {
   Copy,
   Check,
   X,
-  Wallet
+  Wallet,
+  QrCode,
+  Download,
+  Share2
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import { generateCouponStoryDataUrl, generateQrPngDataUrl, STORY_THEMES } from '../../utils/promoGraphics';
 
 export default function PromotionsManager({ fetchWithAuth }) {
   const [activeSubTab, setActiveSubTab] = useState('coupons'); // 'coupons' | 'welcome' | 'referrals'
@@ -70,10 +75,15 @@ export default function PromotionsManager({ fetchWithAuth }) {
   const [savingCoupon, setSavingCoupon] = useState(false);
   const [couponForm, setCouponForm] = useState({
     code: '',
+    campaign_title: '',
+    story_theme: 'olive',
     description: '',
     discount_type: 'percentage', // 'percentage' | 'fixed'
     discount_value: 15,
     min_order_amount: 0,
+    min_kg: 0,
+    applicable_scope: 'all',
+    customer_eligibility: 'all',
     max_discount_amount: '',
     usage_limit: '',
     usage_per_customer: 1,
@@ -81,6 +91,12 @@ export default function PromotionsManager({ fetchWithAuth }) {
     end_date: '',
     is_active: true
   });
+
+  // Modal Kit de Difusión (QR / Story / Link ?promo=CODIGO)
+  const [shareCoupon, setShareCoupon] = useState(null);
+  const [shareTheme, setShareTheme] = useState('olive');
+  const [downloadingAsset, setDownloadingAsset] = useState(false);
+  const shareQrRef = useRef(null);
 
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState(null);
@@ -255,10 +271,15 @@ export default function PromotionsManager({ fetchWithAuth }) {
       setEditingCoupon(coupon);
       setCouponForm({
         code: coupon.code,
+        campaign_title: coupon.campaign_title || '',
+        story_theme: coupon.story_theme || 'olive',
         description: coupon.description || '',
         discount_type: coupon.discount_type || 'percentage',
         discount_value: coupon.discount_value,
         min_order_amount: coupon.min_order_amount || 0,
+        min_kg: coupon.min_kg || 0,
+        applicable_scope: coupon.applicable_scope || 'all',
+        customer_eligibility: coupon.customer_eligibility || 'all',
         max_discount_amount: coupon.max_discount_amount || '',
         usage_limit: coupon.usage_limit || '',
         usage_per_customer: coupon.usage_per_customer || 1,
@@ -270,10 +291,15 @@ export default function PromotionsManager({ fetchWithAuth }) {
       setEditingCoupon(null);
       setCouponForm({
         code: '',
+        campaign_title: '',
+        story_theme: 'olive',
         description: '',
         discount_type: 'percentage',
         discount_value: 15,
         min_order_amount: 0,
+        min_kg: 0,
+        applicable_scope: 'all',
+        customer_eligibility: 'all',
         max_discount_amount: '',
         usage_limit: '',
         usage_per_customer: 1,
@@ -292,10 +318,15 @@ export default function PromotionsManager({ fetchWithAuth }) {
     try {
       const payload = {
         code: couponForm.code.trim().toUpperCase(),
+        campaign_title: (couponForm.campaign_title || '').trim(),
+        story_theme: couponForm.story_theme || 'olive',
         description: couponForm.description.trim(),
         discount_type: couponForm.discount_type,
         discount_value: parseFloat(couponForm.discount_value),
         min_order_amount: couponForm.min_order_amount ? parseInt(couponForm.min_order_amount) : 0,
+        min_kg: couponForm.min_kg ? parseFloat(couponForm.min_kg) : 0,
+        applicable_scope: couponForm.applicable_scope || 'all',
+        customer_eligibility: couponForm.customer_eligibility || 'all',
         max_discount_amount: couponForm.max_discount_amount ? parseInt(couponForm.max_discount_amount) : null,
         usage_limit: couponForm.usage_limit ? parseInt(couponForm.usage_limit) : null,
         usage_per_customer: couponForm.usage_per_customer ? parseInt(couponForm.usage_per_customer) : 1,
@@ -570,6 +601,29 @@ export default function PromotionsManager({ fetchWithAuth }) {
                           </div>
                         )}
 
+                        {Number(coupon.min_kg || 0) > 0 && (
+                          <div className="flex justify-between items-center text-[11px] font-body text-amber-800">
+                            <span>Mínimo en Dietas:</span>
+                            <span className="font-bold">{Number(coupon.min_kg)} kg (BARF/Cocinada)</span>
+                          </div>
+                        )}
+
+                        {coupon.applicable_scope && coupon.applicable_scope !== 'all' && (
+                          <div className="flex justify-between items-center text-[11px] font-body text-stone-500">
+                            <span>Alcance:</span>
+                            <span className="font-bold text-stone-700 uppercase">{coupon.applicable_scope}</span>
+                          </div>
+                        )}
+
+                        {coupon.customer_eligibility && coupon.customer_eligibility !== 'all' && (
+                          <div className="flex justify-between items-center text-[11px] font-body text-stone-500">
+                            <span>Público:</span>
+                            <span className="font-bold text-stone-700">
+                              {coupon.customer_eligibility === 'first_order' ? 'Solo 1ra compra' : 'Solo recurrentes'}
+                            </span>
+                          </div>
+                        )}
+
                         {coupon.max_discount_amount && (
                           <div className="flex justify-between items-center text-[11px] font-body text-stone-500">
                             <span>Tope de rebaja:</span>
@@ -599,21 +653,34 @@ export default function PromotionsManager({ fetchWithAuth }) {
                     </div>
 
                     {/* Actions */}
-                    <div className="pt-3 border-t border-stone-100 flex justify-end items-center gap-1.5 mt-2">
+                    <div className="pt-3 border-t border-stone-100 flex justify-between items-center gap-1.5 mt-2">
                       <button
-                        onClick={() => handleOpenCouponModal(coupon)}
-                        className="px-3 py-1.5 text-stone-600 hover:text-[#677333] hover:bg-[#FAF7F2] rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                        onClick={() => {
+                          setShareCoupon(coupon);
+                          setShareTheme(coupon.story_theme || 'olive');
+                        }}
+                        className="px-3 py-1.5 bg-[#677333]/10 hover:bg-[#677333] text-[#4E5824] hover:text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                        title="Generar Link, QR y Tarjeta Story para WhatsApp/Instagram"
                       >
-                        <Edit2 size={13} />
-                        <span>Editar</span>
+                        <QrCode size={13} />
+                        <span>Difundir / QR</span>
                       </button>
-                      <button
-                        onClick={() => handleDeleteCoupon(coupon)}
-                        className="px-3 py-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
-                      >
-                        <Trash2 size={13} />
-                        <span>Eliminar</span>
-                      </button>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleOpenCouponModal(coupon)}
+                          className="px-2.5 py-1.5 text-stone-600 hover:text-[#677333] hover:bg-[#FAF7F2] rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                        >
+                          <Edit2 size={13} />
+                          <span>Editar</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCoupon(coupon)}
+                          className="px-2.5 py-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1170,6 +1237,36 @@ export default function PromotionsManager({ fetchWithAuth }) {
                 />
               </div>
 
+              {/* Título Comercial & Tema Visual de Tarjeta Story */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#3c2716] uppercase tracking-wider mb-1 font-display">
+                    Título de Campaña (Story / Banner)
+                  </label>
+                  <input
+                    type="text"
+                    value={couponForm.campaign_title}
+                    onChange={(e) => setCouponForm({ ...couponForm, campaign_title: e.target.value })}
+                    placeholder="Ej: Especial Navidad / Tarifa Mayorista"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 text-xs md:text-sm font-body text-[#3c2716] focus:outline-none focus:ring-2 focus:ring-[#677333]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#3c2716] uppercase tracking-wider mb-1 font-display">
+                    Tema Visual (Tarjeta Story)
+                  </label>
+                  <select
+                    value={couponForm.story_theme}
+                    onChange={(e) => setCouponForm({ ...couponForm, story_theme: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 text-xs md:text-sm font-body text-[#3c2716] font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-[#677333]"
+                  >
+                    {Object.entries(STORY_THEMES).map(([k, t]) => (
+                      <option key={k} value={k}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               {/* Descripción */}
               <div>
                 <label className="block text-xs font-bold text-[#3c2716] uppercase tracking-wider mb-1 font-display">
@@ -1255,6 +1352,60 @@ export default function PromotionsManager({ fetchWithAuth }) {
                     className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 text-xs md:text-sm font-body text-[#3c2716] focus:outline-none focus:ring-2 focus:ring-[#677333] disabled:bg-stone-50"
                   />
                   <span className="text-[10px] text-stone-400">Límite en pesos para descuentos en %.</span>
+                </div>
+              </div>
+
+              {/* Reglas Avanzadas: Kilos Mínimos (Mayorista), Alcance y Público */}
+              <div className="p-4 bg-[#FAF7F2] rounded-2xl border border-[#EBE4DA] space-y-3">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#677333] block">
+                  Reglas Avanzadas (Opcional — Mayoristas / Segmentación)
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#3c2716] mb-1">
+                      Mínimo Kilos Dietas
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={couponForm.min_kg}
+                      onChange={(e) => setCouponForm({ ...couponForm, min_kg: e.target.value })}
+                      placeholder="0 = sin mínimo"
+                      className="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs bg-white font-bold text-[#3c2716]"
+                    />
+                    <span className="text-[10px] text-stone-400">Solo BARF + Cocinada</span>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#3c2716] mb-1">
+                      Aplica a
+                    </label>
+                    <select
+                      value={couponForm.applicable_scope}
+                      onChange={(e) => setCouponForm({ ...couponForm, applicable_scope: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs bg-white font-semibold text-[#3c2716]"
+                    >
+                      <option value="all">Toda la tienda</option>
+                      <option value="diets">Solo Dietas (BARF/Cocinada)</option>
+                      <option value="barf">Solo BARF Cruda</option>
+                      <option value="cocinada">Solo Cocinada</option>
+                      <option value="snack">Solo Snacks</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#3c2716] mb-1">
+                      Quién puede usarlo
+                    </label>
+                    <select
+                      value={couponForm.customer_eligibility}
+                      onChange={(e) => setCouponForm({ ...couponForm, customer_eligibility: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs bg-white font-semibold text-[#3c2716]"
+                    >
+                      <option value="all">Todos los clientes</option>
+                      <option value="first_order">Solo 1ra compra</option>
+                      <option value="returning">Solo recurrentes</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -1350,6 +1501,162 @@ export default function PromotionsManager({ fetchWithAuth }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ========================================================================= */}
+      {/* MODAL KIT DE DIFUSIÓN DE CUPÓN (LINK ?promo=, QR PNG Y STORY 1080x1920)   */}
+      {/* ========================================================================= */}
+      {shareCoupon && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-xl max-h-[92vh] overflow-y-auto p-6 shadow-2xl border border-[#EBE4DA] space-y-5">
+            <div className="flex items-start justify-between border-b border-stone-100 pb-3">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#677333] bg-[#EBF2DA] px-2.5 py-0.5 rounded-full">
+                  Kit de Difusión Instantáneo
+                </span>
+                <h3 className="font-display text-xl font-extrabold text-[#3c2716] mt-1">
+                  {shareCoupon.campaign_title || `Campaña ${shareCoupon.code}`}
+                </h3>
+                <p className="text-xs text-stone-500">
+                  Enlace con pre-aplicación directa al carrito, QR imprimible y Tarjeta Vertical Story.
+                </p>
+              </div>
+              <button
+                onClick={() => setShareCoupon(null)}
+                className="p-1.5 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100 cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-5 items-center">
+              <div className="sm:col-span-5 flex flex-col items-center p-4 bg-[#FAF7F2] rounded-2xl border border-[#EBE4DA]">
+                <div ref={shareQrRef} className="bg-white p-3 rounded-2xl border border-stone-200 shadow-xs">
+                  <QRCodeSVG
+                    value={`https://origencanino.cl/?promo=${shareCoupon.code}`}
+                    size={160}
+                    level="H"
+                    includeMargin={false}
+                  />
+                </div>
+                <span className="font-mono font-extrabold text-sm text-[#3c2716] mt-2.5 tracking-wider">
+                  {shareCoupon.code}
+                </span>
+                <button
+                  type="button"
+                  disabled={downloadingAsset}
+                  onClick={async () => {
+                    setDownloadingAsset(true);
+                    try {
+                      const url = await generateQrPngDataUrl(shareQrRef.current?.querySelector('svg'), shareCoupon.code);
+                      const a = document.createElement('a');
+                      a.download = `qr-promo-${shareCoupon.code.toLowerCase()}.png`;
+                      a.href = url;
+                      a.click();
+                    } finally {
+                      setDownloadingAsset(false);
+                    }
+                  }}
+                  className="mt-2.5 w-full py-1.5 px-3 bg-white hover:bg-stone-100 border border-stone-200 rounded-xl text-[11px] font-bold text-stone-700 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Download size={13} /> Descargar QR PNG
+                </button>
+              </div>
+
+              <div className="sm:col-span-7 space-y-3.5 text-xs">
+                <div>
+                  <label className="font-bold text-stone-600 uppercase text-[10px] tracking-wider block mb-1">
+                    Enlace Directo (pre-aplica el cupón al carrito)
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      readOnly
+                      value={`https://origencanino.cl/?promo=${shareCoupon.code}`}
+                      className="flex-1 p-2.5 bg-stone-50 border border-stone-200 rounded-xl font-mono text-[11px] text-stone-700"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(`https://origencanino.cl/?promo=${shareCoupon.code}`)}
+                      className="px-3 py-2.5 bg-stone-100 hover:bg-stone-200 rounded-xl font-bold text-stone-700 flex items-center gap-1 cursor-pointer shrink-0"
+                    >
+                      {copiedCode === `https://origencanino.cl/?promo=${shareCoupon.code}` ? (
+                        <Check size={14} className="text-emerald-600" />
+                      ) : (
+                        <Copy size={14} />
+                      )}
+                      <span>Copiar</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-stone-600 uppercase text-[10px] tracking-wider block mb-1">
+                    Tema Visual de la Tarjeta Story (1080×1920)
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {Object.entries(STORY_THEMES).map(([k, t]) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => setShareTheme(k)}
+                        className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition cursor-pointer ${
+                          shareTheme === k
+                            ? 'bg-[#677333] text-white border-[#677333]'
+                            : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100'
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={downloadingAsset}
+                  onClick={async () => {
+                    setDownloadingAsset(true);
+                    try {
+                      const url = await generateCouponStoryDataUrl(
+                        shareCoupon,
+                        shareQrRef.current?.querySelector('svg'),
+                        shareTheme
+                      );
+                      const a = document.createElement('a');
+                      a.download = `story-promo-${shareCoupon.code.toLowerCase()}.png`;
+                      a.href = url;
+                      a.click();
+                      notify('success', '¡Tarjeta Story 1080×1920 descargada!');
+                    } finally {
+                      setDownloadingAsset(false);
+                    }
+                  }}
+                  className="w-full py-2.5 px-4 bg-[#677333] hover:bg-[#556029] text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  <Download size={15} />
+                  <span>{downloadingAsset ? 'Generando...' : 'Descargar Tarjeta Story (WhatsApp / IG)'}</span>
+                </button>
+
+                <a
+                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                    `🐾 ¡${shareCoupon.campaign_title || `Promoción Especial ${shareCoupon.code}`} en Origen Canino! ${
+                      shareCoupon.discount_type === 'percentage'
+                        ? `${shareCoupon.discount_value}% OFF`
+                        : `$${Number(shareCoupon.discount_value).toLocaleString('es-CL')} OFF`
+                    } en comida real 100% natural para tu perro${
+                      Number(shareCoupon.min_kg || 0) > 0 ? ` (mínimo ${Number(shareCoupon.min_kg)} kg en dietas)` : ''
+                    }. Entra directo aquí: https://origencanino.cl/?promo=${shareCoupon.code}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-xs"
+                >
+                  <Share2 size={15} /> Compartir por WhatsApp 💬
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       )}

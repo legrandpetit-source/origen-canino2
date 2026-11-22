@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Building2, Plus, Copy, Check, Edit2, Trash2, MapPin, Sparkles, Navigation, 
   Phone, ExternalLink, Shield, ShieldCheck, ShieldAlert, Key, Lock, Unlock, 
-  Eye, EyeOff, Radio, Smartphone, AlertTriangle, RefreshCw, X 
+  Eye, EyeOff, Radio, Smartphone, AlertTriangle, RefreshCw, X, Download, Printer 
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import { generateNfcLamina10x15DataUrl } from '../../utils/promoGraphics';
 
 const NfcManager = ({ fetchWithAuth }) => {
   const [buildings, setBuildings] = useState([]);
@@ -40,6 +42,44 @@ const NfcManager = ({ fetchWithAuth }) => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [globalMasterPassword, setGlobalMasterPassword] = useState('ORIGEN2026');
   const [globalDefaultMode, setGlobalDefaultMode] = useState('burn');
+
+  // Modal Lámina Imprimible 10x15 cm (Canon SELPHY CP1500)
+  const [laminaBuilding, setLaminaBuilding] = useState(null);
+  const [laminaPreviewUrl, setLaminaPreviewUrl] = useState('');
+  const [generatingLamina, setGeneratingLamina] = useState(false);
+  const laminaQrRef = useRef(null);
+
+  useEffect(() => {
+    if (!laminaBuilding) {
+      setLaminaPreviewUrl('');
+      return;
+    }
+    let cancelled = false;
+    setGeneratingLamina(true);
+    const timer = setTimeout(async () => {
+      try {
+        const svgEl = laminaQrRef.current?.querySelector('svg');
+        const dataUrl = await generateNfcLamina10x15DataUrl(laminaBuilding, svgEl);
+        if (!cancelled) setLaminaPreviewUrl(dataUrl);
+      } catch (err) {
+        console.error('Error generando lámina 10x15:', err);
+      } finally {
+        if (!cancelled) setGeneratingLamina(false);
+      }
+    }, 120);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [laminaBuilding]);
+
+  const handleDownloadLamina = () => {
+    if (!laminaPreviewUrl || !laminaBuilding) return;
+    const link = document.createElement('a');
+    link.download = `lamina-nfc-10x15-${laminaBuilding.slug}.png`;
+    link.href = laminaPreviewUrl;
+    link.click();
+  };
 
   // Controladores de sesión NFC y Timeout para evitar bloqueos en Android
   const abortControllerRef = useRef(null);
@@ -444,11 +484,11 @@ const NfcManager = ({ fetchWithAuth }) => {
             </div>
 
             {/* Acciones del Edificio */}
-            <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t">
+            <div className="flex flex-wrap items-center justify-between gap-2 mt-4 pt-3 border-t">
               <button
                 type="button"
                 onClick={() => openProgramModal(b)}
-                className="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs bg-primary-green text-white hover:bg-primary-green-dark"
+                className="flex-1 min-w-[140px] py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs bg-primary-green text-white hover:bg-primary-green-dark cursor-pointer"
                 title="Programar y blindar chip NFC para este edificio"
               >
                 <Radio size={14} className="animate-pulse" />
@@ -457,8 +497,18 @@ const NfcManager = ({ fetchWithAuth }) => {
 
               <button
                 type="button"
+                onClick={() => setLaminaBuilding(b)}
+                className="py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs bg-secondary-orange text-white hover:bg-[#c58235] cursor-pointer"
+                title="Generar lámina vertical 10x15 cm (300 DPI) lista para Canon SELPHY CP1500"
+              >
+                <Printer size={14} />
+                Lámina 10×15
+              </button>
+
+              <button
+                type="button"
                 onClick={() => copyNfcUrl(b.slug, b.id)}
-                className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs ${
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer ${
                   copiedId === b.id 
                     ? 'bg-green-600 text-white' 
                     : 'bg-primary-green/10 text-primary-green hover:bg-primary-green/20'
@@ -497,6 +547,84 @@ const NfcManager = ({ fetchWithAuth }) => {
           </div>
         )}
       </div>
+
+      {/* ============================================================== */}
+      {/* MODAL: LÁMINA IMPRIMIBLE 10×15 CM (CANON SELPHY CP1500)        */}
+      {/* ============================================================== */}
+      {laminaBuilding && (
+        <div className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-2xl w-full max-h-[95vh] overflow-y-auto shadow-2xl space-y-4">
+            <div className="flex justify-between items-start border-b border-stone-100 pb-3">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-secondary-orange bg-amber-50 px-2.5 py-0.5 rounded-full">
+                  Canon SELPHY CP1500 · 10×15 cm (300 DPI)
+                </span>
+                <h3 className="font-header text-xl font-extrabold text-secondary-brown mt-1">
+                  Lámina NFC — {laminaBuilding.name}
+                </h3>
+                <p className="text-xs text-stone-500">
+                  Círculo guía exacto de 25 mm (NTAG213) arriba a la derecha + QR de respaldo + margen seguro 5.5 mm.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLaminaBuilding(null)}
+                className="p-1.5 text-stone-400 hover:text-stone-600 rounded-xl hover:bg-stone-100 cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* QR oculto para vectorización nítida en Canvas */}
+            <div ref={laminaQrRef} className="hidden">
+              <QRCodeSVG
+                value={`https://origencanino.cl/?nfc=${laminaBuilding.slug}`}
+                size={260}
+                level="H"
+                includeMargin={false}
+              />
+            </div>
+
+            <div className="bg-[#FAF7F2] rounded-2xl p-4 border border-[#EBE4DA] flex justify-center">
+              {generatingLamina || !laminaPreviewUrl ? (
+                <div className="py-24 text-xs text-stone-500 flex items-center gap-2">
+                  <RefreshCw size={16} className="animate-spin text-primary-green" />
+                  Generando lámina 1200×1800 px a 300 DPI...
+                </div>
+              ) : (
+                <img
+                  src={laminaPreviewUrl}
+                  alt={`Lámina 10x15 ${laminaBuilding.name}`}
+                  className="max-h-[58vh] w-auto rounded-2xl shadow-lg border border-stone-200"
+                />
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-stone-100">
+              <div className="text-[11px] text-stone-500">
+                Archivo: <span className="font-mono font-bold text-stone-700">1200 × 1800 px</span> · 10×15 cm vertical (pedestal L).
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => setLaminaBuilding(null)}
+                  className="flex-1 sm:flex-initial px-4 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl cursor-pointer"
+                >
+                  Cerrar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadLamina}
+                  disabled={!laminaPreviewUrl}
+                  className="flex-1 sm:flex-initial px-5 py-2.5 bg-primary-green hover:bg-primary-green-dark text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
+                >
+                  <Download size={15} /> Descargar PNG 300 DPI (SELPHY)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ============================================================== */}
       {/* MODAL: PROGRAMAR Y BLINDAR CHIP NFC                          */}

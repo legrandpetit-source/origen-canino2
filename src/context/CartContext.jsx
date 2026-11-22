@@ -112,6 +112,29 @@ export const CartProvider = ({ children }) => {
     localStorage.removeItem('origencanino_nfc_community');
   };
 
+  // Promoción activa por enlace directo (?promo=CODIGO) — pre-aplicable al carrito
+  const [activePromo, setActivePromoState] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('origencanino_active_promo');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const setActivePromo = (promo) => {
+    setActivePromoState(promo);
+    if (promo) {
+      try {
+        sessionStorage.setItem('origencanino_active_promo', JSON.stringify(promo));
+      } catch {}
+    } else {
+      sessionStorage.removeItem('origencanino_active_promo');
+    }
+  };
+
+  const clearActivePromo = () => setActivePromo(null);
+
   const addItem = (product, quantity = 1) => {
     // Info de stock fresca: buscar en catalogStock centralizado o en product
     const stockInfo = catalogStock[product.id] || product;
@@ -187,6 +210,18 @@ export const CartProvider = ({ children }) => {
   const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
+  // Kilos totales SOLO en dietas (BARF + Cocinada; excluye snacks/caldos)
+  const dietKg = Number(
+    (
+      items.reduce((sumG, item) => {
+        const pType = String(item.type || 'barf').toLowerCase();
+        if (pType === 'snack') return sumG;
+        const unitG = parseWeightGrams(item.weight) || 1000;
+        return sumG + unitG * (item.quantity || 0);
+      }, 0) / 1000
+    ).toFixed(2)
+  );
+
   // Descuento NFC calculado (anulado en links de pago directo sin descuento)
   const nfcDiscount = (!directLinkToken && nfcCommunity && nfcCommunity.discount_percent > 0)
     ? Math.round(total * (nfcCommunity.discount_percent / 100))
@@ -200,9 +235,10 @@ export const CartProvider = ({ children }) => {
 
   return (
     <CartContext.Provider value={{
-      items, addItem, removeItem, updateQuantity, clearCart, total, itemCount,
+      items, addItem, removeItem, updateQuantity, clearCart, total, itemCount, dietKg,
       isCartOpen, setIsCartOpen, dogData, setDogData,
       nfcCommunity, setNfcCommunity, clearNfcCommunity, nfcDiscount,
+      activePromo, setActivePromo, clearActivePromo,
       firstOrderPromo, firstOrderDiscount, isFirstPurchaseEligible, markAsPurchased,
       directLinkToken, setDirectLinkToken, loadAssistedCart,
       catalogStock, refreshCatalogStock
