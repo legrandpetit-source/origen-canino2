@@ -107,7 +107,16 @@ export default function CustomersManager({ fetchWithAuth }) {
   const [campaignAudience, setCampaignAudience] = useState('selected'); // selected, all_filtered, no_orders, inactive, vip, ambassadors, guests
   const [selectedTemplateId, setSelectedTemplateId] = useState('reposicion');
   const [waMessageText, setWaMessageText] = useState(WHATSAPP_TEMPLATES[1].text);
+  const [openedWaKeys, setOpenedWaKeys] = useState({});
   const [sentWaKeys, setSentWaKeys] = useState({});
+  const [pendingWaConfirm, setPendingWaConfirm] = useState(null); // { person, text, key }
+
+  const formatStageBadge = (stage) => {
+    const s = String(stage || 'adulto').toLowerCase();
+    if (s === 'cachorro') return 'Cachorro';
+    if (s === 'senior' || s === 'adult_low') return 'Senior';
+    return 'Adulto';
+  };
 
   // Email Marketing + SMTP
   const [emailSubject, setEmailSubject] = useState('Novedades de Origen Canino para {perro} 🐾');
@@ -370,7 +379,8 @@ export default function CustomersManager({ fetchWithAuth }) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
-  const handleOpenWhatsApp = async (person, customText) => {
+  // Abre WhatsApp SIN registrar aún como enviado (evita falsos positivos si el admin cierra la pestaña sin enviar)
+  const handleOpenWhatsApp = (person, customText) => {
     const phone = cleanPhoneForWA(person.phone);
     if (!phone) {
       showToast('error', `${person.name} no tiene teléfono válido registrado.`);
@@ -379,8 +389,17 @@ export default function CustomersManager({ fetchWithAuth }) {
     const text = interpolateTemplate(customText, person);
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
     const key = person.id ? `c-${person.id}` : `g-${person.key}`;
-    setSentWaKeys((prev) => ({ ...prev, [key]: true }));
+    setOpenedWaKeys((prev) => ({ ...prev, [key]: text }));
     if (person.id) {
+      setPendingWaConfirm({ person, text, key });
+    }
+  };
+
+  // Registra el envío en CRM únicamente cuando el admin confirma que sí lo envió en WhatsApp
+  const handleConfirmWhatsAppSent = async (person, text, key) => {
+    setSentWaKeys((prev) => ({ ...prev, [key]: true }));
+    setPendingWaConfirm(null);
+    if (person?.id) {
       try {
         await fetchWithAuth('/api/admin/customers/crm-event', {
           method: 'POST',
@@ -388,10 +407,30 @@ export default function CustomersManager({ fetchWithAuth }) {
           body: JSON.stringify({
             customer_id: person.id,
             event_type: 'whatsapp_sent',
-            details: `WhatsApp enviado: "${text.slice(0, 90)}${text.length > 90 ? '...' : ''}"`
+            details: `WhatsApp confirmado: "${text.slice(0, 90)}${text.length > 90 ? '...' : ''}"`
           })
         });
-      } catch {}
+        showToast('success', `Envío de WhatsApp a ${person.name} registrado en el CRM.`);
+        if (detailData && detailData.customer.id === person.id) {
+          openCustomer360(person.id);
+        }
+      } catch (err) {
+        showToast('error', 'No se pudo registrar el evento en el CRM.');
+      }
+    }
+  };
+
+  const handleDeleteCrmEvent = async (eventId) => {
+    if (!detailData) return;
+    try {
+      const res = await fetchWithAuth(`/api/admin/customers/crm-event/${eventId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Error eliminando evento');
+      setDetailData((prev) =>
+        prev ? { ...prev, events: prev.events.filter((ev) => ev.id !== eventId) } : prev
+      );
+      showToast('success', 'Evento eliminado del historial.');
+    } catch (err) {
+      showToast('error', err.message);
     }
   };
 
@@ -456,6 +495,39 @@ export default function CustomersManager({ fetchWithAuth }) {
 
   return (
     <div className="space-y-6">
+      {/* Banner flotante de confirmación real de envío WhatsApp */}
+      {pendingWaConfirm && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-white border-2 border-emerald-500 shadow-2xl rounded-2xl px-4 py-3 flex flex-wrap items-center gap-3 max-w-xl text-xs">
+          <MessageCircle size={18} className="text-emerald-600 shrink-0" />
+          <div className="flex-1 min-w-[200px]">
+            <span className="font-bold text-secondary-brown">
+              ¿Enviaste el mensaje de WhatsApp a {pendingWaConfirm.person.name}?
+            </span>
+            <p className="text-[11px] text-stone-500">Solo se registrará en su historial CRM si lo confirmas.</p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() =>
+                handleConfirmWhatsAppSent(
+                  pendingWaConfirm.person,
+                  pendingWaConfirm.text,
+                  pendingWaConfirm.key
+                )
+              }
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl cursor-pointer"
+            >
+              Sí, registrar envío ✓
+            </button>
+            <button
+              onClick={() => setPendingWaConfirm(null)}
+              className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-600 font-bold rounded-xl cursor-pointer"
+            >
+              No lo envié
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Toast flotante */}
       {toast && (
         <div
@@ -967,6 +1039,7 @@ export default function CustomersManager({ fetchWithAuth }) {
                   marketingRecipients.map((p) => {
                     const key = p.id ? `c-${p.id}` : `g-${p.key}`;
                     const sent = Boolean(sentWaKeys[key]);
+                    const openedText = openedWaKeys[key];
                     return (
                       <div key={key} className="p-3 flex items-center justify-between gap-3 text-xs">
                         <div className="min-w-0">
@@ -975,18 +1048,30 @@ export default function CustomersManager({ fetchWithAuth }) {
                             {p.phone || 'Sin teléfono'} · {p.dogs?.[0]?.name || p.dog_name || 'Sin perro'}
                           </div>
                         </div>
-                        <button
-                          onClick={() => handleOpenWhatsApp(p, waMessageText)}
-                          disabled={!p.phone}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 flex items-center gap-1.5 cursor-pointer disabled:opacity-40 ${
-                            sent
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                          }`}
-                        >
-                          {sent ? <Check size={13} /> : <MessageCircle size={13} />}
-                          <span>{sent ? 'Enviado ✓' : 'Enviar WA'}</span>
-                        </button>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            onClick={() => handleOpenWhatsApp(p, waMessageText)}
+                            disabled={!p.phone}
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-40 bg-emerald-600 hover:bg-emerald-700 text-white"
+                          >
+                            <MessageCircle size={13} />
+                            <span>Abrir WA</span>
+                          </button>
+                          {openedText && !sent && (
+                            <button
+                              onClick={() => handleConfirmWhatsAppSent(p, openedText, key)}
+                              className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-100 hover:bg-amber-200 text-amber-900 cursor-pointer"
+                              title="Confirmar que enviaste el mensaje en WhatsApp"
+                            >
+                              Confirmar ✓
+                            </button>
+                          )}
+                          {sent && (
+                            <span className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-800 inline-flex items-center gap-1">
+                              <Check size={13} /> Registrado
+                            </span>
+                          )}
+                        </div>
                       </div>
                     );
                   })
@@ -1183,8 +1268,8 @@ export default function CustomersManager({ fetchWithAuth }) {
                         <div key={d.id} className="p-3 bg-[#FAF7F2] rounded-xl border border-[#EBE4DA] text-xs">
                           <div className="font-bold text-secondary-brown flex items-center justify-between gap-2">
                             <span>{d.name} · {d.weight} kg</span>
-                            <span className="text-[10px] px-2 py-0.5 bg-primary-green/10 text-primary-green rounded-full capitalize">
-                              {d.age_label ? `${d.age_label} (${d.computed_stage || d.age_stage})` : (d.age_stage || 'Adulto')}
+                            <span className="text-[10px] px-2 py-0.5 bg-primary-green/10 text-primary-green rounded-full">
+                              {d.age_label ? `${d.age_label} (${formatStageBadge(d.computed_stage || d.age_stage)})` : formatStageBadge(d.age_stage)}
                             </span>
                           </div>
                           <div className="text-[11px] text-stone-500 mt-1 flex flex-wrap gap-2">
@@ -1393,7 +1478,16 @@ export default function CustomersManager({ fetchWithAuth }) {
                             </span>
                             <span className="text-stone-600">{ev.details}</span>
                           </div>
-                          <span className="text-[10px] text-stone-400 shrink-0">{formatDateTime(ev.created_at)}</span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-[10px] text-stone-400">{formatDateTime(ev.created_at)}</span>
+                            <button
+                              onClick={() => handleDeleteCrmEvent(ev.id)}
+                              className="text-stone-300 hover:text-red-500 transition cursor-pointer"
+                              title="Eliminar evento del historial"
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>

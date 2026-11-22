@@ -506,6 +506,14 @@ def create_customer_crm_router(get_current_admin, get_password_hash, log_securit
             conn.commit()
         return {"status": "ok"}
 
+    @router.delete("/crm-event/{event_id}")
+    def delete_crm_event(event_id: int, current_user: str = Depends(get_current_admin)):
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM customer_crm_events WHERE id = %s", (event_id,))
+            conn.commit()
+        return {"status": "ok"}
+
     @router.post("/send-email-campaign")
     def send_email_campaign(payload: EmailCampaignRequest, current_user: str = Depends(get_current_admin)):
         if not payload.customer_ids:

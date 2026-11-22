@@ -33,3 +33,19 @@
   - Mensaje de WhatsApp 1-Toque corregido para usar `${referralInfo?.discount_percent || 10}%` con redacción cálida y empática.
   - Nuevo botón **"Descargar Tarjeta para Historia (WhatsApp / IG)"** que renderiza un PNG vertical `1080×1920` con branding de Origen Canino, el descuento del embajador, su código y su QR escaneable.
 
+## 4. Nuevo Módulo Admin: Clientes (CRM, Soporte & Marketing Directo)
+- **Planificación documentada:** `PLAN_MODULO_CLIENTES_CRM.md`.
+- **Backend modular (`backend/customer_crm_routes.py` + `backend/main.py`):**
+  - Migración automática segura en `customers` (`is_blocked`, `blocked_reason`, `blocked_at`, `is_deleted`, `deleted_at`, `last_login_at`, `login_count`, `visit_count`, `last_seen_at`, `admin_notes`, `tags`, `marketing_opt_in`) y tabla `customer_crm_events`.
+  - Tracking real en `/api/customer/login` (logins + visitas), `/api/customer/me` (1 visita por día activo con sesión recordada) y bloqueo efectivo en `get_current_customer` (`HTTP 403`).
+  - Endpoints protegidos bajo `/api/admin/customers`: directorio enriquecido con KPIs e Invitados sin cuenta, Ficha 360°, edición de soporte/notas/tags, restablecimiento de contraseña con clave temporal, bloqueo/desbloqueo, ajuste manual de billetera, eliminación/anonimización con blindaje contable, configuración SMTP y envío de campañas Email HTML.
+- **Frontend (`src/components/admin/CustomersManager.jsx` + `AdminPanel.jsx`):**
+  - Integrado como primera opción del grupo **Marketing y Clientes** en `/admin`.
+  - 5 KPIs clicables, buscador global, chips de segmentación, filtro por comuna, ordenamiento, exportación CSV, Ficha 360° lateral, pestaña de Compradores Invitados y centro de Marketing Directo (Cola Asistida de WhatsApp con plantillas editables + Campañas Email HTML con SMTP configurable).
+
+## 5. Evolución de Fichas de Mascotas: Fecha de Nacimiento, Etapa Dinámica y Cumpleaños en CRM
+- **Base de Datos (`customer_dogs`):** Nuevas columnas `birth_date` (`DATE`), `birth_date_approx` (`BOOLEAN`) y `weight_updated_at` (`TIMESTAMP`).
+- **Motor Dinámico (`backend/customer_crm_routes.py` + `backend/main.py`):** `enrich_dog_dict()` calcula en tiempo real edad exacta (`age_months`, `age_label`), etapa biológica diferenciada por peso/tamaño (Cachorro `<12m` chicos/medianos o `<15m` grandes `>=25kg`; Senior `>=8` años chicos/medianos o `>=7` años grandes), días para el próximo cumpleaños (`days_to_birthday`) y alerta `needs_weight_update` (>30 días sin actualizar peso en cachorros).
+- **Portal de Clientes (`CustomerPortal.jsx`):** Modal con **Fecha de Nacimiento** + modo 1-clic *"¿No sabes la fecha exacta?"* (edad aproximada en meses/años), selector de **Dieta Habitual (BARF vs Cocinada)** con cálculo diferenciado de porción diaria, aviso suave para completar fecha en perros antiguos y recordatorio mensual de peso para cachorros.
+- **CRM Admin (`CustomersManager.jsx`):** Muestra edad exacta y dieta de cada perro en tabla/Ficha 360°, más bloque **🎂 Próximos Cumpleaños Perrunos (30 días)** con botón de saludo por WhatsApp en 1 clic.
+
