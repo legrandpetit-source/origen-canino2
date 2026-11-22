@@ -5,7 +5,7 @@ import string
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -79,6 +79,9 @@ def ensure_crm_schema():
                 "ALTER TABLE customers ADD COLUMN IF NOT EXISTS admin_notes TEXT DEFAULT '';",
                 "ALTER TABLE customers ADD COLUMN IF NOT EXISTS tags TEXT DEFAULT '';",
                 "ALTER TABLE customers ADD COLUMN IF NOT EXISTS marketing_opt_in BOOLEAN DEFAULT TRUE;",
+                "ALTER TABLE customer_dogs ADD COLUMN IF NOT EXISTS birth_date DATE;",
+                "ALTER TABLE customer_dogs ADD COLUMN IF NOT EXISTS birth_date_approx BOOLEAN DEFAULT FALSE;",
+                "ALTER TABLE customer_dogs ADD COLUMN IF NOT EXISTS weight_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
             ]
             for stmt in alter_cols:
                 cursor.execute(stmt)
@@ -104,7 +107,96 @@ def ensure_crm_schema():
 def _fmt_dt(val):
     if isinstance(val, datetime):
         return val.isoformat()
+    if isinstance(val, date):
+        return val.isoformat()
     return val
+
+
+def parse_birth_date(raw_val) -> Optional[date]:
+    if not raw_val:
+        return None
+    if isinstance(raw_val, datetime):
+        return raw_val.date()
+    if isinstance(raw_val, date):
+        return raw_val
+    try:
+        return date.fromisoformat(str(raw_val).strip()[:10])
+    except Exception:
+        return None
+
+
+def enrich_dog_dict(row) -> dict:
+    """Calcula edad exacta, etapa dinámica (según peso/tamaño), próximo cumpleaños y alerta de peso."""
+    d = dict(row)
+    if d.get("weight") is not None:
+        d["weight"] = float(d["weight"])
+    weight_val = float(d.get("weight") or 10.0)
+    bdate = parse_birth_date(d.get("birth_date"))
+    today = date.today()
+
+    age_months = None
+    age_label = None
+    days_to_birthday = None
+    computed_stage = d.get("age_stage") or "adulto"
+
+    if bdate and bdate <= today:
+        total_months = (today.year - bdate.year) * 12 + (today.month - bdate.month)
+        if today.day < bdate.day:
+            total_months -= 1
+        age_months = max(0, total_months)
+
+        years = age_months // 12
+        rem_months = age_months % 12
+        if years == 0:
+            age_label = f"{max(1, age_months)} {'mes' if age_months <= 1 else 'meses'}"
+        elif rem_months == 0:
+            age_label = f"{years} {'año' if years == 1 else 'años'}"
+        else:
+            age_label = f"{years} {'año' if years == 1 else 'años'} {rem_months}m"
+
+        # Etapa biológica diferenciada por tamaño/peso (perros grandes >= 25kg maduran más lento y envejecen antes)
+        puppy_cutoff_m = 15 if weight_val >= 25 else 12
+        senior_cutoff_m = 84 if weight_val >= 25 else 96  # 7 años grandes vs 8 años chicos/medianos
+        if age_months < puppy_cutoff_m:
+            computed_stage = "cachorro"
+        elif age_months >= senior_cutoff_m:
+            computed_stage = "senior"
+        else:
+            computed_stage = "adulto"
+
+        # Próximo cumpleaños
+        try:
+            next_bday = bdate.replace(year=today.year)
+        except ValueError:
+            next_bday = date(today.year, 2, 28)
+        if next_bday < today:
+            try:
+                next_bday = bdate.replace(year=today.year + 1)
+            except ValueError:
+                next_bday = date(today.year + 1, 2, 28)
+        days_to_birthday = (next_bday - today).days
+
+    # Alerta de actualización de peso para cachorros (> 30 días sin actualizar peso)
+    w_upd = d.get("weight_updated_at")
+    needs_weight_update = False
+    if computed_stage == "cachorro":
+        if w_upd is None:
+            needs_weight_update = True
+        elif isinstance(w_upd, datetime):
+            w_utc = w_upd.replace(tzinfo=timezone.utc) if w_upd.tzinfo is None else w_upd
+            needs_weight_update = (datetime.now(timezone.utc) - w_utc).days >= 30
+
+    d["birth_date"] = bdate.isoformat() if bdate else None
+    d["birth_date_approx"] = bool(d.get("birth_date_approx"))
+    d["weight_updated_at"] = _fmt_dt(w_upd)
+    d["age_months"] = age_months
+    d["age_label"] = age_label
+    d["computed_stage"] = computed_stage
+    d["age_stage"] = computed_stage
+    d["days_to_birthday"] = days_to_birthday
+    d["needs_weight_update"] = needs_weight_update
+    d["favorite_diet"] = d.get("favorite_diet") or "barf"
+    return d
 
 
 def create_customer_crm_router(get_current_admin, get_password_hash, log_security_event):
@@ -142,19 +234,17 @@ def create_customer_crm_router(get_current_admin, get_password_hash, log_securit
             """)
             cust_rows = cursor.fetchall()
 
-            # Perros por cliente
+            # Perros por cliente (enriquecidos con edad y cumpleaños)
             cursor.execute("""
-                SELECT id, customer_id, name, weight, age_stage, favorite_diet, notes, photo_url
+                SELECT id, customer_id, name, weight, age_stage, favorite_diet, notes, photo_url,
+                       birth_date, birth_date_approx, weight_updated_at
                 FROM customer_dogs
                 ORDER BY id ASC
             """)
             dogs_by_cust = {}
             for d in cursor.fetchall():
                 cid = d["customer_id"]
-                d_copy = dict(d)
-                if d_copy.get("weight") is not None:
-                    d_copy["weight"] = float(d_copy["weight"])
-                dogs_by_cust.setdefault(cid, []).append(d_copy)
+                dogs_by_cust.setdefault(cid, []).append(enrich_dog_dict(d))
 
             # Estadísticas de órdenes agrupadas por customer_id y por email (para enlazar compras previas al registro)
             cursor.execute("""
@@ -313,6 +403,29 @@ def create_customer_crm_router(get_current_admin, get_password_hash, log_securit
 
             guests_list = sorted(guests_map.values(), key=lambda x: x["total_spent"], reverse=True)
 
+            # Cumpleaños próximos (próximos 30 días) para saludo emocional por WhatsApp
+            upcoming_birthdays = []
+            for item in enriched:
+                if item.get("is_blocked"):
+                    continue
+                for dg in item.get("dogs", []):
+                    dtb = dg.get("days_to_birthday")
+                    if dtb is not None and 0 <= dtb <= 30:
+                        upcoming_birthdays.append(
+                            {
+                                "customer_id": item["id"],
+                                "customer_name": item["name"],
+                                "customer_phone": item.get("phone") or "",
+                                "dog_id": dg["id"],
+                                "dog_name": dg["name"],
+                                "birth_date": dg.get("birth_date"),
+                                "age_label": dg.get("age_label"),
+                                "days_to_birthday": dtb,
+                                "birth_date_approx": dg.get("birth_date_approx", False),
+                            }
+                        )
+            upcoming_birthdays.sort(key=lambda x: x["days_to_birthday"])
+
             return {
                 "kpis": {
                     "total_customers": len(enriched),
@@ -328,6 +441,7 @@ def create_customer_crm_router(get_current_admin, get_password_hash, log_securit
                 "customers": enriched,
                 "guests": guests_list,
                 "comunas": sorted(comunas_set),
+                "upcoming_birthdays": upcoming_birthdays,
             }
 
     @router.get("/smtp-settings")
@@ -553,15 +667,14 @@ def create_customer_crm_router(get_current_admin, get_password_hash, log_securit
                 customer[dt_field] = _fmt_dt(customer.get(dt_field))
 
             cursor.execute(
-                "SELECT id, name, weight, age_stage, favorite_diet, notes, photo_url FROM customer_dogs WHERE customer_id = %s ORDER BY id ASC",
+                """
+                SELECT id, name, weight, age_stage, favorite_diet, notes, photo_url,
+                       birth_date, birth_date_approx, weight_updated_at
+                FROM customer_dogs WHERE customer_id = %s ORDER BY id ASC
+                """,
                 (customer_id,),
             )
-            dogs = []
-            for d in cursor.fetchall():
-                dd = dict(d)
-                if dd.get("weight") is not None:
-                    dd["weight"] = float(dd["weight"])
-                dogs.append(dd)
+            dogs = [enrich_dog_dict(d) for d in cursor.fetchall()]
 
             # Historial de pedidos por customer_id o email coincidente
             clean_email = (customer["email"] or "").strip().lower()

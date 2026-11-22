@@ -18,7 +18,7 @@ import urllib.error
 from server_db import get_connection, init_database
 import batch_service
 from batch_routes import create_batch_router
-from customer_crm_routes import create_customer_crm_router, ensure_crm_schema
+from customer_crm_routes import create_customer_crm_router, ensure_crm_schema, enrich_dog_dict, parse_birth_date
 from PIL import Image, UnidentifiedImageError, ImageOps
 import io
 import uuid
@@ -434,9 +434,11 @@ class CustomerDogCreateUpdate(BaseModel):
     name: str
     weight: float
     age_stage: Optional[str] = "adulto"
-    favorite_diet: Optional[str] = None
+    favorite_diet: Optional[str] = "barf"
     notes: Optional[str] = None
     photo_url: Optional[str] = None
+    birth_date: Optional[str] = None
+    birth_date_approx: Optional[bool] = False
 
 class LeadCreate(BaseModel):
     customer_name: Optional[str] = None
@@ -1237,11 +1239,12 @@ def customer_login(req: CustomerLoginRequest):
             conn.commit()
         except Exception as e_trk:
             print("Error registrando login CRM:", e_trk)
-        cursor.execute("SELECT id, name, weight, age_stage, favorite_diet, notes, photo_url FROM customer_dogs WHERE customer_id = %s ORDER BY id ASC", (customer_id,))
-        dogs = cursor.fetchall()
-        for d in dogs:
-            if "weight" in d and d["weight"] is not None:
-                d["weight"] = float(d["weight"])
+        cursor.execute("""
+            SELECT id, name, weight, age_stage, favorite_diet, notes, photo_url,
+                   birth_date, birth_date_approx, weight_updated_at
+            FROM customer_dogs WHERE customer_id = %s ORDER BY id ASC
+        """, (customer_id,))
+        dogs = [enrich_dog_dict(d) for d in cursor.fetchall()]
                 
         token = create_access_token(data={"customer_id": customer_id, "sub": clean_email, "type": "customer"})
         
@@ -1292,11 +1295,12 @@ def get_customer_profile(customer_id: int = Depends(get_current_customer)):
             
         customer["wallet_balance"] = float(customer.get("wallet_balance") or 0.0)
 
-        cursor.execute("SELECT id, name, weight, age_stage, favorite_diet, notes, photo_url FROM customer_dogs WHERE customer_id = %s ORDER BY id ASC", (customer_id,))
-        dogs = cursor.fetchall()
-        for d in dogs:
-            if "weight" in d and d["weight"] is not None:
-                d["weight"] = float(d["weight"])
+        cursor.execute("""
+            SELECT id, name, weight, age_stage, favorite_diet, notes, photo_url,
+                   birth_date, birth_date_approx, weight_updated_at
+            FROM customer_dogs WHERE customer_id = %s ORDER BY id ASC
+        """, (customer_id,))
+        dogs = [enrich_dog_dict(d) for d in cursor.fetchall()]
                 
         if isinstance(customer.get("created_at"), datetime):
             customer["created_at"] = customer["created_at"].strftime("%d/%m/%Y")
@@ -1322,34 +1326,66 @@ def update_customer_profile(req: CustomerProfileUpdate, customer_id: int = Depen
 
 @app.post("/api/customer/dogs")
 def add_customer_dog(dog: CustomerDogCreateUpdate, customer_id: int = Depends(get_current_customer)):
+    bdate = parse_birth_date(dog.birth_date)
+    preview = enrich_dog_dict({"weight": dog.weight, "birth_date": bdate, "age_stage": dog.age_stage or "adulto"})
+    stage_to_save = preview["computed_stage"] if bdate else (dog.age_stage or "adulto")
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO customer_dogs (customer_id, name, weight, age_stage, favorite_diet, notes, photo_url)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            RETURNING id, name, weight, age_stage, favorite_diet, notes, photo_url
-        """, (customer_id, dog.name.strip(), dog.weight, dog.age_stage or "adulto", dog.favorite_diet, dog.notes, dog.photo_url))
-        new_dog = cursor.fetchone()
-        if "weight" in new_dog and new_dog["weight"] is not None:
-            new_dog["weight"] = float(new_dog["weight"])
+            INSERT INTO customer_dogs (customer_id, name, weight, age_stage, favorite_diet, notes, photo_url, birth_date, birth_date_approx, weight_updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+            RETURNING id, name, weight, age_stage, favorite_diet, notes, photo_url, birth_date, birth_date_approx, weight_updated_at
+        """, (
+            customer_id,
+            dog.name.strip(),
+            dog.weight,
+            stage_to_save,
+            dog.favorite_diet or "barf",
+            dog.notes,
+            dog.photo_url,
+            bdate,
+            bool(dog.birth_date_approx),
+        ))
+        new_dog = enrich_dog_dict(cursor.fetchone())
         conn.commit()
         return {"success": True, "dog": new_dog}
 
 @app.put("/api/customer/dogs/{dog_id}")
 def update_customer_dog(dog_id: int, dog: CustomerDogCreateUpdate, customer_id: int = Depends(get_current_customer)):
+    bdate = parse_birth_date(dog.birth_date)
+    preview = enrich_dog_dict({"weight": dog.weight, "birth_date": bdate, "age_stage": dog.age_stage or "adulto"})
+    stage_to_save = preview["computed_stage"] if bdate else (dog.age_stage or "adulto")
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             UPDATE customer_dogs 
-            SET name = %s, weight = %s, age_stage = %s, favorite_diet = %s, notes = %s, photo_url = COALESCE(%s, photo_url)
+            SET name = %s,
+                weight = %s,
+                age_stage = %s,
+                favorite_diet = %s,
+                notes = %s,
+                photo_url = COALESCE(%s, photo_url),
+                birth_date = %s,
+                birth_date_approx = %s,
+                weight_updated_at = CURRENT_TIMESTAMP
             WHERE id = %s AND customer_id = %s
-            RETURNING id, name, weight, age_stage, favorite_diet, notes, photo_url
-        """, (dog.name.strip(), dog.weight, dog.age_stage or "adulto", dog.favorite_diet, dog.notes, dog.photo_url, dog_id, customer_id))
-        updated_dog = cursor.fetchone()
-        if not updated_dog:
+            RETURNING id, name, weight, age_stage, favorite_diet, notes, photo_url, birth_date, birth_date_approx, weight_updated_at
+        """, (
+            dog.name.strip(),
+            dog.weight,
+            stage_to_save,
+            dog.favorite_diet or "barf",
+            dog.notes,
+            dog.photo_url,
+            bdate,
+            bool(dog.birth_date_approx),
+            dog_id,
+            customer_id,
+        ))
+        row = cursor.fetchone()
+        if not row:
             raise HTTPException(status_code=404, detail="Perrito no encontrado")
-        if "weight" in updated_dog and updated_dog["weight"] is not None:
-            updated_dog["weight"] = float(updated_dog["weight"])
+        updated_dog = enrich_dog_dict(row)
         conn.commit()
         return {"success": True, "dog": updated_dog}
 

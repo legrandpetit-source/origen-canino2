@@ -544,6 +544,49 @@ export default function CustomersManager({ fetchWithAuth }) {
         </div>
       </div>
 
+      {/* Próximos Cumpleaños de Mascotas (30 días) */}
+      {(data.upcoming_birthdays || []).length > 0 && (
+        <div className="bg-gradient-to-r from-amber-50 via-[#FAF7F2] to-emerald-50/60 border border-amber-200/80 rounded-2xl p-4 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <h3 className="font-header font-bold text-sm text-secondary-brown flex items-center gap-2">
+              🎂 Próximos Cumpleaños Perrunos ({data.upcoming_birthdays.length})
+            </h3>
+            <span className="text-[11px] text-stone-500">Próximos 30 días · Ideal para saludo o regalito</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {data.upcoming_birthdays.map((b) => (
+              <div
+                key={`${b.customer_id}-${b.dog_id}`}
+                className="bg-white border border-amber-200/70 rounded-xl px-3 py-2 flex items-center gap-3 text-xs shadow-2xs"
+              >
+                <div>
+                  <span className="font-bold text-secondary-brown">{b.dog_name}</span>
+                  <span className="text-stone-400"> ({b.customer_name.split(' ')[0]})</span>
+                  <div className="text-[10px] text-amber-800 font-semibold">
+                    {b.days_to_birthday === 0
+                      ? '🎉 ¡Hoy está de cumpleaños!'
+                      : `En ${b.days_to_birthday} día${b.days_to_birthday === 1 ? '' : 's'} · ${b.age_label || ''}`}
+                  </div>
+                </div>
+                {b.customer_phone && (
+                  <button
+                    onClick={() =>
+                      handleOpenWhatsApp(
+                        { id: b.customer_id, name: b.customer_name, phone: b.customer_phone, dog_name: b.dog_name },
+                        `¡Hola {nombre}! 🎂🐾 En Origen Canino vimos que {perro} está de cumpleaños${b.days_to_birthday === 0 ? ' hoy' : ' muy pronto'} y queríamos mandarle un abrazo gigante. ¡Que cumpla muchos años más lleno de salud y comida real!`
+                      )
+                    }
+                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <MessageCircle size={12} /> Saludar
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Sub-tabs */}
       <div className="flex flex-wrap items-center gap-2 border-b border-[#EBE4DA] pb-3">
         {[
@@ -716,7 +759,11 @@ export default function CustomersManager({ fetchWithAuth }) {
                                 <div key={d.id} className="inline-flex items-center gap-1 bg-stone-100 px-2 py-0.5 rounded-full text-[11px] text-stone-700 mr-1">
                                   <PawPrint size={11} className="text-primary-green" />
                                   <span className="font-semibold">{d.name}</span>
+                                  {d.age_label ? <span className="text-primary-green font-semibold">· {d.age_label}</span> : null}
                                   {d.weight ? <span className="text-stone-400">({d.weight}kg)</span> : null}
+                                  {d.days_to_birthday !== null && d.days_to_birthday !== undefined && d.days_to_birthday <= 14 ? (
+                                    <span title={`Cumpleaños en ${d.days_to_birthday} días`}>🎂</span>
+                                  ) : null}
                                 </div>
                               ))}
                             </div>
@@ -1134,8 +1181,18 @@ export default function CustomersManager({ fetchWithAuth }) {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       {detailData.dogs.map((d) => (
                         <div key={d.id} className="p-3 bg-[#FAF7F2] rounded-xl border border-[#EBE4DA] text-xs">
-                          <div className="font-bold text-secondary-brown">{d.name} · {d.weight} kg ({d.age_stage})</div>
-                          {d.favorite_diet && <div className="text-[11px] text-primary-green">Dieta: {d.favorite_diet}</div>}
+                          <div className="font-bold text-secondary-brown flex items-center justify-between gap-2">
+                            <span>{d.name} · {d.weight} kg</span>
+                            <span className="text-[10px] px-2 py-0.5 bg-primary-green/10 text-primary-green rounded-full capitalize">
+                              {d.age_label ? `${d.age_label} (${d.computed_stage || d.age_stage})` : (d.age_stage || 'Adulto')}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-stone-500 mt-1 flex flex-wrap gap-2">
+                            <span>Dieta: <strong className="uppercase">{d.favorite_diet || 'BARF'}</strong></span>
+                            {d.birth_date && (
+                              <span>· Nac: {formatShortDate(d.birth_date)}{d.birth_date_approx ? ' (aprox)' : ''}</span>
+                            )}
+                          </div>
                           {d.notes && <div className="text-[11px] text-stone-500 mt-1">{d.notes}</div>}
                         </div>
                       ))}
@@ -1387,3 +1444,4 @@ export default function CustomersManager({ fetchWithAuth }) {
     </div>
   );
 }
+

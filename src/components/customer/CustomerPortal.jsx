@@ -82,10 +82,81 @@ const CustomerPortal = () => {
     name: '',
     weight: '',
     age_stage: 'adulto',
+    favorite_diet: 'barf',
+    birth_date: '',
+    birth_date_approx: false,
     notes: '',
     photo_url: ''
   });
+  const [approxAgeMode, setApproxAgeMode] = useState(false);
+  const [approxAgeNum, setApproxAgeNum] = useState('2');
+  const [approxAgeUnit, setApproxAgeUnit] = useState('years'); // 'months' | 'years'
   const [savingDog, setSavingDog] = useState(false);
+
+  // Calcula edad, etapa biológica y % de porción diaria diferenciada por dieta (BARF vs Cocinada)
+  const getDogNutritionProfile = (dog) => {
+    const weight = Number(dog.weight || 0);
+    const diet = (dog.favorite_diet || 'barf').toLowerCase();
+    const isCocinada = diet.includes('cocin');
+
+    let ageMonths = dog.age_months ?? null;
+    let ageLabel = dog.age_label || null;
+    let stage = dog.computed_stage || dog.age_stage || 'adulto';
+
+    if (dog.birth_date && ageMonths === null) {
+      const bd = new Date(`${dog.birth_date}T00:00:00`);
+      const now = new Date();
+      if (!isNaN(bd.getTime()) && bd <= now) {
+        let m = (now.getFullYear() - bd.getFullYear()) * 12 + (now.getMonth() - bd.getMonth());
+        if (now.getDate() < bd.getDate()) m -= 1;
+        ageMonths = Math.max(0, m);
+        const yrs = Math.floor(ageMonths / 12);
+        const rem = ageMonths % 12;
+        ageLabel = yrs === 0
+          ? `${Math.max(1, ageMonths)} ${ageMonths <= 1 ? 'mes' : 'meses'}`
+          : rem === 0
+            ? `${yrs} ${yrs === 1 ? 'año' : 'años'}`
+            : `${yrs} ${yrs === 1 ? 'año' : 'años'} ${rem}m`;
+
+        const puppyCutoff = weight >= 25 ? 15 : 12;
+        const seniorCutoff = weight >= 25 ? 84 : 96;
+        stage = ageMonths < puppyCutoff ? 'cachorro' : ageMonths >= seniorCutoff ? 'senior' : 'adulto';
+      }
+    }
+
+    // Porcentaje diario según dieta y etapa real (BARF vs Cocinada al vapor)
+    let pct = isCocinada ? 3.2 : 2.5;
+    if (stage === 'cachorro') {
+      if (ageMonths !== null && ageMonths < 4) pct = isCocinada ? 9.0 : 8.0;
+      else if (ageMonths !== null && ageMonths < 6) pct = isCocinada ? 7.0 : 6.0;
+      else pct = isCocinada ? 5.0 : 4.5;
+    } else if (stage === 'senior' || stage === 'adult_low') {
+      pct = isCocinada ? 2.8 : 2.2;
+    }
+
+    const dailyGrams = Math.round(weight * 1000 * (pct / 100));
+    const monthlyKilos = ((dailyGrams * 30) / 1000).toFixed(1);
+    const stageLabel = stage === 'cachorro' ? 'Cachorro' : (stage === 'senior' || stage === 'adult_low') ? 'Senior' : 'Adulto';
+
+    return {
+      ageMonths,
+      ageLabel,
+      stage,
+      stageLabel,
+      pct,
+      dailyGrams,
+      monthlyKilos,
+      dietLabel: isCocinada ? 'Cocinada al Vapor' : 'BARF Cruda'
+    };
+  };
+
+  const computeApproxBirthDate = (num, unit) => {
+    const n = Math.max(1, parseInt(num || '1', 10));
+    const d = new Date();
+    if (unit === 'months') d.setMonth(d.getMonth() - n);
+    else d.setFullYear(d.getFullYear() - n);
+    return d.toISOString().slice(0, 10);
+  };
 
   // Pay pending order modal state
   const [payModalOrder, setPayModalOrder] = useState(null);
@@ -450,12 +521,18 @@ const CustomerPortal = () => {
 
   // Open dog modal for create or edit
   const handleOpenDogModal = (dog = null) => {
+    setApproxAgeMode(false);
+    setApproxAgeNum('2');
+    setApproxAgeUnit('years');
     if (dog) {
       setEditingDog(dog);
       setDogForm({
         name: dog.name,
         weight: dog.weight,
-        age_stage: dog.age_stage || 'adulto',
+        age_stage: dog.computed_stage || dog.age_stage || 'adulto',
+        favorite_diet: dog.favorite_diet || 'barf',
+        birth_date: dog.birth_date || '',
+        birth_date_approx: Boolean(dog.birth_date_approx),
         notes: dog.notes || '',
         photo_url: dog.photo_url || ''
       });
@@ -465,6 +542,9 @@ const CustomerPortal = () => {
         name: '',
         weight: '',
         age_stage: 'adulto',
+        favorite_diet: 'barf',
+        birth_date: '',
+        birth_date_approx: false,
         notes: '',
         photo_url: ''
       });
@@ -477,17 +557,20 @@ const CustomerPortal = () => {
     e.preventDefault();
     setSavingDog(true);
     try {
+      const finalBirthDate = approxAgeMode
+        ? computeApproxBirthDate(approxAgeNum, approxAgeUnit)
+        : (dogForm.birth_date || null);
+      const payload = {
+        ...dogForm,
+        weight: parseFloat(dogForm.weight),
+        birth_date: finalBirthDate,
+        birth_date_approx: approxAgeMode ? true : Boolean(dogForm.birth_date_approx)
+      };
       if (editingDog) {
-        await updateDog(editingDog.id, {
-          ...dogForm,
-          weight: parseFloat(dogForm.weight)
-        });
+        await updateDog(editingDog.id, payload);
         notify('success', `Datos de ${dogForm.name} actualizados.`);
       } else {
-        await addDog({
-          ...dogForm,
-          weight: parseFloat(dogForm.weight)
-        });
+        await addDog(payload);
         notify('success', `¡${dogForm.name} registrado con éxito!`);
       }
       setIsDogModalOpen(false);
@@ -713,8 +796,9 @@ const CustomerPortal = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {dogs.map((dog) => {
-                  const dailyGrams = Math.round(dog.weight * 1000 * 0.025); // 2.5% de peso corporal
-                  const monthlyKilos = ((dailyGrams * 30) / 1000).toFixed(1);
+                  const nut = getDogNutritionProfile(dog);
+                  const dailyGrams = nut.dailyGrams;
+                  const monthlyKilos = nut.monthlyKilos;
 
                   return (
                     <div 
@@ -775,12 +859,20 @@ const CustomerPortal = () => {
                             </div>
 
                             <div>
-                              <h3 className="font-header text-2xl text-secondary-brown font-bold tracking-tight">
-                                {dog.name}
+                              <h3 className="font-header text-2xl text-secondary-brown font-bold tracking-tight flex items-center gap-1.5">
+                                <span>{dog.name}</span>
+                                {dog.days_to_birthday !== null && dog.days_to_birthday !== undefined && dog.days_to_birthday <= 7 && (
+                                  <span className="text-base" title={dog.days_to_birthday === 0 ? '¡Hoy es su cumpleaños!' : `Cumple años en ${dog.days_to_birthday} días`}>🎂</span>
+                                )}
                               </h3>
-                              <span className="text-xs font-bold px-2.5 py-0.5 bg-primary-green/10 text-primary-green-dark rounded-full capitalize border border-primary-green/20">
-                                {dog.age_stage === 'adult_low' ? 'Adulto / Senior' : dog.age_stage || 'Adulto'}
-                              </span>
+                              <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                <span className="text-xs font-bold px-2.5 py-0.5 bg-primary-green/10 text-primary-green-dark rounded-full border border-primary-green/20">
+                                  {nut.ageLabel ? `${nut.ageLabel} · ${nut.stageLabel}` : nut.stageLabel}
+                                </span>
+                                <span className="text-[10px] font-bold px-2 py-0.5 bg-stone-100 text-stone-600 rounded-full">
+                                  {nut.dietLabel}
+                                </span>
+                              </div>
                             </div>
                           </div>
 
@@ -812,9 +904,33 @@ const CustomerPortal = () => {
                           <div className="pl-2">
                             <p className="text-[11px] text-primary-green font-bold uppercase tracking-wider">Porción Diaria</p>
                             <p className="text-2xl font-extrabold text-primary-green mt-0.5">~{dailyGrams} g</p>
-                            <p className="text-[10px] text-stone-400 mt-0.5">2.5% diario (~{monthlyKilos} kg/mes)</p>
+                            <p className="text-[10px] text-stone-400 mt-0.5">{nut.pct}% {nut.dietLabel} (~{monthlyKilos} kg/mes)</p>
                           </div>
                         </div>
+
+                        {/* Recordatorio inteligente: actualizar peso en cachorros */}
+                        {dog.needs_weight_update && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDogModal(dog)}
+                            className="w-full mb-2 px-3 py-2 bg-amber-50 hover:bg-amber-100/80 border border-amber-200 rounded-xl text-[11px] text-amber-900 flex items-center justify-between gap-2 text-left transition cursor-pointer"
+                          >
+                            <span>🐾 <strong>¡Los cachorros crecen rápido!</strong> ¿Subió de peso este mes? Actualízalo para recalcular su porción.</span>
+                            <span className="font-bold underline shrink-0">Actualizar</span>
+                          </button>
+                        )}
+
+                        {/* Aviso suave si aún no tiene fecha de nacimiento */}
+                        {!dog.birth_date && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDogModal(dog)}
+                            className="w-full mb-2 px-3 py-2 bg-primary-green/5 hover:bg-primary-green/10 border border-primary-green/20 rounded-xl text-[11px] text-primary-green-dark flex items-center justify-between gap-2 text-left transition cursor-pointer"
+                          >
+                            <span>🎂 Agrega la <strong>fecha de nacimiento</strong> de {dog.name} para ajustar su ración automáticamente al crecer.</span>
+                            <span className="font-bold underline shrink-0">Agregar</span>
+                          </button>
+                        )}
 
                         <div className="text-[11px] text-stone-500 flex items-center justify-center gap-1.5 py-1">
                           <ShieldCheck size={14} className="text-primary-green" />
@@ -1366,17 +1482,85 @@ const CustomerPortal = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-stone-700 mb-1">Etapa de Vida</label>
+                    <label className="block text-xs font-bold text-stone-700 mb-1">Dieta Habitual</label>
                     <select
-                      value={dogForm.age_stage}
-                      onChange={(e) => setDogForm({ ...dogForm, age_stage: e.target.value })}
+                      value={dogForm.favorite_diet || 'barf'}
+                      onChange={(e) => setDogForm({ ...dogForm, favorite_diet: e.target.value })}
                       className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white cursor-pointer"
                     >
-                      <option value="adulto">Adulto</option>
-                      <option value="cachorro">Cachorro</option>
-                      <option value="adult_low">Adulto / Senior</option>
+                      <option value="barf">BARF Cruda</option>
+                      <option value="cocinada">Cocinada al Vapor</option>
                     </select>
                   </div>
+                </div>
+
+                {/* Fecha de Nacimiento (calcula edad y etapa automáticamente) */}
+                <div className="p-3.5 bg-[#FAF7F2] rounded-2xl border border-[#EBE4DA] space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-xs font-bold text-stone-700">
+                      🎂 Fecha de Nacimiento
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setApproxAgeMode((v) => !v)}
+                      className="text-[11px] font-bold text-primary-green hover:underline cursor-pointer"
+                    >
+                      {approxAgeMode ? 'Ingresar fecha exacta' : '¿No sabes la fecha exacta?'}
+                    </button>
+                  </div>
+
+                  {approxAgeMode ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="25"
+                        value={approxAgeNum}
+                        onChange={(e) => setApproxAgeNum(e.target.value)}
+                        className="border border-stone-300 rounded-xl p-2.5 text-sm bg-white outline-none"
+                        placeholder="Ej. 3"
+                      />
+                      <select
+                        value={approxAgeUnit}
+                        onChange={(e) => setApproxAgeUnit(e.target.value)}
+                        className="border border-stone-300 rounded-xl p-2.5 text-sm bg-white outline-none cursor-pointer"
+                      >
+                        <option value="months">Meses aprox.</option>
+                        <option value="years">Años aprox.</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <input
+                      type="date"
+                      max={new Date().toISOString().slice(0, 10)}
+                      value={dogForm.birth_date || ''}
+                      onChange={(e) => setDogForm({ ...dogForm, birth_date: e.target.value, birth_date_approx: false })}
+                      className="w-full border border-stone-300 rounded-xl p-2.5 focus:ring-2 focus:ring-primary-green outline-none text-sm bg-white"
+                    />
+                  )}
+
+                  {(() => {
+                    const previewDate = approxAgeMode
+                      ? computeApproxBirthDate(approxAgeNum, approxAgeUnit)
+                      : dogForm.birth_date;
+                    if (!previewDate) {
+                      return (
+                        <p className="text-[11px] text-stone-500">
+                          Calculamos automáticamente si es Cachorro, Adulto o Senior y ajustamos su ración a medida que crece.
+                        </p>
+                      );
+                    }
+                    const prev = getDogNutritionProfile({
+                      weight: parseFloat(dogForm.weight) || 10,
+                      favorite_diet: dogForm.favorite_diet,
+                      birth_date: previewDate
+                    });
+                    return (
+                      <div className="text-[11px] text-primary-green-dark bg-primary-green/10 px-3 py-1.5 rounded-xl font-semibold">
+                        ✨ Detectado: <strong>{prev.ageLabel || prev.stageLabel}</strong> ({prev.stageLabel}) · Porción estimada <strong>{prev.pct}%</strong> ({prev.dietLabel})
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div>
