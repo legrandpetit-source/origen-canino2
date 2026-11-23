@@ -285,12 +285,23 @@ export const generateCouponStoryDataUrl = async (
   ctx.restore();
 
   // 5. Bloque Editorial Principal (UNA sola fuente: Outfit)
+  const scopeEyebrowMap = {
+    all: 'BENEFICIO EXCLUSIVO · DIETA BARF Y COMIDA COCINADA',
+    diets: 'BENEFICIO EXCLUSIVO · DIETA BARF Y COMIDA COCINADA',
+    barf: 'BENEFICIO EXCLUSIVO · DIETA BARF CRUDA 100% NATURAL',
+    cocinada: 'BENEFICIO EXCLUSIVO · ALIMENTACIÓN NATURAL COCINADA',
+    snack: 'BENEFICIO EXCLUSIVO · SNACKS NATURALES DESHIDRATADOS'
+  };
+  const eyebrowTxt =
+    scopeEyebrowMap[String(coupon.applicable_scope || 'all').toLowerCase()] ||
+    scopeEyebrowMap.all;
+
   ctx.textAlign = 'left';
   ctx.fillStyle = theme.accentColor;
-  ctx.font = '700 26px "Outfit", sans-serif';
-  ctx.fillText('BENEFICIO EXCLUSIVO · COMIDA REAL 100% NATURAL', SAFE, 932);
+  ctx.font = '700 25px "Outfit", sans-serif';
+  ctx.fillText(eyebrowTxt, SAFE, 930);
 
-  // Beneficio protagonista gigante
+  // Beneficio protagonista gigante (sin repetir el % abajo)
   const val = Number(coupon.discount_value || 0);
   const benefitBig =
     coupon.discount_type === 'percentage'
@@ -298,12 +309,24 @@ export const generateCouponStoryDataUrl = async (
       : `$${Math.round(val).toLocaleString('es-CL')} OFF`;
   ctx.fillStyle = theme.titleColor;
   ctx.font = '900 144px "Outfit", sans-serif';
-  ctx.fillText(benefitBig, SAFE, 1072);
+  ctx.fillText(benefitBig, SAFE, 1068);
 
-  // Descripción limpia (máx 2 líneas)
+  // Bajada clara explicando el producto (2 líneas limpias, jamás muestra notas internas ni repite %)
+  const defaultProductCopyMap = {
+    all: 'Dieta BARF cruda y alimentación natural cocinada al vapor para tu perro. Sin harinas ni ultraprocesados.',
+    diets: 'Dieta BARF cruda y alimentación natural cocinada al vapor para tu perro. Sin harinas ni ultraprocesados.',
+    barf: 'Dieta BARF cruda biológicamente apropiada con carnes, huesos carnosos y vegetales reales.',
+    cocinada: 'Alimentación natural cocinada suavemente al vapor, ideal para estómagos sensibles y fácil digestión.',
+    snack: 'Snacks 100% naturales deshidratados a baja temperatura y caldos de huesos para tu perro.'
+  };
+  const desc = (
+    (options.customSubtitle || '').trim() ||
+    defaultProductCopyMap[String(coupon.applicable_scope || 'all').toLowerCase()] ||
+    defaultProductCopyMap.all
+  );
+
   ctx.fillStyle = theme.subColor;
-  ctx.font = '500 34px "Outfit", sans-serif';
-  const desc = (coupon.description || 'Dietas BARF crudas y recetas cocinadas al vapor para tu perro.').trim();
+  ctx.font = '500 32px "Outfit", sans-serif';
   const words = desc.split(/\s+/).filter(Boolean);
   const descLines = [];
   let curLine = '';
@@ -318,7 +341,7 @@ export const generateCouponStoryDataUrl = async (
     }
   }
   if (curLine && descLines.length < 2) descLines.push(curLine);
-  descLines.forEach((ln, idx) => ctx.fillText(ln, SAFE, 1138 + idx * 44));
+  descLines.forEach((ln, idx) => ctx.fillText(ln, SAFE, 1134 + idx * 42));
 
   // Separador fino
   const sepY = 1236;

@@ -98,10 +98,11 @@ export default function PromotionsManager({ fetchWithAuth }) {
   const [shareTheme, setShareTheme] = useState('olive');
   const [storyPreviewUrl, setStoryPreviewUrl] = useState('');
   const [customStoryHero, setCustomStoryHero] = useState(null);
+  const [customStorySubtitle, setCustomStorySubtitle] = useState('');
   const [downloadingAsset, setDownloadingAsset] = useState(false);
   const shareQrRef = useRef(null);
 
-  // Vista previa en vivo de la Tarjeta Story cuando cambia el cupón, el tema o la foto
+  // Vista previa en vivo de la Tarjeta Story cuando cambia el cupón, el tema, la foto o el texto
   useEffect(() => {
     if (!shareCoupon) {
       setStoryPreviewUrl('');
@@ -112,7 +113,8 @@ export default function PromotionsManager({ fetchWithAuth }) {
       try {
         const svgEl = shareQrRef.current?.querySelector('svg');
         const url = await generateCouponStoryDataUrl(shareCoupon, svgEl, shareTheme, {
-          customHeroSrc: customStoryHero
+          customHeroSrc: customStoryHero,
+          customSubtitle: customStorySubtitle
         });
         if (!cancelled) setStoryPreviewUrl(url);
       } catch (err) {
@@ -123,7 +125,7 @@ export default function PromotionsManager({ fetchWithAuth }) {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [shareCoupon, shareTheme, customStoryHero]);
+  }, [shareCoupon, shareTheme, customStoryHero, customStorySubtitle]);
 
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState(null);
@@ -685,6 +687,7 @@ export default function PromotionsManager({ fetchWithAuth }) {
                         onClick={() => {
                           setShareCoupon(coupon);
                           setShareTheme(coupon.story_theme || 'olive');
+                          setCustomStorySubtitle('');
                         }}
                         className="px-3 py-1.5 bg-[#677333]/10 hover:bg-[#677333] text-[#4E5824] hover:text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                         title="Generar Link, QR y Tarjeta Story para WhatsApp/Instagram"
@@ -1634,6 +1637,19 @@ export default function PromotionsManager({ fetchWithAuth }) {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-stone-600 uppercase text-[10px] tracking-wider block mb-1">
+                    Texto descriptivo en la Story (Opcional — por defecto explica BARF y Cocinada)
+                  </label>
+                  <input
+                    type="text"
+                    value={customStorySubtitle}
+                    onChange={(e) => setCustomStorySubtitle(e.target.value)}
+                    placeholder="Dieta BARF cruda y alimentación natural cocinada al vapor para tu perro..."
+                    className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-700 outline-none focus:ring-2 focus:ring-[#677333]/30"
+                  />
                 </div>
 
                 <label className="flex items-center justify-between gap-2 p-2.5 bg-[#FAF7F2] hover:bg-[#F2ECE1] border border-[#E6DCCB] rounded-xl cursor-pointer transition">
